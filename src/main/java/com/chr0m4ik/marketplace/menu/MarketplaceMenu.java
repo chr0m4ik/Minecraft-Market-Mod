@@ -8,6 +8,7 @@ import com.chr0m4ik.marketplace.economy.TraderService;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
+import com.chr0m4ik.marketplace.price.ItemPrices;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -58,6 +59,9 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	/** С какого места в данных начинаются минуты до конца продажи по каждой ячейке. */
 	private static final int CELL_DATA_START = 10;
 
+	/** Где лежат номер страницы магазина, всего страниц и номер раздела. */
+	private static final int PAGE_DATA = 10;
+
 	/** С какого места начинаются наценки по ячейкам. */
 	private static final int CELL_MARKUP_START = 10 + MarketService.SLOTS;
 
@@ -91,6 +95,18 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Кнопки меню разделов магазина: выход снизу, разделы — в средней строке (9…17). */
 	public static final int BUY_SLOT_EXIT = 22;
 	public static final int BUY_SLOT_FIRST_CATEGORY = 9;
+
+	/** Кнопки списка товаров: выход, предыдущая и следующая страницы. */
+	public static final int BUY_LIST_EXIT = 45;
+	public static final int BUY_LIST_PREV = 47;
+	public static final int BUY_LIST_NEXT = 51;
+
+	/** Кнопки окна покупки: выход, количество, сам предмет, выдача, подтверждение. */
+	public static final int BUY_ITEM_BACK = 9;
+	public static final int BUY_ITEM_QUANTITY = 11;
+	public static final int BUY_ITEM_PREVIEW = 13;
+	public static final int BUY_ITEM_DROP = 15;
+	public static final int BUY_ITEM_CONFIRM = 17;
 
 	/** Кнопка «Назад» в окнах-заготовках. */
 	public static final int BACK_SLOT = 49;
@@ -147,6 +163,23 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.updateData();
 		this.fillButtons();
 		this.loadMarketCells();
+		this.loadShopPage();
+	}
+
+	/** Заполняет ячейки окна списка товарами текущей страницы раздела. */
+	private void loadShopPage() {
+		if (this.serverPlayer == null || this.kind != WindowKind.BUY_LIST) {
+			return;
+		}
+
+		MarketService.ShopState shop = MarketService.shop(this.serverPlayer.getUUID());
+		ShopCatalog.Category[] categories = ShopCatalog.Category.values();
+		ShopCatalog.Category category = categories[Math.max(0, Math.min(shop.category(), categories.length - 1))];
+		List<ItemStack> page = ShopCatalog.page(category, shop.page());
+
+		for (int i = 0; i < this.kind.tradeSlots(); i++) {
+			this.tradeContainer.setItem(i, i < page.size() ? page.get(i).copy() : ItemStack.EMPTY);
+		}
 	}
 	private void loadMarketCells() {
 		if (this.serverPlayer == null || !this.hasMarketCells()) {
@@ -379,7 +412,49 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
+		if (this.kind == WindowKind.BUY_LIST) {
+			this.setButton(BUY_LIST_EXIT, Items.BARRIER, "marketplace.gui.button.exit");
+			this.setButton(BUY_LIST_PREV, Items.SPECTRAL_ARROW, "marketplace.gui.button.prevPage");
+			this.setButton(BUY_LIST_NEXT, Items.ARROW, "marketplace.gui.button.nextPage");
+			return;
+		}
+
+		if (this.kind == WindowKind.BUY_ITEM) {
+			this.setButton(BUY_ITEM_BACK, Items.BARRIER, "marketplace.gui.button.back");
+			this.updateShopButtons();
+			return;
+		}
+
 		this.setButton(BACK_SLOT, Items.ARROW, "marketplace.gui.button.back");
+	}
+
+	/** Кнопки окна покупки: количество, сам предмет, выдача и подтверждение. */
+	private void updateShopButtons() {
+		if (this.serverPlayer == null) {
+			return;
+		}
+
+		MarketService.ShopState shop = MarketService.shop(this.serverPlayer.getUUID());
+		ItemStack quantity = new ItemStack(Items.REPEATER);
+		quantity.set(DataComponents.CUSTOM_NAME, Component.translatable("marketplace.gui.button.quantity",
+				Component.literal(shop.quantityText())));
+		quantity.set(DataComponents.LORE, new ItemLore(List.of(
+				Component.translatable("marketplace.gui.button.quantity.hint").withStyle(ChatFormatting.GRAY))));
+		this.setButtonStack(BUY_ITEM_QUANTITY, quantity);
+
+		// Сам предмет: только для показа, брать его нельзя.
+		this.setButtonStack(BUY_ITEM_PREVIEW, shop.selected().copy());
+
+		ItemStack drop = new ItemStack(Items.DISPENSER);
+		drop.set(DataComponents.CUSTOM_NAME, Component.translatable(shop.drop()
+				? "marketplace.gui.button.drop.ground" : "marketplace.gui.button.drop.inventory"));
+
+		if (shop.drop()) {
+			drop.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
+		}
+
+		this.setButtonStack(BUY_ITEM_DROP, drop);
+		this.setButton(BUY_ITEM_CONFIRM, Items.EMERALD, "marketplace.gui.button.buy");
 	}
 
 	/** Кладёт готовый предмет-кнопку в системный слот (номер — как его видит игрок). */
@@ -471,6 +546,13 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
+		// Клик по товару в списке: выбираем предмет и открываем окно покупки.
+		if (this.kind == WindowKind.BUY_LIST && input == ContainerInput.PICKUP && button == 0
+				&& slotId >= 0 && slotId < this.kind.tradeSlots()) {
+			this.selectShopItem(player, slotId);
+			return;
+		}
+
 		// Shift-клик по ячейке рынка: забрать предмет или снять ордер.
 		if (input == ContainerInput.QUICK_MOVE && this.hasMarketCells()
 				&& slotId >= 0 && slotId < this.kind.tradeSlots()) {
@@ -556,6 +638,41 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				this.buyNextSlot(serverPlayer);
 			} else if (slotId == SLOT_WINDOW_CANCEL) {
 				MarketplaceMenus.open(serverPlayer, WindowKind.SELL);
+			}
+
+			return;
+		}
+
+		if (this.kind == WindowKind.BUY_LIST) {
+			if (slotId == BUY_LIST_EXIT) {
+				MarketplaceMenus.open(serverPlayer, WindowKind.BUY);
+			} else if (slotId == BUY_LIST_PREV) {
+				this.turnShopPage(serverPlayer, -1);
+			} else if (slotId == BUY_LIST_NEXT) {
+				this.turnShopPage(serverPlayer, 1);
+			}
+
+			return;
+		}
+
+		if (this.kind == WindowKind.BUY_ITEM) {
+			MarketService.ShopState shop = MarketService.shop(serverPlayer.getUUID());
+
+			if (slotId == BUY_ITEM_BACK) {
+				// Возврат к списку: количество и способ выдачи сбрасываются.
+				MarketService.setShop(serverPlayer.getUUID(), shop.withQuantity(1).withDrop(false));
+				MarketplaceMenus.open(serverPlayer, WindowKind.BUY_LIST);
+			} else if (slotId == BUY_ITEM_QUANTITY) {
+				MarketService.setShop(serverPlayer.getUUID(),
+						shop.withQuantity(MarketService.nextQuantity(shop)));
+				this.updateShopButtons();
+				this.broadcastChanges();
+			} else if (slotId == BUY_ITEM_DROP) {
+				MarketService.setShop(serverPlayer.getUUID(), shop.withDrop(!shop.drop()));
+				this.updateShopButtons();
+				this.broadcastChanges();
+			} else if (slotId == BUY_ITEM_CONFIRM) {
+				this.buyShopItem(serverPlayer);
 			}
 
 			return;
@@ -683,7 +800,64 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 	}
 
-	/** Сообщение о том, что торговец больше не берёт столько за сегодня. */
+	/** Выбрали товар в списке: запоминаем предмет и открываем окно покупки. */
+	private void selectShopItem(Player player, int cell) {
+		if (!(player instanceof ServerPlayer serverPlayer)) {
+			return;
+		}
+
+		ItemStack stack = this.tradeContainer.getItem(cell);
+
+		if (stack.isEmpty()) {
+			return;
+		}
+
+		MarketService.setShop(serverPlayer.getUUID(), MarketService.shop(serverPlayer.getUUID()).withSelected(stack.copy()));
+		MarketplaceMenus.open(serverPlayer, WindowKind.BUY_ITEM);
+	}
+
+	/** Перелистывание страниц списка товаров (без переоткрытия окна). */
+	private void turnShopPage(ServerPlayer player, int delta) {
+		MarketService.ShopState shop = MarketService.shop(player.getUUID());
+		ShopCatalog.Category[] categories = ShopCatalog.Category.values();
+		ShopCatalog.Category category = categories[Math.max(0, Math.min(shop.category(), categories.length - 1))];
+		int pages = ShopCatalog.pages(category);
+		int page = Math.floorMod(shop.page() + delta, pages);
+		MarketService.setShop(player.getUUID(), shop.withPage(page));
+		this.loadShopPage();
+		this.updateData();
+		this.broadcastChanges();
+	}
+
+	/** Покупка выбранного предмета. Окно не закрывается — можно покупать дальше. */
+	private void buyShopItem(ServerPlayer player) {
+		MinecraftServer server = player.level().getServer();
+
+		if (server == null) {
+			return;
+		}
+
+		MarketService.ShopState shop = MarketService.shop(player.getUUID());
+		double cost = MoneyFormat.round(ItemPrices.priceOf(shop.selected()) * shop.count()
+				* ItemPrices.BUY_MULTIPLIER);
+
+		if (MarketService.buy(server, player, shop)) {
+			player.sendSystemMessage(Component.translatable("marketplace.gui.buy.bought",
+					Component.literal(String.valueOf(shop.count())), shop.selected().getHoverName(),
+					money(player.isCreative() ? 0.0 : cost)).withStyle(ChatFormatting.GREEN));
+		} else {
+			player.sendSystemMessage(Component.translatable("marketplace.gui.buy.noMoney", money(cost))
+					.withStyle(ChatFormatting.RED));
+		}
+
+		this.updateData();
+		this.broadcastChanges();
+	}
+
+	/** Выбрали товар в списке: запоминаем предмет и открываем окно покупки. */
+	private void selectShopItemPlaceholder() {
+		// Заглушка не нужна: метод selectShopItem(Player, int) объявлен ниже.
+	}
 	private static void sendLimitMessage(ServerPlayer player) {
 		player.sendSystemMessage(Component.translatable("marketplace.gui.trader.limit")
 				.withStyle(ChatFormatting.RED));
@@ -798,6 +972,17 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.data.set(8, (int) Math.round(state.markup(playerId) * 100.0));
 		this.data.set(9, MarketService.unlockedSlots(state, playerId));
 
+		if (this.kind == WindowKind.BUY_LIST) {
+			// Данные для надписи «страница X из Y» справа вверху.
+			MarketService.ShopState shop = MarketService.shop(playerId);
+			ShopCatalog.Category[] categories = ShopCatalog.Category.values();
+			ShopCatalog.Category category = categories[Math.max(0, Math.min(shop.category(), categories.length - 1))];
+			this.data.set(PAGE_DATA, shop.page() + 1);
+			this.data.set(PAGE_DATA + 1, ShopCatalog.pages(category));
+			this.data.set(PAGE_DATA + 2, shop.category());
+			return;
+		}
+
 		if (this.kind != WindowKind.SELL) {
 			return;
 		}
@@ -865,6 +1050,16 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	private double money(int index) {
 		long cents = ((long) this.data.get(index) << 32) | (this.data.get(index + 1) & 0xFFFFFFFFL);
 		return cents / 100.0;
+	}
+
+	/** Номер текущей страницы магазина (с единицы). */
+	public int getShopPage() {
+		return this.data.get(PAGE_DATA);
+	}
+
+	/** Сколько всего страниц в разделе. */
+	public int getShopPages() {
+		return Math.max(1, this.data.get(PAGE_DATA + 1));
 	}
 
 	/** Баланс, который видит клиент (в долларах). */

@@ -100,4 +100,15 @@
 	"marketplace.gui.category.count": "Items: %s",
 	"marketplace.gui.buy.list.title": "Shop — items",
 	"marketplace.gui.buy.item.title": "Buy an item"
+,	"marketplace.gui.button.prevPage": "Previous page",
+	"marketplace.gui.button.nextPage": "Next page",
+	"marketplace.gui.button.quantity": "Amount: %s stacks",
+	"marketplace.gui.button.quantity.hint": "Click to change the amount",
+	"marketplace.gui.button.drop.inventory": "Give: to inventory",
+	"marketplace.gui.button.drop.ground": "Give: drop on the ground",
+	"marketplace.gui.buy.page": "Page %s of %s",
+	"marketplace.gui.buy.bought": "Bought: %s pcs — %s for %s",
+	"marketplace.gui.buy.noMoney": "Not enough money: the purchase costs %s",
+	"marketplace.tooltip.buy.unit": "Price per stack: %s",
+	"marketplace.tooltip.buy.total": "For all: %s"
 }

@@ -5,10 +5,13 @@ import com.chr0m4ik.marketplace.economy.MarketplaceState;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Prediction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -150,5 +153,124 @@ public final class MarketService {
 		}
 
 		return MARKUPS[0];
+	}
+
+	// --- Магазин: выбор игрока и покупка ---
+
+	/** Сколько стаков можно выбрать в окне покупки (0 = половина стака). */
+	public static final int[] QUANTITIES = {0, 1, 2, 5, 10, 25};
+
+	/**
+	 * Что игрок выбрал в магазине: раздел, страница, предмет, количество и способ выдачи.
+	 * Хранится в памяти: выбор не нужно сохранять в сейв, после перезапуска он сбрасывается.
+	 */
+	public record ShopState(int category, int page, ItemStack selected, int quantityIndex, boolean drop) {
+		public static ShopState initial() {
+			return new ShopState(0, 0, ItemStack.EMPTY, 1, false);
+		}
+
+		public ShopState withCategory(int value) {
+			return new ShopState(value, 0, ItemStack.EMPTY, 1, false);
+		}
+
+		public ShopState withPage(int value) {
+			return new ShopState(this.category, value, this.selected, this.quantityIndex, this.drop);
+		}
+
+		/** Выбрали предмет — количество и способ выдачи возвращаются к стандартным. */
+		public ShopState withSelected(ItemStack stack) {
+			return new ShopState(this.category, this.page, stack, 1, false);
+		}
+
+		public ShopState withQuantity(int value) {
+			return new ShopState(this.category, this.page, this.selected, value, this.drop);
+		}
+
+		public ShopState withDrop(boolean value) {
+			return new ShopState(this.category, this.page, this.selected, this.quantityIndex, value);
+		}
+
+		/** Сколько предметов покупаем: количество стаков × размер стака. */
+		public int count() {
+			if (this.selected.isEmpty()) {
+				return 0;
+			}
+
+			int maxStack = Math.max(1, this.selected.getItem().getDefaultMaxStackSize());
+			int stacks = QUANTITIES[Math.max(0, Math.min(this.quantityIndex, QUANTITIES.length - 1))];
+			return stacks == 0 ? Math.max(1, maxStack / 2) : stacks * maxStack;
+		}
+
+		/** Доступно ли «половина стака»: для нестакающихся предметов — нет. */
+		public boolean halfStackAllowed() {
+			return !this.selected.isEmpty() && this.selected.getItem().getDefaultMaxStackSize() > 1;
+		}
+
+		/** Надпись с количеством: «0.5», «1», «25». */
+		public String quantityText() {
+			int stacks = QUANTITIES[Math.max(0, Math.min(this.quantityIndex, QUANTITIES.length - 1))];
+			return stacks == 0 ? "0.5" : String.valueOf(stacks);
+		}
+	}
+
+	/** Выбор игрока в магазине. */
+	private static final Map<UUID, ShopState> SHOP = new HashMap<>();
+
+	public static ShopState shop(UUID playerId) {
+		return SHOP.getOrDefault(playerId, ShopState.initial());
+	}
+
+	public static void setShop(UUID playerId, ShopState state) {
+		SHOP.put(playerId, state);
+	}
+
+	/** Следующее количество по кругу; «половина стака» пропускается для нестакающихся. */
+	public static int nextQuantity(ShopState state) {
+		int next = state.quantityIndex();
+
+		for (int i = 0; i < QUANTITIES.length; i++) {
+			next = (next + 1) % QUANTITIES.length;
+
+			if (next != 0 || state.halfStackAllowed()) {
+				break;
+			}
+		}
+
+		return next;
+	}
+
+	/**
+	 * Покупка: списывает деньги и выдаёт предметы. В креативе покупка бесплатная.
+	 *
+	 * @return {@code false}, если денег не хватило
+	 */
+	public static boolean buy(MinecraftServer server, ServerPlayer player, ShopState state) {
+		if (state.selected().isEmpty()) {
+			return false;
+		}
+
+		int count = state.count();
+		double cost = MoneyFormat.round(ItemPrices.priceOf(state.selected()) * count * ItemPrices.BUY_MULTIPLIER);
+
+		if (!player.isCreative() && !MarketplaceEconomy.trySpend(server, player.getUUID(), cost)) {
+			return false;
+		}
+
+		int maxStack = Math.max(1, state.selected().getItem().getDefaultMaxStackSize());
+		int left = count;
+
+		while (left > 0) {
+			int part = Math.min(left, maxStack);
+			ItemStack stack = state.selected().copyWithCount(part);
+			left -= part;
+
+			if (state.drop()) {
+				player.drop(stack, false, Prediction.SERVER_ONLY);
+			} else {
+				player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+			}
+		}
+
+		return true;
 	}
 }

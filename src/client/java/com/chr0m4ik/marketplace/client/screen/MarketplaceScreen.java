@@ -90,6 +90,16 @@ public class MarketplaceScreen extends AbstractContainerScreen<MarketplaceMenu> 
 	public void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 		super.extractContents(graphics, mouseX, mouseY, partialTick);
 		this.extractMoneyPlate(graphics);
+
+		// Справа вверху — номер страницы магазина.
+		if (this.menu.getKind() == WindowKind.BUY_LIST) {
+			Component page = Component.translatable("marketplace.gui.buy.page",
+					Component.literal(String.valueOf(this.menu.getShopPage())),
+					Component.literal(String.valueOf(this.menu.getShopPages())));
+			int width = this.font.width(page);
+			graphics.text(this.font, page, this.leftPos + this.imageWidth - width - 8, this.topPos + 6,
+					0x404040, false);
+		}
 	}
 
 	/**

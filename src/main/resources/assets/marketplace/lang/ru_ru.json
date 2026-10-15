@@ -100,4 +100,15 @@
 	"marketplace.gui.category.count": "Предметов: %s",
 	"marketplace.gui.buy.list.title": "Магазин — товары",
 	"marketplace.gui.buy.item.title": "Покупка предмета"
+,	"marketplace.gui.button.prevPage": "Предыдущая страница",
+	"marketplace.gui.button.nextPage": "Следующая страница",
+	"marketplace.gui.button.quantity": "Количество: %s стаков",
+	"marketplace.gui.button.quantity.hint": "Нажми, чтобы изменить количество",
+	"marketplace.gui.button.drop.inventory": "Выдать: в инвентарь",
+	"marketplace.gui.button.drop.ground": "Выдать: выбросить на землю",
+	"marketplace.gui.buy.page": "Страница %s из %s",
+	"marketplace.gui.buy.bought": "Куплено: %s шт. — %s за %s",
+	"marketplace.gui.buy.noMoney": "Не хватает денег: покупка стоит %s",
+	"marketplace.tooltip.buy.unit": "Цена за стак: %s",
+	"marketplace.tooltip.buy.total": "За всё: %s"
 }
