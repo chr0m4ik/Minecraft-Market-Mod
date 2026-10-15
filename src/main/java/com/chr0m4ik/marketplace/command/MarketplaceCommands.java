@@ -4,6 +4,7 @@ import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.menu.WindowKind;
+import com.chr0m4ik.marketplace.price.ItemPrices;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -13,10 +14,13 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.arguments.item.ItemArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionCheck;
 import net.minecraft.server.permissions.Permissions;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * Команды мода.
@@ -41,6 +45,7 @@ public final class MarketplaceCommands {
 
 	private static final String ARG_PLAYER = "player";
 	private static final String ARG_AMOUNT = "amount";
+	private static final String ARG_ITEM = "item";
 
 	public static void register() {
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -67,10 +72,15 @@ public final class MarketplaceCommands {
 					.then(moneySet)
 					.then(moneyAdd);
 
+			LiteralArgumentBuilder<CommandSourceStack> price = Commands.literal("price")
+					.then(Commands.argument(ARG_ITEM, ItemArgument.item(registryAccess))
+							.executes(MarketplaceCommands::showPrice));
+
 			dispatcher.register(Commands.literal("market")
 					.executes(MarketplaceCommands::openMainMenu)
 					.then(Commands.literal("help")
 							.executes(MarketplaceCommands::showHelp))
+					.then(price)
 					.then(money));
 		});
 	}
@@ -88,6 +98,8 @@ public final class MarketplaceCommands {
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.header")
 				.withStyle(ChatFormatting.GOLD), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.open")
+				.withStyle(ChatFormatting.GRAY), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.help.price")
 				.withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.money.get")
 				.withStyle(ChatFormatting.GRAY), false);
@@ -151,5 +163,35 @@ public final class MarketplaceCommands {
 	/** Сумма в виде цветного текста — так её видно в сообщении. */
 	private static Component money(double amount) {
 		return Component.literal(MoneyFormat.format(amount)).withStyle(ChatFormatting.GREEN);
+	}
+
+	/** {@code /market price <предмет>} — показать цену предмета. */
+	private static int showPrice(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		CommandSourceStack source = context.getSource();
+		ItemStack stack = ItemArgument.getItem(context, ARG_ITEM).createItemStack(1);
+		Item item = stack.getItem();
+		double price = ItemPrices.priceOf(item);
+
+		source.sendSuccess(() -> Component.translatable("marketplace.command.price.item",
+				stack.getHoverName(), money(price)).withStyle(ChatFormatting.GOLD), false);
+
+		if (ItemPrices.isBuyable(item)) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.price.buy",
+					money(price * ItemPrices.BUY_MULTIPLIER)), false);
+		} else {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.price.cannotBuy")
+					.withStyle(ChatFormatting.GRAY), false);
+		}
+
+		source.sendSuccess(() -> Component.translatable("marketplace.command.price.sell",
+				money(price), money(price * ItemPrices.MAX_MARKET_MARKUP),
+				money(price * ItemPrices.TRADER_MULTIPLIER)), false);
+
+		if (!ItemPrices.isLoaded()) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.price.notLoaded")
+					.withStyle(ChatFormatting.RED), false);
+		}
+
+		return 1;
 	}
 }

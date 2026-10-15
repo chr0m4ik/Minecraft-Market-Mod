@@ -14,6 +14,10 @@ logs/
 lastest.md
 .dsh/
 
+# Отчёты генератора прайса (пересоздаются командой node tools/generate-prices.js)
+tools/leftovers.txt
+tools/craft-cheats.txt
+
 # Мусор IDE
 *.iml
 .idea/

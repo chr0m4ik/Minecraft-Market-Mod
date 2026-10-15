@@ -14,6 +14,7 @@
 
 	"marketplace.command.help.header": "Minecraft Marketplace — commands:",
 	"marketplace.command.help.open": "/market — open the market menu",
+	"marketplace.command.help.price": "/market price <item> — show the price of an item",
 	"marketplace.command.help.money.get": "/market money get [player] — show balance",
 	"marketplace.command.help.money.set": "/market money set <player> <amount> — set balance",
 	"marketplace.command.help.money.add": "/market money add <player> <amount> — change balance (negative amount subtracts)",
@@ -21,5 +22,11 @@
 	"marketplace.command.money.balance.self": "Your balance: %s",
 	"marketplace.command.money.balance.other": "%s's balance: %s",
 	"marketplace.command.money.set": "%s's balance set to %s",
-	"marketplace.command.money.changed": "%s's balance changed by %s. Now: %s"
+	"marketplace.command.money.changed": "%s's balance changed by %s. Now: %s",
+
+	"marketplace.command.price.item": "%s — base price %s",
+	"marketplace.command.price.buy": "Buy for: %s",
+	"marketplace.command.price.cannotBuy": "Not for sale — sell only",
+	"marketplace.command.price.sell": "Sell: market %s (up to %s with markup), trader %s",
+	"marketplace.command.price.notLoaded": "Price list is not loaded, prices unknown"
 }
