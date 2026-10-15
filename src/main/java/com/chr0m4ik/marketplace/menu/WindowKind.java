@@ -23,8 +23,8 @@ public enum WindowKind {
 	TRADER("marketplace.gui.trader.title", 6, 139, 222, 45, false),
 	/** Рынок: 45 ячеек под ордера + системная строка с кнопками. */
 	SELL("marketplace.gui.sell.title", 6, 139, 222, 45, false),
-	/** Подтверждение ордеров: те же 45 ячеек, но только для показа, плюс кнопки. */
-	CONFIRM("marketplace.gui.confirm.title", 6, 139, 222, 45, true),
+	/** Подтверждение ордеров: 9×3 как у сундука, три кнопки по центру. */
+	CONFIRM("marketplace.gui.confirm.title", 3, 84, 167, 0, false),
 	/** Покупка слота: 9×3, одни кнопки. */
 	BUY_SLOT("marketplace.gui.slot.title", 3, 84, 167, 0, false),
 	/** Покупка: 9×5 предметов + системная строка (пока заготовка). */

@@ -19,11 +19,11 @@ public class MarketSlot extends Slot {
 
 	@Override
 	public boolean mayPlace(ItemStack stack) {
-		return this.menu.isCellUnlocked(this.getContainerSlot());
+		return this.menu.isCellUnlocked(this.getContainerSlot()) && !this.menu.isCellOrder(this.getContainerSlot());
 	}
 
 	@Override
 	public boolean mayPickup(Player player) {
-		return this.menu.isCellUnlocked(this.getContainerSlot());
+		return this.menu.isCellUnlocked(this.getContainerSlot()) && !this.menu.isCellOrder(this.getContainerSlot());
 	}
 }

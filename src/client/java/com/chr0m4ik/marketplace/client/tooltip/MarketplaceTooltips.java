@@ -66,21 +66,8 @@ public final class MarketplaceTooltips {
 			}
 
 			if (menu.getKind() == WindowKind.SELL) {
-				// В ячейке рынка: либо ордер (видно, сколько осталось), либо неподтверждённый предмет.
-				int cell = marketplace.getHoveredSlotIndex();
-				int minutes = menu.getCellMinutes(cell);
-
-				if (minutes >= 0) {
-					lines.add(Component.translatable("marketplace.tooltip.market.time", time(minutes))
-							.withStyle(ChatFormatting.AQUA));
-				} else if (!menu.isCellUnlocked(cell)) {
-					lines.add(Component.translatable("marketplace.gui.slot.locked")
-							.withStyle(ChatFormatting.RED));
-					return;
-				} else {
-					lines.add(Component.translatable("marketplace.tooltip.market.staged")
-							.withStyle(ChatFormatting.GRAY));
-				}
+				addMarketCellLines(lines, marketplace, menu, stack);
+				return;
 			}
 
 			if (menu.getKind() == WindowKind.TRADER) {
@@ -90,6 +77,38 @@ public final class MarketplaceTooltips {
 		}
 
 		addBasePriceLines(lines, stack);
+	}
+
+	/** Подсказка для ячейки рынка: обычная цена, наценка и время до продажи. */
+	private static void addMarketCellLines(List<Component> lines, MarketplaceScreen screen,
+			MarketplaceMenu menu, ItemStack stack) {
+		int cell = screen.getHoveredSlotIndex();
+
+		if (!menu.isCellUnlocked(cell)) {
+			lines.add(Component.translatable("marketplace.gui.slot.locked").withStyle(ChatFormatting.RED));
+			return;
+		}
+
+		int minutes = menu.getCellMinutes(cell);
+
+		if (minutes >= 0) {
+			lines.add(Component.translatable("marketplace.tooltip.market.time", time(minutes))
+					.withStyle(ChatFormatting.AQUA));
+		} else if (!stack.isEmpty()) {
+			lines.add(Component.translatable("marketplace.tooltip.market.staged").withStyle(ChatFormatting.GRAY));
+		}
+
+		addBasePriceLines(lines, stack);
+
+		// Если предмет выставлен с наценкой — показываем и обычную цену, и итоговую.
+		double markup = menu.getCellMarkup(cell);
+
+		if (markup > 1.001) {
+			lines.add(Component.translatable("marketplace.tooltip.market.markedUp", markup(markup),
+					money(ItemPrices.priceOf(stack) * markup)).withStyle(ChatFormatting.GOLD));
+		}
+
+		lines.add(Component.translatable("marketplace.tooltip.market.take").withStyle(ChatFormatting.DARK_GRAY));
 	}
 
 	/** Обычная цена: так платят рынок и покупка. */
