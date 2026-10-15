@@ -6,6 +6,7 @@ import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.menu.WindowKind;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -16,6 +17,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.item.ItemArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionCheck;
 import net.minecraft.server.permissions.Permissions;
@@ -46,6 +48,7 @@ public final class MarketplaceCommands {
 	private static final String ARG_PLAYER = "player";
 	private static final String ARG_AMOUNT = "amount";
 	private static final String ARG_ITEM = "item";
+	private static final String ARG_COUNT = "count";
 
 	public static void register() {
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -74,7 +77,9 @@ public final class MarketplaceCommands {
 
 			LiteralArgumentBuilder<CommandSourceStack> price = Commands.literal("price")
 					.then(Commands.argument(ARG_ITEM, ItemArgument.item(registryAccess))
-							.executes(MarketplaceCommands::showPrice));
+							.executes(MarketplaceCommands::showPrice)
+							.then(Commands.argument(ARG_COUNT, IntegerArgumentType.integer(1, 9999))
+									.executes(MarketplaceCommands::showPriceForCount)));
 
 			dispatcher.register(Commands.literal("market")
 					.executes(MarketplaceCommands::openMainMenu)
@@ -165,27 +170,41 @@ public final class MarketplaceCommands {
 		return Component.literal(MoneyFormat.format(amount)).withStyle(ChatFormatting.GREEN);
 	}
 
-	/** {@code /market price <предмет>} — показать цену предмета. */
+	/** {@code /market price <предмет>} — показать цену одного предмета. */
 	private static int showPrice(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		return sendPrice(context, 1);
+	}
+
+	/** {@code /market price <предмет> <количество>} — цена сразу нескольких штук. */
+	private static int showPriceForCount(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		return sendPrice(context, IntegerArgumentType.getInteger(context, ARG_COUNT));
+	}
+
+	private static int sendPrice(CommandContext<CommandSourceStack> context, int count) throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
 		ItemStack stack = ItemArgument.getItem(context, ARG_ITEM).createItemStack(1);
 		Item item = stack.getItem();
-		double price = ItemPrices.priceOf(item);
+		double unit = ItemPrices.priceOf(stack);
+		double total = unit * count;
 
-		source.sendSuccess(() -> Component.translatable("marketplace.command.price.item",
-				stack.getHoverName(), money(price)).withStyle(ChatFormatting.GOLD), false);
+		MutableComponent title = count == 1
+				? Component.translatable("marketplace.command.price.item", stack.getHoverName(), money(unit))
+				: Component.translatable("marketplace.command.price.itemCount", stack.getHoverName(),
+						Component.literal(String.valueOf(count)), money(total), money(unit));
+
+		source.sendSuccess(() -> title.withStyle(ChatFormatting.GOLD), false);
 
 		if (ItemPrices.isBuyable(item)) {
 			source.sendSuccess(() -> Component.translatable("marketplace.command.price.buy",
-					money(price * ItemPrices.BUY_MULTIPLIER)), false);
+					money(total * ItemPrices.BUY_MULTIPLIER)), false);
 		} else {
 			source.sendSuccess(() -> Component.translatable("marketplace.command.price.cannotBuy")
 					.withStyle(ChatFormatting.GRAY), false);
 		}
 
 		source.sendSuccess(() -> Component.translatable("marketplace.command.price.sell",
-				money(price), money(price * ItemPrices.MAX_MARKET_MARKUP),
-				money(price * ItemPrices.TRADER_MULTIPLIER)), false);
+				money(total), money(total * ItemPrices.MAX_MARKET_MARKUP),
+				money(total * ItemPrices.TRADER_MULTIPLIER)), false);
 
 		if (!ItemPrices.isLoaded()) {
 			source.sendSuccess(() -> Component.translatable("marketplace.command.price.notLoaded")

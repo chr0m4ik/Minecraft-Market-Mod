@@ -16,11 +16,15 @@ public final class MarketplaceNetworking {
 	}
 
 	public static void registerServer() {
-		// Регистрируем тип пакета: клиент → сервер.
+		// Клиент → сервер: «нажал клавишу, открой рынок».
 		PayloadTypeRegistry.serverboundPlay().register(OpenMarketplacePayload.TYPE, OpenMarketplacePayload.CODEC);
 
-		// И обработчик: открыть игроку главное меню рынка.
+		// Сервер → клиент: баланс и стоимость инвентаря для плашки на HUD.
+		PayloadTypeRegistry.clientboundPlay().register(MarketplaceStatusPayload.TYPE, MarketplaceStatusPayload.CODEC);
+
 		ServerPlayNetworking.registerGlobalReceiver(OpenMarketplacePayload.TYPE, (payload, context) ->
 				MarketplaceMenus.open(context.player(), WindowKind.MAIN));
+
+		MarketplaceStatusSync.register();
 	}
 }

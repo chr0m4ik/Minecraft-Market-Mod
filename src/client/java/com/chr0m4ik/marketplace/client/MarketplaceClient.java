@@ -1,19 +1,23 @@
 package com.chr0m4ik.marketplace.client;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
+import com.chr0m4ik.marketplace.client.hud.MoneyHudElement;
 import com.chr0m4ik.marketplace.client.screen.MarketplaceScreen;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
+import com.chr0m4ik.marketplace.network.MarketplaceStatusPayload;
 import com.chr0m4ik.marketplace.network.OpenMarketplacePayload;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.screens.MenuScreens;
 
 /**
- * Точка входа клиентской части. Здесь всё, что связано с экранами, клавишами и рендером.
+ * Точка входа клиентской части. Здесь всё, что связано с экранами, клавишами, HUD и рендером.
  */
 public class MarketplaceClient implements ClientModInitializer {
 	/** Своя группа в настройках управления, чтобы клавиша не терялась среди ванильных. */
@@ -35,9 +39,19 @@ public class MarketplaceClient implements ClientModInitializer {
 		MenuScreens.register(MarketplaceMenus.SELL, MarketplaceScreen::new);
 		MenuScreens.register(MarketplaceMenus.BUY, MarketplaceScreen::new);
 
+		// Плашка с деньгами поверх игры (правый верхний угол).
+		HudElementRegistry.addLast(MarketplaceMod.id("money"), new MoneyHudElement());
+
+		// Состояние с сервера: баланс и стоимость инвентаря.
+		ClientPlayNetworking.registerGlobalReceiver(MarketplaceStatusPayload.TYPE, (payload, context) ->
+				ClientMarketplaceStatus.update(payload.balanceCents(), payload.inventoryCents()));
+
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ClientMarketplaceStatus.clear());
+
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			while (openMenuKey.consumeClick()) {
-				if (client.player != null) {
+				// Отправляем только если сервер умеет принимать наш пакет.
+				if (client.player != null && ClientPlayNetworking.canSend(OpenMarketplacePayload.TYPE)) {
 					// Окно создаёт сервер — клиент только просит его открыть.
 					ClientPlayNetworking.send(new OpenMarketplacePayload());
 				}

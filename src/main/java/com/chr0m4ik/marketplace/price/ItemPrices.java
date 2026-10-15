@@ -6,12 +6,15 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -124,13 +127,40 @@ public final class ItemPrices {
 		return PRICES.getOrDefault(item, UNKNOWN_PRICE);
 	}
 
-	/** Базовая цена всего стака. */
+	/** Базовая цена всего стака, включая зачарования. */
 	public static double priceOf(ItemStack stack) {
 		if (stack.isEmpty()) {
 			return 0.0;
 		}
 
-		return priceOf(stack.getItem()) * stack.getCount();
+		double price = priceOf(stack.getItem()) * stack.getCount();
+
+		// Зачарования на самом предмете.
+		ItemEnchantments enchantments = stack.get(DataComponents.ENCHANTMENTS);
+
+		if (enchantments != null) {
+			price += EnchantmentPrices.valueOf(enchantments);
+		}
+
+		// Зачарования внутри книги.
+		ItemEnchantments stored = stack.get(DataComponents.STORED_ENCHANTMENTS);
+
+		if (stored != null) {
+			price += EnchantmentPrices.valueOf(stored);
+		}
+
+		return price;
+	}
+
+	/** Сколько стоит всё, что лежит в инвентаре игрока (по цене продажи за 1x). */
+	public static double priceOfInventory(Inventory inventory) {
+		double total = 0.0;
+
+		for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+			total += priceOf(inventory.getItem(slot));
+		}
+
+		return total;
 	}
 
 	/** Есть ли предмет в прайсе. */
