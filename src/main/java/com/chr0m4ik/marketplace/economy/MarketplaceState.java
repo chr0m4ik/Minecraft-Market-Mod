@@ -48,6 +48,10 @@ public class MarketplaceState extends SavedData {
 	private static final String PENDING_SALES_KEY = "pending_sales";
 	private static final String PENDING_COUNT_KEY = "count";
 	private static final String PENDING_TOTAL_KEY = "total";
+	/** Ключи для неподтверждённых предметов и выбранной наценки. */
+	private static final String STAGING_KEY = "staging";
+	private static final String STAGING_ITEM_KEY = "item";
+	private static final String MARKUP_KEY = "markup";
 
 	private final Map<UUID, Double> balances = new HashMap<>();
 	/** Игрок → (id предмета → сколько стаков уже сдано за день). */
@@ -64,6 +68,10 @@ public class MarketplaceState extends SavedData {
 	private final Map<UUID, Integer> boughtSlots = new HashMap<>();
 	/** Игрок → [сколько ордеров продалось без него, на какую сумму] — показать при входе. */
 	private final Map<UUID, double[]> pendingSales = new HashMap<>();
+	/** Игрок → (номер ячейки → предмет, который положили, но ещё не подтвердили). */
+	private final Map<UUID, Map<Integer, ItemStack>> staging = new HashMap<>();
+	/** Игрок → выбранная наценка для новых ордеров. */
+	private final Map<UUID, Double> markup = new HashMap<>();
 
 	public MarketplaceState() {
 	}
@@ -261,6 +269,27 @@ public class MarketplaceState extends SavedData {
 		return pending;
 	}
 
+	// --- Рынок: ячейки, которые игрок заполнил, но ещё не подтвердил ---
+
+	public Map<Integer, ItemStack> staging(UUID playerId) {
+		return staging.getOrDefault(playerId, Map.of());
+	}
+
+	public void setStaging(UUID playerId, Map<Integer, ItemStack> items) {
+		staging.put(playerId, new HashMap<>(items));
+		setDirty();
+	}
+
+	/** Выбранная игроком наценка для новых ордеров. */
+	public double markup(UUID playerId) {
+		return markup.getOrDefault(playerId, 1.0);
+	}
+
+	public void setMarkup(UUID playerId, double value) {
+		markup.put(playerId, value);
+		setDirty();
+	}
+
 	// --- Превращение в NBT и обратно ---
 
 	private static MarketplaceState fromTag(CompoundTag tag) {
@@ -367,6 +396,42 @@ public class MarketplaceState extends SavedData {
 					entry.getDoubleOr(PENDING_COUNT_KEY, 0.0), entry.getDoubleOr(PENDING_TOTAL_KEY, 0.0)});
 		}
 
+		// Неподтверждённые предметы: ключ — номер ячейки.
+		CompoundTag storedStaging = tag.getCompoundOrEmpty(STAGING_KEY);
+
+		for (String playerKey : storedStaging.keySet()) {
+			Optional<UUID> playerId = parseUuid(playerKey);
+
+			if (playerId.isEmpty()) {
+				continue;
+			}
+
+			CompoundTag playerStaging = storedStaging.getCompoundOrEmpty(playerKey);
+			Map<Integer, ItemStack> items = new HashMap<>();
+
+			for (String slotKey : playerStaging.keySet()) {
+				int slot = parseSlot(slotKey, playerKey);
+				Optional<ItemStack> item = ItemStack.CODEC
+						.parse(NbtOps.INSTANCE, playerStaging.getCompoundOrEmpty(slotKey).getCompoundOrEmpty(STAGING_ITEM_KEY))
+						.result();
+
+				if (slot < 0 || item.isEmpty() || item.get().isEmpty()) {
+					continue;
+				}
+
+				items.put(slot, item.get());
+			}
+
+			state.staging.put(playerId.get(), items);
+		}
+
+		CompoundTag storedMarkup = tag.getCompoundOrEmpty(MARKUP_KEY);
+
+		for (String key : storedMarkup.keySet()) {
+			Optional<UUID> playerId = parseUuid(key);
+			playerId.ifPresent(id -> state.markup.put(id, storedMarkup.getDoubleOr(key, 1.0)));
+		}
+
 		return state;
 	}
 
@@ -448,6 +513,30 @@ public class MarketplaceState extends SavedData {
 		});
 
 		tag.put(PENDING_SALES_KEY, storedPending);
+
+		CompoundTag storedStaging = new CompoundTag();
+
+		state.staging.forEach((playerId, items) -> {
+			CompoundTag playerTag = new CompoundTag();
+
+			items.forEach((slot, item) -> {
+				CompoundTag entry = new CompoundTag();
+
+				ItemStack.CODEC.encodeStart(NbtOps.INSTANCE, item).result()
+						.ifPresent(encoded -> entry.put(STAGING_ITEM_KEY, encoded));
+
+				playerTag.put(String.valueOf(slot), entry);
+			});
+
+			storedStaging.put(playerId.toString(), playerTag);
+		});
+
+		tag.put(STAGING_KEY, storedStaging);
+
+		CompoundTag storedMarkup = new CompoundTag();
+		state.markup.forEach((playerId, value) -> storedMarkup.putDouble(playerId.toString(), value));
+		tag.put(MARKUP_KEY, storedMarkup);
+
 		return tag;
 	}
 

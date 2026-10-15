@@ -3,6 +3,7 @@ package com.chr0m4ik.marketplace.market;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
+import com.chr0m4ik.marketplace.price.ItemPrices;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemStack;
@@ -124,6 +125,11 @@ public final class MarketService {
 		}
 
 		return sold;
+	}
+
+	/** Сколько дадут за стак при такой наценке (без учёта случайного времени продажи). */
+	public static double payoutFor(ItemStack stack, double markup) {
+		return MoneyFormat.round(ItemPrices.priceOf(stack) * markup);
 	}
 
 	/** Следующая наценка по кругу: x1 → x1,25 → x1,5 → x1,75 → x2 → x1. */

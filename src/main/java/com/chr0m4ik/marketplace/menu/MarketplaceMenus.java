@@ -24,6 +24,8 @@ public final class MarketplaceMenus {
 	public static final MenuType<MarketplaceMenu> MAIN = register(WindowKind.MAIN, "main");
 	public static final MenuType<MarketplaceMenu> TRADER = register(WindowKind.TRADER, "trader");
 	public static final MenuType<MarketplaceMenu> SELL = register(WindowKind.SELL, "sell");
+	public static final MenuType<MarketplaceMenu> CONFIRM = register(WindowKind.CONFIRM, "confirm");
+	public static final MenuType<MarketplaceMenu> BUY_SLOT = register(WindowKind.BUY_SLOT, "buy_slot");
 	public static final MenuType<MarketplaceMenu> BUY = register(WindowKind.BUY, "buy");
 
 	private MarketplaceMenus() {

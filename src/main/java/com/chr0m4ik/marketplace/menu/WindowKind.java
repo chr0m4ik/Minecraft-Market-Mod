@@ -18,13 +18,17 @@ import net.minecraft.network.chat.Component;
  */
 public enum WindowKind {
 	/** Главное меню: 9×3, все 27 слотов — кнопки. */
-	MAIN("marketplace.gui.main.title", 3, 84, 167, 0),
+	MAIN("marketplace.gui.main.title", 3, 84, 167, 0, false),
 	/** Сдать торговцу: 45 слотов под товар + системная строка с кнопками. */
-	TRADER("marketplace.gui.trader.title", 6, 139, 222, 45),
-	/** Продажа на рынке: 9×5 слотов-ордеров + системная строка (пока заготовка). */
-	SELL("marketplace.gui.sell.title", 6, 139, 222, 0),
+	TRADER("marketplace.gui.trader.title", 6, 139, 222, 45, false),
+	/** Рынок: 45 ячеек под ордера + системная строка с кнопками. */
+	SELL("marketplace.gui.sell.title", 6, 139, 222, 45, false),
+	/** Подтверждение ордеров: те же 45 ячеек, но только для показа, плюс кнопки. */
+	CONFIRM("marketplace.gui.confirm.title", 6, 139, 222, 45, true),
+	/** Покупка слота: 9×3, одни кнопки. */
+	BUY_SLOT("marketplace.gui.slot.title", 3, 84, 167, 0, false),
 	/** Покупка: 9×5 предметов + системная строка (пока заготовка). */
-	BUY("marketplace.gui.buy.title", 6, 139, 222, 0);
+	BUY("marketplace.gui.buy.title", 6, 139, 222, 0, false);
 
 	/** Ширина всех ванильных окон-контейнеров. */
 	public static final int IMAGE_WIDTH = 176;
@@ -34,13 +38,20 @@ public enum WindowKind {
 	private final int inventoryY;
 	private final int imageHeight;
 	private final int tradeSlots;
+	private final boolean readOnlySlots;
 
-	WindowKind(String titleKey, int rows, int inventoryY, int imageHeight, int tradeSlots) {
+	WindowKind(String titleKey, int rows, int inventoryY, int imageHeight, int tradeSlots, boolean readOnlySlots) {
 		this.titleKey = titleKey;
 		this.rows = rows;
 		this.inventoryY = inventoryY;
 		this.imageHeight = imageHeight;
 		this.tradeSlots = tradeSlots;
+		this.readOnlySlots = readOnlySlots;
+	}
+
+	/** Можно ли брать и класть предметы в слоты верхней части окна. */
+	public boolean readOnlySlots() {
+		return this.readOnlySlots;
 	}
 
 	/** Заголовок окна. */

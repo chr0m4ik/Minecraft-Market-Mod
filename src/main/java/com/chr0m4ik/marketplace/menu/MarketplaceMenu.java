@@ -1,8 +1,12 @@
 package com.chr0m4ik.marketplace.menu;
 
+import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
+import com.chr0m4ik.marketplace.economy.MarketplaceState;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.economy.TraderService;
+import com.chr0m4ik.marketplace.market.MarketOrder;
+import com.chr0m4ik.marketplace.market.MarketService;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -22,6 +26,10 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
 /**
  * Окно рынка. Один класс на все окна мода — вид задаётся через {@link WindowKind}.
  *
@@ -37,7 +45,7 @@ import net.minecraft.world.item.Items;
  */
 public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Баланс передаём как одно long-число (копейки), а слоты данных — это int. Отсюда 2. */
-	private static final int DATA_SIZE = 2;
+	private static final int DATA_SIZE = 10;
 
 	/** Слоты кнопок главного меню (средний ряд: 10, 13, 16). */
 	public static final int MAIN_SLOT_TRADER = 10;
@@ -48,6 +56,22 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	public static final int TRADER_SLOT_CANCEL = 45;
 	public static final int TRADER_SLOT_INFO = 47;
 	public static final int TRADER_SLOT_TRADE = 49;
+
+	/** Кнопки окна рынка. */
+	public static final int MARKET_SLOT_EXIT = 45;
+	public static final int MARKET_SLOT_BUY = 47;
+	public static final int MARKET_SLOT_CHECKOUT = 49;
+	public static final int MARKET_SLOT_INFO = 51;
+
+	/** Кнопки окна подтверждения ордеров. */
+	public static final int CONFIRM_SLOT_EXIT = 45;
+	public static final int CONFIRM_SLOT_PRICE = 47;
+	public static final int CONFIRM_SLOT_CONFIRM = 49;
+
+	/** Кнопки окна покупки слота. */
+	public static final int SLOT_WINDOW_CANCEL = 10;
+	public static final int SLOT_WINDOW_INFO = 13;
+	public static final int SLOT_WINDOW_CONFIRM = 16;
 
 	/** Кнопка «Назад» в окнах-заготовках. */
 	public static final int BACK_SLOT = 49;
@@ -72,9 +96,11 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		int total = kind.containerSlots();
 		int tradeSlots = kind.tradeSlots();
 
-		// Сначала слоты под товар — они работают как обычные.
+		// Сначала слоты под товар. В окне подтверждения их нельзя брать — только смотреть.
 		for (int i = 0; i < tradeSlots; i++) {
-			this.addSlot(new Slot(this.tradeContainer, i, slotX(i), slotY(i)));
+			this.addSlot(kind.readOnlySlots()
+					? new ActionSlot(this.tradeContainer, i, slotX(i), slotY(i))
+					: new Slot(this.tradeContainer, i, slotX(i), slotY(i)));
 		}
 
 		// Потом слоты-кнопки.
@@ -89,7 +115,57 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.addDataSlots(this.data);
 
 		this.fillButtons();
-		this.updateBalance();
+		this.updateData();
+		this.loadMarketCells();
+	}
+
+	/**
+	 * Заполняет ячейки рынка тем, что уже лежит в сейве: подтверждённые ордера и неподтверждённые
+	 * предметы. Контейнер окна живёт только пока окно открыто, поэтому «реестр» — это сейв.
+	 */
+	private void loadMarketCells() {
+		if (this.serverPlayer == null || !this.hasMarketCells()) {
+			return;
+		}
+
+		MarketplaceState state = MarketplaceEconomy.state(this.serverPlayer.level().getServer());
+		UUID playerId = this.serverPlayer.getUUID();
+
+		for (int i = 0; i < this.kind.tradeSlots(); i++) {
+			MarketOrder order = state.order(playerId, i);
+			ItemStack staged = state.staging(playerId).get(i);
+			this.tradeContainer.setItem(i, order != null ? order.stack() : (staged == null ? ItemStack.EMPTY : staged));
+		}
+	}
+
+	/** Есть ли в этом окне ячейки рынка. */
+	private boolean hasMarketCells() {
+		return this.kind == WindowKind.SELL || this.kind == WindowKind.CONFIRM;
+	}
+
+	/** Сохраняет то, что игрок разложил по ячейкам, в сейв (кроме подтверждённых ордеров). */
+	private void saveMarketCells() {
+		if (this.serverPlayer == null || this.kind != WindowKind.SELL) {
+			return;
+		}
+
+		MarketplaceState state = MarketplaceEconomy.state(this.serverPlayer.level().getServer());
+		UUID playerId = this.serverPlayer.getUUID();
+		Map<Integer, ItemStack> items = new HashMap<>();
+
+		for (int i = 0; i < this.kind.tradeSlots(); i++) {
+			if (state.order(playerId, i) != null) {
+				continue;
+			}
+
+			ItemStack stack = this.tradeContainer.getItem(i);
+
+			if (!stack.isEmpty()) {
+				items.put(i, stack.copy());
+			}
+		}
+
+		state.setStaging(playerId, items);
 	}
 
 	private static int slotX(int index) {
@@ -113,6 +189,28 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			this.setButton(TRADER_SLOT_CANCEL, Items.BARRIER, "marketplace.gui.button.cancel");
 			this.setButton(TRADER_SLOT_INFO, Items.PAPER, "marketplace.gui.button.total");
 			this.setButton(TRADER_SLOT_TRADE, Items.EMERALD, "marketplace.gui.button.trade");
+			return;
+		}
+
+		if (this.kind == WindowKind.SELL) {
+			this.setButton(45, Items.BARRIER, "marketplace.gui.button.exit");
+			this.setButton(47, Items.ITEM_FRAME, "marketplace.gui.button.buySlot");
+			this.setButton(49, Items.EMERALD, "marketplace.gui.button.checkout");
+			this.setButton(51, Items.PAPER, "marketplace.gui.button.info");
+			return;
+		}
+
+		if (this.kind == WindowKind.CONFIRM) {
+			this.setButton(45, Items.BARRIER, "marketplace.gui.button.exit");
+			this.setButton(47, Items.GOLD_INGOT, "marketplace.gui.button.price");
+			this.setButton(49, Items.EMERALD, "marketplace.gui.button.confirm");
+			return;
+		}
+
+		if (this.kind == WindowKind.BUY_SLOT) {
+			this.setButton(10, Items.BARRIER, "marketplace.gui.button.cancel");
+			this.setButton(13, Items.PAPER, "marketplace.gui.button.slotInfo");
+			this.setButton(16, Items.EMERALD, "marketplace.gui.button.confirm");
 			return;
 		}
 
@@ -183,8 +281,106 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
+		if (this.kind == WindowKind.SELL) {
+			if (slotId == MARKET_SLOT_EXIT) {
+				// Предметы остаются в ячейках рынка: они лежат в сейве, а не в окне.
+				this.saveMarketCells();
+				MarketplaceMenus.open(serverPlayer, WindowKind.MAIN);
+			} else if (slotId == MARKET_SLOT_BUY) {
+				this.saveMarketCells();
+				MarketplaceMenus.open(serverPlayer, WindowKind.BUY_SLOT);
+			} else if (slotId == MARKET_SLOT_CHECKOUT) {
+				this.saveMarketCells();
+				MarketplaceMenus.open(serverPlayer, WindowKind.CONFIRM);
+			}
+
+			// Кнопка «информация» ничего не делает — она только показывает подсказку.
+			return;
+		}
+
+		if (this.kind == WindowKind.CONFIRM) {
+			if (slotId == CONFIRM_SLOT_EXIT) {
+				MarketplaceMenus.open(serverPlayer, WindowKind.SELL);
+			} else if (slotId == CONFIRM_SLOT_PRICE) {
+				this.cycleMarkup(serverPlayer);
+			} else if (slotId == CONFIRM_SLOT_CONFIRM) {
+				this.confirmOrders(serverPlayer);
+			}
+
+			return;
+		}
+
+		if (this.kind == WindowKind.BUY_SLOT) {
+			if (slotId == SLOT_WINDOW_CONFIRM) {
+				this.buyNextSlot(serverPlayer);
+			} else if (slotId == SLOT_WINDOW_CANCEL) {
+				MarketplaceMenus.open(serverPlayer, WindowKind.SELL);
+			}
+
+			return;
+		}
+
 		if (slotId == BACK_SLOT) {
 			MarketplaceMenus.open(serverPlayer, WindowKind.MAIN);
+		}
+	}
+
+	/** Переключение наценки по кругу: x1 → x1,25 → x1,5 → x1,75 → x2 → x1. */
+	private void cycleMarkup(ServerPlayer player) {
+		MarketplaceState state = MarketplaceEconomy.state(player.level().getServer());
+		state.setMarkup(player.getUUID(), MarketService.nextMarkup(state.markup(player.getUUID())));
+		this.updateData();
+	}
+
+	/** Подтверждение: неподтверждённые предметы становятся ордерами. */
+	private void confirmOrders(ServerPlayer player) {
+		MinecraftServer server = player.level().getServer();
+
+		if (server == null) {
+			return;
+		}
+
+		MarketplaceState state = MarketplaceEconomy.state(server);
+		UUID playerId = player.getUUID();
+		long now = GameTime.now(server);
+		double markup = state.markup(playerId);
+		int created = 0;
+
+		for (Map.Entry<Integer, ItemStack> entry : Map.copyOf(state.staging(playerId)).entrySet()) {
+			if (MarketService.placeOrder(state, playerId, entry.getKey(), entry.getValue(), markup, now,
+					server.overworld().getRandom()) != null) {
+				created++;
+			}
+		}
+
+		state.setStaging(playerId, Map.of());
+		this.loadMarketCells();
+		MarketplaceMenus.open(player, WindowKind.SELL);
+
+		if (created > 0) {
+			player.sendSystemMessage(Component.translatable("marketplace.gui.market.listed",
+					Component.literal(String.valueOf(created))).withStyle(ChatFormatting.GREEN));
+		}
+	}
+
+	/** Покупка следующего слота рынка. */
+	private void buyNextSlot(ServerPlayer player) {
+		MinecraftServer server = player.level().getServer();
+
+		if (server == null) {
+			return;
+		}
+
+		MarketplaceState state = MarketplaceEconomy.state(server);
+		double price = MarketService.slotPrice(state, player.getUUID());
+
+		if (MarketService.buySlot(server, player.getUUID())) {
+			player.sendSystemMessage(Component.translatable("marketplace.gui.slot.bought", money(price))
+					.withStyle(ChatFormatting.GREEN));
+			MarketplaceMenus.open(player, WindowKind.SELL);
+		} else {
+			player.sendSystemMessage(Component.translatable("marketplace.gui.slot.noMoney", money(price))
+					.withStyle(ChatFormatting.RED));
 		}
 	}
 
@@ -267,8 +463,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	}
 
 	/**
-	 * Окно закрыли, а товар остался — возвращаем его игроку (или выбрасываем, если не влезает).
-	 * Так предметы не пропадают, если игрок вышел из игры, не нажав «Торговать».
+	 * Окно закрыли. Товар торговца возвращаем в инвентарь, а ячейки рынка — нет: они лежат
+	 * в сейве мира и остаются в окне (забрать предмет можно shift-кликом по ячейке).
 	 */
 	@Override
 	public void removed(Player player) {
@@ -276,6 +472,15 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 		// На клиенте ничего не делаем: там serverPlayer пустой, и предметы продублировались бы.
 		if (this.serverPlayer == null) {
+			return;
+		}
+
+		if (this.kind == WindowKind.SELL) {
+			this.saveMarketCells();
+			return;
+		}
+
+		if (this.kind == WindowKind.CONFIRM) {
 			return;
 		}
 
@@ -294,12 +499,15 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 	@Override
 	public void broadcastChanges() {
-		this.updateBalance();
+		this.updateData();
 		super.broadcastChanges();
 	}
 
-	/** Серверная часть: кладём баланс в слоты данных, игра сама отправит их клиенту. */
-	private void updateBalance() {
+	/**
+	 * Серверная часть: кладём в слоты данных всё, что нужно клиенту для подсказок —
+	 * баланс, суммы по ордерам и неподтверждённым предметам, их количество и наценку.
+	 */
+	private void updateData() {
 		if (this.serverPlayer == null) {
 			return;
 		}
@@ -310,16 +518,82 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
-		double balance = MarketplaceEconomy.getBalance(server, this.serverPlayer.getUUID());
-		long cents = Math.round(balance * 100.0);
-		this.data.set(0, (int) (cents >>> 32));
-		this.data.set(1, (int) cents);
+		UUID playerId = this.serverPlayer.getUUID();
+		MarketplaceState state = MarketplaceEconomy.state(server);
+
+		setMoney(0, MarketplaceEconomy.getBalance(server, playerId));
+
+		if (!this.hasMarketCells()) {
+			return;
+		}
+
+		double ordersMoney = 0.0;
+		int ordersCount = 0;
+
+		for (MarketOrder order : state.orders(playerId).values()) {
+			ordersMoney += order.payout();
+			ordersCount += order.stack().getCount();
+		}
+
+		double stagedMoney = 0.0;
+		int stagedCount = 0;
+
+		for (ItemStack stack : state.staging(playerId).values()) {
+			stagedMoney += MarketService.payoutFor(stack, state.markup(playerId));
+			stagedCount += stack.getCount();
+		}
+
+		setMoney(2, ordersMoney);
+		setMoney(4, stagedMoney);
+		this.data.set(6, ordersCount);
+		this.data.set(7, stagedCount);
+		this.data.set(8, (int) Math.round(state.markup(playerId) * 100.0));
+		this.data.set(9, MarketService.unlockedSlots(state, playerId));
+	}
+
+	/** Кладёт сумму в копейках в две ячейки данных (числа там только int). */
+	private void setMoney(int index, double amount) {
+		long cents = Math.round(amount * 100.0);
+		this.data.set(index, (int) (cents >>> 32));
+		this.data.set(index + 1, (int) cents);
+	}
+
+	private double money(int index) {
+		long cents = ((long) this.data.get(index) << 32) | (this.data.get(index + 1) & 0xFFFFFFFFL);
+		return cents / 100.0;
 	}
 
 	/** Баланс, который видит клиент (в долларах). */
 	public double getBalance() {
-		long cents = ((long) this.data.get(0) << 32) | (this.data.get(1) & 0xFFFFFFFFL);
-		return cents / 100.0;
+		return money(0);
+	}
+
+	/** Сколько дадут за все подтверждённые ордера. */
+	public double getOrdersPayout() {
+		return money(2);
+	}
+
+	/** Сколько дадут за предметы, которые положили, но ещё не подтвердили. */
+	public double getStagedPayout() {
+		return money(4);
+	}
+
+	public int getOrdersCount() {
+		return this.data.get(6);
+	}
+
+	public int getStagedCount() {
+		return this.data.get(7);
+	}
+
+	/** Текущая наценка (x1…x2). */
+	public double getMarkup() {
+		return this.data.get(8) / 100.0;
+	}
+
+	/** Сколько ячеек рынка открыто. */
+	public int getUnlockedSlots() {
+		return this.data.get(9);
 	}
 
 	public WindowKind getKind() {

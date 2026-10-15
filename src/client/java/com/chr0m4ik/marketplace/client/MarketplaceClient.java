@@ -38,6 +38,8 @@ public class MarketplaceClient implements ClientModInitializer {
 		MenuScreens.register(MarketplaceMenus.MAIN, MarketplaceScreen::new);
 		MenuScreens.register(MarketplaceMenus.TRADER, MarketplaceScreen::new);
 		MenuScreens.register(MarketplaceMenus.SELL, MarketplaceScreen::new);
+		MenuScreens.register(MarketplaceMenus.CONFIRM, MarketplaceScreen::new);
+		MenuScreens.register(MarketplaceMenus.BUY_SLOT, MarketplaceScreen::new);
 		MenuScreens.register(MarketplaceMenus.BUY, MarketplaceScreen::new);
 
 		// Плашка с деньгами поверх игры (правый верхний угол).
