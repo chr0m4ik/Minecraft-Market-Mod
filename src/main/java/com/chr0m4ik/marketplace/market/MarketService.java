@@ -53,7 +53,16 @@ public final class MarketService {
 
 	/** Цена следующего слота. */
 	public static double slotPrice(MarketplaceState state, UUID playerId) {
-		return MoneyFormat.round(SLOT_BASE_PRICE * Math.pow(SLOT_PRICE_STEP, state.boughtSlots(playerId)));
+		return slotPriceFor(unlockedSlots(state, playerId));
+	}
+
+	/**
+	 * Цена следующего слота по числу уже открытых ячеек. Клиент считает цену этой же формулой —
+	 * так ему не нужно передавать её отдельно.
+	 */
+	public static double slotPriceFor(int unlockedSlots) {
+		int bought = Math.max(0, unlockedSlots - FREE_SLOTS);
+		return MoneyFormat.round(SLOT_BASE_PRICE * Math.pow(SLOT_PRICE_STEP, bought));
 	}
 
 	/** Покупка следующего слота. {@code false} — если слотов уже максимум или не хватило денег. */

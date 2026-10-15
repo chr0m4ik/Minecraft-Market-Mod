@@ -9,6 +9,7 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * Экран рынка. Один класс на все окна мода: текстура и высота выбираются по виду окна.
@@ -37,6 +38,9 @@ public class MarketplaceScreen extends AbstractContainerScreen<MarketplaceMenu> 
 	/** Насколько плашка отступает вправо от окна. */
 	private static final int PLATE_MARGIN = 6;
 
+	/** Полупрозрачная зелёная подсветка ячеек рынка, которые ещё не подтвердили. */
+	private static final int STAGED_TINT = 0x5500FF00;
+
 	public MarketplaceScreen(MarketplaceMenu menu, Inventory inventory, Component title) {
 		super(menu, inventory, title, WindowKind.IMAGE_WIDTH, menu.getKind().imageHeight());
 	}
@@ -57,6 +61,8 @@ public class MarketplaceScreen extends AbstractContainerScreen<MarketplaceMenu> 
 	@Override
 	public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 		super.extractBackground(graphics, mouseX, mouseY, partialTick);
+		// Зелёная подсветка ложится под предметы, поэтому рисуем её сразу после фона окна.
+		this.extractStagedCells(graphics);
 
 		int rows = this.menu.getKind().rows();
 		int x = this.leftPos;
@@ -84,6 +90,28 @@ public class MarketplaceScreen extends AbstractContainerScreen<MarketplaceMenu> 
 	public void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 		super.extractContents(graphics, mouseX, mouseY, partialTick);
 		this.extractMoneyPlate(graphics);
+	}
+
+	/**
+	 * Подсвечивает зелёным предметы, которые игрок только что положил и ещё не подтвердил.
+	 * Так видно, что уже выставлено на продажу (ордер), а что пока лежит «на столе».
+	 */
+	private void extractStagedCells(GuiGraphicsExtractor graphics) {
+		if (this.menu.getKind() != WindowKind.SELL) {
+			return;
+		}
+
+		for (int i = 0; i < this.menu.tradeSlotCount(); i++) {
+			ItemStack stack = this.menu.getTradeContainer().getItem(i);
+
+			if (stack.isEmpty() || this.menu.isCellOrder(i)) {
+				continue;
+			}
+
+			int x = this.leftPos + 8 + (i % 9) * 18;
+			int y = this.topPos + 18 + (i / 9) * 18;
+			graphics.fill(x, y, x + 16, y + 16, STAGED_TINT);
+		}
 	}
 
 	private void extractMoneyPlate(GuiGraphicsExtractor graphics) {

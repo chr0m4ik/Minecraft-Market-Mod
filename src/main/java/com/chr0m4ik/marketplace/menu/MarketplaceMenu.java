@@ -50,16 +50,13 @@ import java.util.UUID;
  */
 public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Баланс передаём как одно long-число (копейки), а слоты данных — это int. Отсюда 2. */
-	private static final int DATA_SIZE = 12 + MarketService.SLOTS * 2;
+	private static final int DATA_SIZE = 10 + MarketService.SLOTS * 2;
 
 	/** С какого места в данных начинаются минуты до конца продажи по каждой ячейке. */
 	private static final int CELL_DATA_START = 10;
 
 	/** С какого места начинаются наценки по ячейкам. */
 	private static final int CELL_MARKUP_START = 10 + MarketService.SLOTS;
-
-	/** Где лежит цена следующего слота (это тоже long, поэтому две ячейки). */
-	private static final int NEXT_SLOT_PRICE = 10 + MarketService.SLOTS * 2;
 
 	/** Слоты кнопок главного меню (средний ряд: 10, 13, 16). */
 	public static final int MAIN_SLOT_TRADER = 10;
@@ -136,16 +133,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.data = new SimpleContainerData(DATA_SIZE);
 		this.addDataSlots(this.data);
 
-		this.fillButtons();
+		// Сначала данные (в них лежит текущая наценка), потом кнопки: кнопка цены выделяет
+		// в подсказке именно текущую наценку, поэтому ей нужны уже заполненные данные.
 		this.updateData();
+		this.fillButtons();
 		this.loadMarketCells();
 	}
-
-	/**
-	 * Заполняет ячейки рынка тем, что уже лежит в сейве: подтверждённые ордера, неподтверждённые
-	 * предметы и красные панели на некупленных ячейках. Контейнер окна живёт только пока окно
-	 * открыто, поэтому «реестр» — это сейв.
-	 */
 	private void loadMarketCells() {
 		if (this.serverPlayer == null || !this.hasMarketCells()) {
 			return;
@@ -261,7 +254,11 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.broadcastChanges();
 	}
 
-	/** Приводит ячейки окна в соответствие с сейвом: например, убирает уже проданный ордер. */
+	/**
+	 * Приводит ячейки в порядок: показывает ордера из сейва и красные панели на закрытых ячейках.
+	 * Ячейки без ордера НЕ трогаем — в них лежит то, что игрок только что положил (иначе предметы
+	 * пропадали бы: сохранение в сейв идёт отдельно и могло ещё не сработать).
+	 */
 	private void syncMarketCells() {
 		if (this.serverPlayer == null || this.kind != WindowKind.SELL) {
 			return;
@@ -272,17 +269,15 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		int unlocked = MarketService.unlockedSlots(state, playerId);
 
 		for (int i = 0; i < this.kind.tradeSlots(); i++) {
-			ItemStack expected;
+			ItemStack expected = null;
 
 			if (i >= unlocked) {
 				expected = lockedPane();
-			} else {
-				MarketOrder order = state.order(playerId, i);
-				ItemStack staged = state.staging(playerId).get(i);
-				expected = order != null ? order.stack() : (staged == null ? ItemStack.EMPTY : staged);
+			} else if (state.order(playerId, i) != null) {
+				expected = state.order(playerId, i).stack();
 			}
 
-			if (!ItemStack.matches(this.tradeContainer.getItem(i), expected)) {
+			if (expected != null && !ItemStack.matches(this.tradeContainer.getItem(i), expected)) {
 				this.tradeContainer.setItem(i, expected);
 			}
 		}
@@ -375,6 +370,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 						? "marketplace.gui.button.target.on" : "marketplace.gui.button.target.off")));
 		button.set(DataComponents.LORE, new ItemLore(List.of(
 				Component.translatable("marketplace.gui.button.target.hint").withStyle(ChatFormatting.GRAY))));
+
+		if (this.targetMode) {
+			// Подсвечиваем кнопку, как зачарованную — видно, что режим включён.
+			button.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
+		}
+
 		this.buttonContainer.setItem(MARKET_SLOT_TARGET - this.kind.tradeSlots(), button);
 	}
 
@@ -711,6 +712,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	@Override
 	public void broadcastChanges() {
 		this.updateData();
+		this.saveMarketCells();
 		this.syncMarketCells();
 		super.broadcastChanges();
 	}
@@ -735,7 +737,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 		setMoney(0, MarketplaceEconomy.getBalance(server, playerId));
 		this.data.set(8, (int) Math.round(state.markup(playerId) * 100.0));
-		setMoney(NEXT_SLOT_PRICE, MarketService.slotPrice(state, playerId));
+		this.data.set(9, MarketService.unlockedSlots(state, playerId));
 
 		if (this.kind != WindowKind.SELL) {
 			return;
@@ -761,7 +763,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		setMoney(4, stagedMoney);
 		this.data.set(6, ordersCount);
 		this.data.set(7, stagedCount);
-		this.data.set(9, MarketService.unlockedSlots(state, playerId));
 
 		// Сколько минут осталось каждому ордеру и с какой наценкой он выставлен.
 		long now = GameTime.now(server);
@@ -840,9 +841,9 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		return this.data.get(9);
 	}
 
-	/** Цена следующего слота рынка. */
+	/** Цена следующего слота рынка: считаем из числа открытых ячеек — так надёжнее. */
 	public double getNextSlotPrice() {
-		return money(NEXT_SLOT_PRICE);
+		return MarketService.slotPriceFor(this.getUnlockedSlots());
 	}
 
 	public WindowKind getKind() {
