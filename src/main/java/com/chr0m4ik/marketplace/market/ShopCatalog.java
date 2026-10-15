@@ -2,14 +2,19 @@ package com.chr0m4ik.marketplace.market;
 
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.component.OminousBottleAmplifier;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 
@@ -72,8 +77,19 @@ public final class ShopCatalog {
 	/** Кэш: раздел → товары (отсортированы по названию, как в креативном инвентаре). */
 	private static final Map<Category, List<ItemStack>> CACHE = new EnumMap<>(Category.class);
 
+	/** Доступ к реестрам мира: зачарования в 26.3 лежат в динамическом реестре, вне мира их не видно. */
+	private static HolderLookup.Provider registries;
+
 	private ShopCatalog() {
 		// Класс только со статическими методами.
+	}
+
+	/** Отдаём каталогу реестры мира (вызывается серверной частью окна). */
+	public static void setRegistries(HolderLookup.Provider value) {
+		if (registries != value) {
+			registries = value;
+			CACHE.clear();
+		}
 	}
 
 	/** Товары раздела. Список строится один раз. */
@@ -132,9 +148,13 @@ public final class ShopCatalog {
 		return stack;
 	}
 
-	/** Зелье дурного знамения. Варианты по силе добавлю отдельно (у них особый компонент). */
+	/** Зелья дурного знамения: все пять уровней силы. */
 	private static void addOminousBottles(List<ItemStack> stacks) {
-		stacks.add(new ItemStack(Items.OMINOUS_BOTTLE));
+		for (int level = OminousBottleAmplifier.MIN_AMPLIFIER; level <= OminousBottleAmplifier.MAX_AMPLIFIER; level++) {
+			ItemStack stack = new ItemStack(Items.OMINOUS_BOTTLE);
+			stack.set(DataComponents.OMINOUS_BOTTLE_AMPLIFIER, new OminousBottleAmplifier(level));
+			stacks.add(stack);
+		}
 	}
 
 	/** Стрелы: обычная, спектральная и все стрелы с эффектом. */
@@ -149,9 +169,20 @@ public final class ShopCatalog {
 		}
 	}
 
-	/** Книги зачарований: пока обычная книга (варианты по зачарованиям добавлю отдельно). */
+	/** Книги зачарований: по книге на каждое зачарование (максимального уровня). */
 	private static void addBooks(List<ItemStack> stacks) {
-		stacks.add(new ItemStack(Items.ENCHANTED_BOOK));
+		if (registries == null) {
+			stacks.add(new ItemStack(Items.ENCHANTED_BOOK));
+			return;
+		}
+
+		registries.lookup(Registries.ENCHANTMENT).ifPresent(lookup -> lookup.listElements().forEach(enchantment -> {
+			ItemStack stack = new ItemStack(Items.ENCHANTED_BOOK);
+			ItemEnchantments.Mutable enchantments = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
+			enchantments.set(enchantment, enchantment.value().getMaxLevel());
+			stack.set(DataComponents.STORED_ENCHANTMENTS, enchantments.toImmutable());
+			stacks.add(stack);
+		}));
 	}
 
 	/** Ключ сортировки: сначала по названию предмета, потом по цене. */

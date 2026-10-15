@@ -984,6 +984,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		MarketplaceState state = MarketplaceEconomy.state(server);
 
 		setMoney(0, MarketplaceEconomy.getBalance(server, playerId));
+		// Список книг зачарований строится по реестру мира — отдаём его каталогу магазина.
+		ShopCatalog.setRegistries(server.registryAccess());
 		this.data.set(8, (int) Math.round(state.markup(playerId) * 100.0));
 		this.data.set(9, MarketService.unlockedSlots(state, playerId));
 
