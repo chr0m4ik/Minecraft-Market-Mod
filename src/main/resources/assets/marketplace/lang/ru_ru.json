@@ -1,5 +1,19 @@
 {
+	"marketplace.gui.main.title": "Рынок",
+	"marketplace.gui.trader.title": "Сдать торговцу",
+	"marketplace.gui.sell.title": "Продажа на рынке",
+	"marketplace.gui.buy.title": "Покупка",
+
+	"marketplace.gui.button.trader": "Сдать торговцу",
+	"marketplace.gui.button.sell": "Продать",
+	"marketplace.gui.button.buy": "Купить",
+	"marketplace.gui.button.back": "Назад",
+
+	"key.category.marketplace.main": "Minecraft Marketplace",
+	"key.marketplace.open": "Открыть рынок",
+
 	"marketplace.command.help.header": "Minecraft Marketplace — команды:",
+	"marketplace.command.help.open": "/market — открыть меню рынка",
 	"marketplace.command.help.money.get": "/market money get [игрок] — посмотреть баланс",
 	"marketplace.command.help.money.set": "/market money set <игрок> <сумма> — установить баланс",
 	"marketplace.command.help.money.add": "/market money add <игрок> <сумма> — изменить баланс (отрицательная сумма вычитает)",

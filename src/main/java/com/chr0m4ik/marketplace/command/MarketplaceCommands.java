@@ -2,6 +2,8 @@ package com.chr0m4ik.marketplace.command;
 
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
+import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
+import com.chr0m4ik.marketplace.menu.WindowKind;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -66,9 +68,18 @@ public final class MarketplaceCommands {
 					.then(moneyAdd);
 
 			dispatcher.register(Commands.literal("market")
-					.executes(MarketplaceCommands::showHelp)
+					.executes(MarketplaceCommands::openMainMenu)
+					.then(Commands.literal("help")
+							.executes(MarketplaceCommands::showHelp))
 					.then(money));
 		});
+	}
+
+	/** {@code /market} — открыть главное меню рынка. */
+	private static int openMainMenu(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		ServerPlayer player = context.getSource().getPlayerOrException();
+		MarketplaceMenus.open(player, WindowKind.MAIN);
+		return 1;
 	}
 
 	private static int showHelp(CommandContext<CommandSourceStack> context) {
@@ -76,6 +87,8 @@ public final class MarketplaceCommands {
 
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.header")
 				.withStyle(ChatFormatting.GOLD), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.help.open")
+				.withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.money.get")
 				.withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.money.set")

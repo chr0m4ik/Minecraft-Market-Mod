@@ -1,5 +1,19 @@
 {
+	"marketplace.gui.main.title": "Market",
+	"marketplace.gui.trader.title": "Sell to trader",
+	"marketplace.gui.sell.title": "Market listings",
+	"marketplace.gui.buy.title": "Buy",
+
+	"marketplace.gui.button.trader": "Sell to trader",
+	"marketplace.gui.button.sell": "Sell",
+	"marketplace.gui.button.buy": "Buy",
+	"marketplace.gui.button.back": "Back",
+
+	"key.category.marketplace.main": "Minecraft Marketplace",
+	"key.marketplace.open": "Open market",
+
 	"marketplace.command.help.header": "Minecraft Marketplace — commands:",
+	"marketplace.command.help.open": "/market — open the market menu",
 	"marketplace.command.help.money.get": "/market money get [player] — show balance",
 	"marketplace.command.help.money.set": "/market money set <player> <amount> — set balance",
 	"marketplace.command.help.money.add": "/market money add <player> <amount> — change balance (negative amount subtracts)",
