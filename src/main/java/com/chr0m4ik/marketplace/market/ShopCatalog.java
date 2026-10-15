@@ -1,14 +1,18 @@
 package com.chr0m4ik.marketplace.market;
 
 import com.chr0m4ik.marketplace.price.ItemPrices;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.alchemy.Potion;
+import net.minecraft.world.item.alchemy.PotionContents;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -56,31 +60,43 @@ public final class ShopCatalog {
 	private static final double RARE_PRICE = 1_000_000.0;
 
 	/** Кэш: раздел → предметы (отсортированы по цене, от дешёвых к дорогим). */
-	private static final Map<Category, List<Item>> CACHE = new EnumMap<>(Category.class);
+	private static final Map<Category, List<ItemStack>> CACHE = new EnumMap<>(Category.class);
 
 	private ShopCatalog() {
 		// Класс только со статическими методами.
 	}
 
-	/** Предметы раздела. Список строится один раз и сортируется по цене. */
-	public static List<Item> items(Category category) {
-		List<Item> cached = CACHE.get(category);
+	/**
+	 * Товары раздела. Список строится один раз и сортируется по цене.
+	 *
+	 * <p>Зелья — особый случай: в игре это один предмет ({@code minecraft:potion}) с разным
+	 * содержимым, поэтому перебираем виды зелий из реестра, а не предметы.
+	 */
+	public static List<ItemStack> items(Category category) {
+		List<ItemStack> cached = CACHE.get(category);
 
 		if (cached != null) {
 			return cached;
 		}
 
-		List<Item> items = new ArrayList<>();
+		List<ItemStack> stacks = new ArrayList<>();
 
-		for (Item item : BuiltInRegistries.ITEM) {
-			// Киты — отдельная система (этап 8), предметов у них пока нет.
-			if (category != Category.KITS && categoryOf(item) == category) {
-				items.add(item);
+		if (category == Category.POTIONS) {
+			for (Holder<Potion> potion : BuiltInRegistries.POTION.listElements().toList()) {
+				ItemStack stack = new ItemStack(Items.POTION);
+				stack.set(DataComponents.POTION_CONTENTS, new PotionContents(potion));
+				stacks.add(stack);
+			}
+		} else if (category != Category.KITS) {
+			for (Item item : BuiltInRegistries.ITEM) {
+				if (categoryOf(item) == category) {
+					stacks.add(new ItemStack(item));
+				}
 			}
 		}
 
-		items.sort((first, second) -> Double.compare(ItemPrices.priceOf(first), ItemPrices.priceOf(second)));
-		List<Item> result = List.copyOf(items);
+		stacks.sort(Comparator.comparingDouble(ItemPrices::priceOf));
+		List<ItemStack> result = List.copyOf(stacks);
 		CACHE.put(category, result);
 		return result;
 	}
@@ -90,9 +106,9 @@ public final class ShopCatalog {
 		return Math.max(1, (items(category).size() + PAGE_SIZE - 1) / PAGE_SIZE);
 	}
 
-	/** Предметы одной страницы раздела. */
-	public static List<Item> page(Category category, int page) {
-		List<Item> all = items(category);
+	/** Товары одной страницы раздела. */
+	public static List<ItemStack> page(Category category, int page) {
+		List<ItemStack> all = items(category);
 		int from = Math.max(0, Math.min(page, pages(category) - 1) * PAGE_SIZE);
 		int to = Math.min(all.size(), from + PAGE_SIZE);
 		return from >= to ? List.of() : all.subList(from, to);
