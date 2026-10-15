@@ -596,6 +596,26 @@ const LIMITS_OUT = path.join(path.dirname(OUT), 'trader_limits.json');
 fs.writeFileSync(LIMITS_OUT, JSON.stringify({ default: TRADER_DEFAULT_LIMIT, limits }, null, '\t') + '\n', 'utf8');
 
 // ---------------------------------------------------------------------------
+// Время продажи на рынке: сколько секунд продаётся ОДНА штука предмета.
+// Формула заказчика на словах: земля — пара секунд за штуку (стак — пара минут),
+// элитры — несколько реальных часов. Разброс времени (от ×0,05 до ×10) и замедление
+// от наценки считаются уже в моде — см. market/SaleTimes.java.
+// ---------------------------------------------------------------------------
+const SALE_TIME_BASE = 2.0;
+const SALE_TIME_POWER = 0.35;
+const SALE_TIME_MIN = 1.0;
+const SALE_TIME_MAX = 6 * 60 * 60;
+
+const marketTimes = {};
+for (const [item, price] of Object.entries(sorted)) {
+	const seconds = Math.min(SALE_TIME_MAX, Math.max(SALE_TIME_MIN, SALE_TIME_BASE * Math.pow(price, SALE_TIME_POWER)));
+	marketTimes[item] = Math.round(seconds * 100) / 100;
+}
+
+const TIMES_OUT = path.join(path.dirname(OUT), 'market_times.json');
+fs.writeFileSync(TIMES_OUT, JSON.stringify(marketTimes, null, '\t') + '\n', 'utf8');
+
+// ---------------------------------------------------------------------------
 // 5. Отчёт.
 // ---------------------------------------------------------------------------
 const byPrice = [...prices.values()];
@@ -613,6 +633,7 @@ if (missingNotBuyable.length > 0) {
 }
 console.log('выгодных перепродаж крафтом: ' + cheats.length + ' (см. tools/craft-cheats.txt)');
 console.log('лимиты торговца: ' + Object.keys(limits).length + ' предметов с уменьшенным лимитом (файл ' + LIMITS_OUT + ')');
+console.log('время продажи на рынке: ' + Object.keys(marketTimes).length + ' предметов (файл ' + TIMES_OUT + ')');
 console.log('файл: ' + OUT);
 
 const show = (title, list) => {

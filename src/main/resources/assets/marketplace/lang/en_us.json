@@ -23,6 +23,8 @@
 	"marketplace.gui.trader.sold": "Sold to trader: %s items for %s",
 	"marketplace.gui.trader.limit": "The trader will not buy that much today — some items stayed in the window",
 	"marketplace.death.lost": "Lost on death: %s",
+	"marketplace.gui.market.sold": "Sold %s %s for %s",
+	"marketplace.gui.market.offline": "While you were away, %s orders sold for %s",
 
 	"key.category.marketplace.main": "Minecraft Marketplace",
 	"key.marketplace.open": "Open market",

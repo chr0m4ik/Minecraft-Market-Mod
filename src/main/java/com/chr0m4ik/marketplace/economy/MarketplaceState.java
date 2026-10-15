@@ -1,17 +1,21 @@
 package com.chr0m4ik.marketplace.economy;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
+import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -35,6 +39,15 @@ public class MarketplaceState extends SavedData {
 	/** Ключ в NBT, под которым лежит история продаж торговцу (для его динамики цен). */
 	private static final String TRADER_SALES_KEY = "trader_sales";
 	private static final String SOLD_AT_KEY = "at";
+	/** Ключи для ордеров рынка. */
+	private static final String ORDERS_KEY = "orders";
+	private static final String ORDER_ITEM_KEY = "item";
+	private static final String ORDER_MARKUP_KEY = "markup";
+	private static final String ORDER_READY_KEY = "ready";
+	private static final String BOUGHT_SLOTS_KEY = "bought_slots";
+	private static final String PENDING_SALES_KEY = "pending_sales";
+	private static final String PENDING_COUNT_KEY = "count";
+	private static final String PENDING_TOTAL_KEY = "total";
 
 	private final Map<UUID, Double> balances = new HashMap<>();
 	/** Игрок → (id предмета → сколько стаков уже сдано за день). */
@@ -45,6 +58,12 @@ public class MarketplaceState extends SavedData {
 	private final Map<String, Double> traderSold = new HashMap<>();
 	/** id предмета → когда это значение последний раз обновлялось. */
 	private final Map<String, Long> traderSoldAt = new HashMap<>();
+	/** Игрок → (номер ячейки рынка → ордер). */
+	private final Map<UUID, Map<Integer, MarketOrder>> orders = new HashMap<>();
+	/** Игрок → сколько слотов рынка куплено сверх бесплатных. */
+	private final Map<UUID, Integer> boughtSlots = new HashMap<>();
+	/** Игрок → [сколько ордеров продалось без него, на какую сумму] — показать при входе. */
+	private final Map<UUID, double[]> pendingSales = new HashMap<>();
 
 	public MarketplaceState() {
 	}
@@ -173,6 +192,75 @@ public class MarketplaceState extends SavedData {
 		}
 	}
 
+	// --- Рынок: ордера на продажу ---
+
+	/** Ордер в этой ячейке (или null, если ячейка свободна). */
+	public MarketOrder order(UUID playerId, int slot) {
+		Map<Integer, MarketOrder> playerOrders = orders.get(playerId);
+		return playerOrders == null ? null : playerOrders.get(slot);
+	}
+
+	/** Все ячейки с ордерами. */
+	public Map<Integer, MarketOrder> orders(UUID playerId) {
+		return orders.getOrDefault(playerId, Map.of());
+	}
+
+	/** Игроки, у которых есть хоть один ордер (нужно, чтобы обрабатывать продажи). */
+	public Set<UUID> playersWithOrders() {
+		return Set.copyOf(orders.keySet());
+	}
+
+	public void setOrder(UUID playerId, int slot, MarketOrder order) {
+		orders.computeIfAbsent(playerId, id -> new HashMap<>()).put(slot, order);
+		setDirty();
+	}
+
+	/** Убирает ордер из ячейки и возвращает его (или null, если его там не было). */
+	public MarketOrder removeOrder(UUID playerId, int slot) {
+		Map<Integer, MarketOrder> playerOrders = orders.get(playerId);
+
+		if (playerOrders == null) {
+			return null;
+		}
+
+		MarketOrder removed = playerOrders.remove(slot);
+
+		if (removed != null) {
+			setDirty();
+		}
+
+		return removed;
+	}
+
+	/** Сколько слотов рынка игрок купил сверх бесплатных. */
+	public int boughtSlots(UUID playerId) {
+		return boughtSlots.getOrDefault(playerId, 0);
+	}
+
+	public void setBoughtSlots(UUID playerId, int count) {
+		boughtSlots.put(playerId, count);
+		setDirty();
+	}
+
+	/** Запомнить продажу, которая случилась, пока игрока не было в игре. */
+	public void addPendingSale(UUID playerId, double amount) {
+		double[] pending = pendingSales.computeIfAbsent(playerId, id -> new double[2]);
+		pending[0] += 1.0;
+		pending[1] += amount;
+		setDirty();
+	}
+
+	/** Забрать накопленные продажи (при входе игрока): [количество, сумма]. */
+	public double[] takePendingSales(UUID playerId) {
+		double[] pending = pendingSales.remove(playerId);
+
+		if (pending != null) {
+			setDirty();
+		}
+
+		return pending;
+	}
+
 	// --- Превращение в NBT и обратно ---
 
 	private static MarketplaceState fromTag(CompoundTag tag) {
@@ -222,7 +310,74 @@ public class MarketplaceState extends SavedData {
 			state.traderSoldAt.put(itemKey, entry.getLongOr(SOLD_AT_KEY, 0L));
 		}
 
+		// Ордера рынка: ключ — номер ячейки, значение — предмет, наценка и время готовности.
+		CompoundTag storedOrders = tag.getCompoundOrEmpty(ORDERS_KEY);
+
+		for (String playerKey : storedOrders.keySet()) {
+			Optional<UUID> playerId = parseUuid(playerKey);
+
+			if (playerId.isEmpty()) {
+				MarketplaceMod.LOGGER.warn("В сейве некорректный UUID игрока в ордерах, запись пропущена: {}", playerKey);
+				continue;
+			}
+
+			CompoundTag playerOrders = storedOrders.getCompoundOrEmpty(playerKey);
+			Map<Integer, MarketOrder> parsed = new HashMap<>();
+
+			for (String slotKey : playerOrders.keySet()) {
+				int slot = parseSlot(slotKey, playerKey);
+				CompoundTag entry = playerOrders.getCompoundOrEmpty(slotKey);
+				Optional<ItemStack> item = ItemStack.CODEC
+						.parse(NbtOps.INSTANCE, entry.getCompoundOrEmpty(ORDER_ITEM_KEY)).result();
+
+				if (slot < 0) {
+					continue;
+				}
+
+				if (item.isEmpty() || item.get().isEmpty()) {
+					MarketplaceMod.LOGGER.warn("В ордере игрока {} повреждён предмет, запись пропущена", playerKey);
+					continue;
+				}
+
+				parsed.put(slot, new MarketOrder(item.get(),
+						entry.getDoubleOr(ORDER_MARKUP_KEY, 1.0), entry.getLongOr(ORDER_READY_KEY, 0L)));
+			}
+
+			state.orders.put(playerId.get(), parsed);
+		}
+
+		CompoundTag storedSlots = tag.getCompoundOrEmpty(BOUGHT_SLOTS_KEY);
+
+		for (String key : storedSlots.keySet()) {
+			Optional<UUID> playerId = parseUuid(key);
+			playerId.ifPresent(id -> state.boughtSlots.put(id, Math.max(0, storedSlots.getIntOr(key, 0))));
+		}
+
+		CompoundTag storedPending = tag.getCompoundOrEmpty(PENDING_SALES_KEY);
+
+		for (String key : storedPending.keySet()) {
+			Optional<UUID> playerId = parseUuid(key);
+
+			if (playerId.isEmpty()) {
+				continue;
+			}
+
+			CompoundTag entry = storedPending.getCompoundOrEmpty(key);
+			state.pendingSales.put(playerId.get(), new double[] {
+					entry.getDoubleOr(PENDING_COUNT_KEY, 0.0), entry.getDoubleOr(PENDING_TOTAL_KEY, 0.0)});
+		}
+
 		return state;
+	}
+
+	private static int parseSlot(String slotKey, String playerKey) {
+		try {
+			return Integer.parseInt(slotKey);
+		} catch (NumberFormatException exception) {
+			MarketplaceMod.LOGGER.warn("В ордерах игрока {} некорректный номер ячейки, запись пропущена: {}",
+					playerKey, slotKey);
+			return -1;
+		}
 	}
 
 	private static CompoundTag toTag(MarketplaceState state) {
@@ -257,6 +412,42 @@ public class MarketplaceState extends SavedData {
 		}
 
 		tag.put(TRADER_SALES_KEY, storedMarket);
+
+		CompoundTag storedOrders = new CompoundTag();
+
+		state.orders.forEach((playerId, playerOrders) -> {
+			CompoundTag playerTag = new CompoundTag();
+
+			playerOrders.forEach((slot, order) -> {
+				CompoundTag entry = new CompoundTag();
+
+				ItemStack.CODEC.encodeStart(NbtOps.INSTANCE, order.stack()).result()
+						.ifPresent(encoded -> entry.put(ORDER_ITEM_KEY, encoded));
+
+				entry.putDouble(ORDER_MARKUP_KEY, order.markup());
+				entry.putLong(ORDER_READY_KEY, order.readyAt());
+				playerTag.put(String.valueOf(slot), entry);
+			});
+
+			storedOrders.put(playerId.toString(), playerTag);
+		});
+
+		tag.put(ORDERS_KEY, storedOrders);
+
+		CompoundTag storedSlots = new CompoundTag();
+		state.boughtSlots.forEach((playerId, count) -> storedSlots.putInt(playerId.toString(), count));
+		tag.put(BOUGHT_SLOTS_KEY, storedSlots);
+
+		CompoundTag storedPending = new CompoundTag();
+
+		state.pendingSales.forEach((playerId, pending) -> {
+			CompoundTag entry = new CompoundTag();
+			entry.putDouble(PENDING_COUNT_KEY, pending[0]);
+			entry.putDouble(PENDING_TOTAL_KEY, pending[1]);
+			storedPending.put(playerId.toString(), entry);
+		});
+
+		tag.put(PENDING_SALES_KEY, storedPending);
 		return tag;
 	}
 

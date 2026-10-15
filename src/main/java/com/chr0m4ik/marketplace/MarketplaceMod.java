@@ -3,6 +3,8 @@ package com.chr0m4ik.marketplace;
 import com.chr0m4ik.marketplace.command.MarketplaceCommands;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
+import com.chr0m4ik.marketplace.market.MarketTick;
+import com.chr0m4ik.marketplace.market.SaleTimes;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.network.MarketplaceNetworking;
 import com.chr0m4ik.marketplace.price.ItemPrices;
@@ -35,10 +37,14 @@ public class MarketplaceMod implements ModInitializer {
 		MarketplaceMenus.initialize();
 		MarketplaceNetworking.registerServer();
 
-		// Читаем прайс и лимиты сразу при загрузке: если файлы повреждены, это видно в логе,
-		// а не при первой сделке.
+		// Читаем прайс, лимиты и время продажи сразу при загрузке: если файлы повреждены,
+		// это видно в логе, а не при первой сделке.
 		ItemPrices.ensureLoaded();
 		TraderLimits.ensureLoaded();
+		SaleTimes.ensureLoaded();
+
+		// Рынок: ордера продаются со временем, даже если игрок вышел.
+		MarketTick.register();
 
 		// Смерть игрока: теряется часть денег, а не весь кошелёк.
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
