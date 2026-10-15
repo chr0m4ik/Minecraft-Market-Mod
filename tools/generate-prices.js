@@ -104,6 +104,9 @@ const BASE = {
 	'minecraft:trial_key': 25000,
 	'minecraft:experience_bottle': 5000, 'minecraft:enchanted_golden_apple': 50000000,
 	'minecraft:name_tag': 5000, 'minecraft:saddle': 10000, 'minecraft:elytra': 20000000000,
+	// Узор флага Моджанга — как остальные узоры (они дешёвые, из бумаги), а ключи испытаний дорогие.
+	'minecraft:mojang_banner_pattern': 5,
+	'minecraft:trial_key': 1000000, 'minecraft:ominous_trial_key': 1000000,
 	'minecraft:totem_of_undying': 100000000, 'minecraft:nether_star': 2000000000,
 	'minecraft:dragon_egg': 5000000000, 'minecraft:spawner': 10000000000,
 	'minecraft:trial_spawner': 2000000000, 'minecraft:vault': 2000000000, 'minecraft:end_portal_frame': 10000000,
