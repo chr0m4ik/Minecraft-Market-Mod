@@ -3,9 +3,7 @@ package com.chr0m4ik.marketplace;
 import com.chr0m4ik.marketplace.command.MarketplaceCommands;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.network.MarketplaceNetworking;
-import com.chr0m4ik.marketplace.price.ItemPrices;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,9 +26,6 @@ public class MarketplaceMod implements ModInitializer {
 		MarketplaceCommands.register();
 		MarketplaceMenus.initialize();
 		MarketplaceNetworking.registerServer();
-
-		// Прайс-лист читается из ресурсов мода при старте сервера.
-		ServerLifecycleEvents.SERVER_STARTED.register(ItemPrices::load);
 
 		// Дальше здесь появятся: подписка на события, слоты продажи, киты.
 	}

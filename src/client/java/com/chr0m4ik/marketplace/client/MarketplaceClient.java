@@ -3,6 +3,7 @@ package com.chr0m4ik.marketplace.client;
 import com.chr0m4ik.marketplace.MarketplaceMod;
 import com.chr0m4ik.marketplace.client.hud.MoneyHudElement;
 import com.chr0m4ik.marketplace.client.screen.MarketplaceScreen;
+import com.chr0m4ik.marketplace.client.tooltip.MarketplaceTooltips;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.network.MarketplaceStatusPayload;
 import com.chr0m4ik.marketplace.network.OpenMarketplacePayload;
@@ -41,6 +42,9 @@ public class MarketplaceClient implements ClientModInitializer {
 
 		// Плашка с деньгами поверх игры (правый верхний угол).
 		HudElementRegistry.addLast(MarketplaceMod.id("money"), new MoneyHudElement());
+
+		// Цены в подсказках предметов.
+		MarketplaceTooltips.register();
 
 		// Состояние с сервера: баланс и стоимость инвентаря.
 		ClientPlayNetworking.registerGlobalReceiver(MarketplaceStatusPayload.TYPE, (payload, context) ->

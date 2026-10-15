@@ -1,7 +1,6 @@
 package com.chr0m4ik.marketplace.price;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
@@ -9,15 +8,16 @@ import com.mojang.serialization.JsonOps;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,8 +40,8 @@ import java.util.Set;
  * Так как покупка дороже самой выгодной продажи, «купить — продать» всегда в убыток.
  */
 public final class ItemPrices {
-	/** Файл с прайсом внутри мода. */
-	private static final Identifier FILE = MarketplaceMod.id("prices.json");
+	/** Прайс внутри мода. Читаем его прямо из своего jar-файла, поэтому цены одинаковы на клиенте и на сервере. */
+	private static final String FILE_PATH = "/data/marketplace/prices.json";
 
 	/** Цена предмета, которого нет в прайсе: продать можно за копейку, купить нельзя. */
 	public static final double UNKNOWN_PRICE = 1.0;
@@ -58,73 +58,72 @@ public final class ItemPrices {
 	private static final Codec<Map<String, Double>> PRICES_CODEC = Codec.unboundedMap(Codec.STRING, Codec.DOUBLE);
 	private static final Codec<List<String>> NAMES_CODEC = Codec.STRING.listOf();
 
-	private static final Map<Item, Double> PRICES = new HashMap<>();
-	private static final Set<Item> NOT_BUYABLE = new HashSet<>();
+	private static Map<Item, Double> prices = Map.of();
+	private static Set<Item> notBuyable = Set.of();
+	/** Пытались ли уже загрузить прайс (чтобы не пробовать повторно при ошибке). */
+	private static boolean loadAttempted;
 	private static boolean loaded;
 
 	private ItemPrices() {
 		// Класс только со статическими методами.
 	}
 
-	/** Вызывается при старте сервера: читает прайс из ресурсов мода. */
-	public static void load(MinecraftServer server) {
-		PRICES.clear();
-		NOT_BUYABLE.clear();
-		loaded = false;
-
-		List<Resource> stack = server.getResourceManager().getResourceStack(FILE);
-
-		if (stack.isEmpty()) {
-			MarketplaceMod.LOGGER.error("Не найден прайс-лист {} — цены не загружены, покупать нельзя ничего", FILE);
+	/**
+	 * Читает прайс-лист из ресурсов мода. Вызывается сама при первом обращении —
+	 * и на сервере, и на клиенте (клиенту цены нужны для подсказок предметов).
+	 */
+	public static synchronized void ensureLoaded() {
+		if (loadAttempted) {
 			return;
 		}
 
-		// Последний в списке — ресурс с самым высоким приоритетом (наш мод).
-		Resource resource = stack.getLast();
+		loadAttempted = true;
 
-		try (Reader reader = resource.openAsReader()) {
-			JsonElement root = JsonParser.parseReader(reader);
-			JsonObject object = root.getAsJsonObject();
+		Map<Item, Double> loadedPrices = new HashMap<>();
+		Set<Item> loadedNotBuyable = new HashSet<>();
 
-			Map<String, Double> prices = PRICES_CODEC.parse(JsonOps.INSTANCE, object.get("prices")).getOrThrow();
-			List<String> notBuyable = NAMES_CODEC.parse(JsonOps.INSTANCE, object.get("notBuyable")).getOrThrow();
+		try (InputStream stream = ItemPrices.class.getResourceAsStream(FILE_PATH)) {
+			if (stream == null) {
+				MarketplaceMod.LOGGER.error("Не найден прайс-лист {} — цены неизвестны, покупать нельзя ничего", FILE_PATH);
+				return;
+			}
 
-			prices.forEach(ItemPrices::register);
-			notBuyable.forEach(ItemPrices::registerNotBuyable);
+			try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+				JsonObject object = JsonParser.parseReader(reader).getAsJsonObject();
+
+				PRICES_CODEC.parse(JsonOps.INSTANCE, object.get("prices")).getOrThrow()
+						.forEach((id, price) -> resolveItem(id).ifPresent(item -> loadedPrices.put(item, price)));
+
+				NAMES_CODEC.parse(JsonOps.INSTANCE, object.get("notBuyable")).getOrThrow()
+						.forEach(id -> resolveItem(id).ifPresent(loadedNotBuyable::add));
+			}
+
+			prices = Map.copyOf(loadedPrices);
+			notBuyable = Set.copyOf(loadedNotBuyable);
 			loaded = true;
 
-			MarketplaceMod.LOGGER.info("Прайс-лист загружен: {} предметов, {} нельзя купить", PRICES.size(), NOT_BUYABLE.size());
+			MarketplaceMod.LOGGER.info("Прайс-лист загружен: {} предметов, {} нельзя купить", prices.size(), notBuyable.size());
 		} catch (IOException | RuntimeException exception) {
 			// Не прячем проблему: пишем понятную ошибку и оставляем прайс пустым.
-			MarketplaceMod.LOGGER.error("Не удалось прочитать прайс-лист {}", FILE, exception);
+			MarketplaceMod.LOGGER.error("Не удалось прочитать прайс-лист {}", FILE_PATH, exception);
 		}
 	}
 
-	private static void register(String id, double price) {
+	/** Находит предмет по его id. Неизвестные id пропускаем с предупреждением. */
+	private static Optional<Item> resolveItem(String id) {
 		Optional<Item> item = BuiltInRegistries.ITEM.getOptional(Identifier.parse(id));
 
 		if (item.isEmpty()) {
 			MarketplaceMod.LOGGER.warn("В прайсе есть неизвестный предмет, запись пропущена: {}", id);
-			return;
 		}
 
-		PRICES.put(item.get(), price);
-	}
-
-	private static void registerNotBuyable(String id) {
-		Optional<Item> item = BuiltInRegistries.ITEM.getOptional(Identifier.parse(id));
-
-		if (item.isEmpty()) {
-			MarketplaceMod.LOGGER.warn("В списке «нельзя купить» неизвестный предмет, запись пропущена: {}", id);
-			return;
-		}
-
-		NOT_BUYABLE.add(item.get());
+		return item;
 	}
 
 	/** Базовая цена предмета (за 1 штуку). */
 	public static double priceOf(Item item) {
-		return PRICES.getOrDefault(item, UNKNOWN_PRICE);
+		ensureLoaded();
+		return prices.getOrDefault(item, UNKNOWN_PRICE);
 	}
 
 	/** Базовая цена всего стака, включая зачарования. */
@@ -133,7 +132,8 @@ public final class ItemPrices {
 			return 0.0;
 		}
 
-		double price = priceOf(stack.getItem()) * stack.getCount();
+		ensureLoaded();
+		double price = prices.getOrDefault(stack.getItem(), UNKNOWN_PRICE) * stack.getCount();
 
 		// Зачарования на самом предмете.
 		ItemEnchantments enchantments = stack.get(DataComponents.ENCHANTMENTS);
@@ -154,6 +154,7 @@ public final class ItemPrices {
 
 	/** Сколько стоит всё, что лежит в инвентаре игрока (по цене продажи за 1x). */
 	public static double priceOfInventory(Inventory inventory) {
+		ensureLoaded();
 		double total = 0.0;
 
 		for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
@@ -165,21 +166,25 @@ public final class ItemPrices {
 
 	/** Есть ли предмет в прайсе. */
 	public static boolean isPriced(Item item) {
-		return PRICES.containsKey(item);
+		ensureLoaded();
+		return prices.containsKey(item);
 	}
 
 	/** Можно ли купить предмет у рынка. */
 	public static boolean isBuyable(Item item) {
-		return loaded && PRICES.containsKey(item) && !NOT_BUYABLE.contains(item);
+		ensureLoaded();
+		return loaded && prices.containsKey(item) && !notBuyable.contains(item);
 	}
 
 	/** Загружен ли прайс (если нет — цены считаются неизвестными). */
 	public static boolean isLoaded() {
+		ensureLoaded();
 		return loaded;
 	}
 
 	/** Сколько предметов в прайсе — для проверок и логов. */
 	public static int size() {
-		return PRICES.size();
+		ensureLoaded();
+		return prices.size();
 	}
 }

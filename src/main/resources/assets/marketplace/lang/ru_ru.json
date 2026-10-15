@@ -8,6 +8,17 @@
 	"marketplace.gui.button.sell": "Продать",
 	"marketplace.gui.button.buy": "Купить",
 	"marketplace.gui.button.back": "Назад",
+	"marketplace.gui.button.cancel": "Отмена",
+	"marketplace.gui.button.trade": "Торговать",
+	"marketplace.gui.button.total": "Итоговая цена",
+
+	"marketplace.tooltip.price.unit": "Цена: %s",
+	"marketplace.tooltip.price.stack": "Всего: %s",
+	"marketplace.tooltip.trader.count": "Товара: %s шт.",
+	"marketplace.tooltip.trader.full": "Обычная цена: %s",
+	"marketplace.tooltip.trader.discounted": "С уценкой у торговца: %s",
+
+	"marketplace.gui.trader.sold": "Продано торговцу: %s шт. на %s",
 
 	"key.category.marketplace.main": "Minecraft Marketplace",
 	"key.marketplace.open": "Открыть рынок",

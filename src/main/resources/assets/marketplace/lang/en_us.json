@@ -8,6 +8,17 @@
 	"marketplace.gui.button.sell": "Sell",
 	"marketplace.gui.button.buy": "Buy",
 	"marketplace.gui.button.back": "Back",
+	"marketplace.gui.button.cancel": "Cancel",
+	"marketplace.gui.button.trade": "Trade",
+	"marketplace.gui.button.total": "Total price",
+
+	"marketplace.tooltip.price.unit": "Price: %s",
+	"marketplace.tooltip.price.stack": "Total: %s",
+	"marketplace.tooltip.trader.count": "Items: %s",
+	"marketplace.tooltip.trader.full": "Full price: %s",
+	"marketplace.tooltip.trader.discounted": "With trader discount: %s",
+
+	"marketplace.gui.trader.sold": "Sold to trader: %s items for %s",
 
 	"key.category.marketplace.main": "Minecraft Marketplace",
 	"key.marketplace.open": "Open market",

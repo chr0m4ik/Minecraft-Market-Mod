@@ -1,10 +1,14 @@
 package com.chr0m4ik.marketplace.menu;
 
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
+import com.chr0m4ik.marketplace.economy.MoneyFormat;
+import com.chr0m4ik.marketplace.economy.TraderService;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Prediction;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -12,6 +16,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.SimpleContainerData;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -21,28 +26,36 @@ import net.minecraft.world.item.Items;
  *
  * <p>Как устроено:
  * <ul>
- *     <li>верхняя часть окна (3 или 6 рядов) — «ненастоящий» контейнер {@link SimpleContainer}.
- *     Предметы в нём — это кнопки: их нельзя взять или подменить, а клик по ним выполняет
- *     действие (см. {@link #clicked});</li>
- *     <li>нижняя часть — обычный инвентарь игрока, он работает как всегда;</li>
- *     <li>баланс показывается на клиенте через {@link ContainerData} — это штатный способ
- *     передавать числа из серверной части окна в клиентскую.</li>
+ *     <li>верхняя часть окна делится на слоты для предметов ({@link WindowKind#tradeSlots()}) и
+ *     слоты-кнопки. Кнопка — это предмет, который нельзя забрать или подменить, а клик по нему
+ *     выполняет действие (см. {@link #clicked});</li>
+ *     <li>нижняя часть — обычный инвентарь игрока;</li>
+ *     <li>баланс показывается на клиенте через {@link ContainerData} — штатный способ передать
+ *     числа из серверной части окна в клиентскую.</li>
  * </ul>
  */
 public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Баланс передаём как одно long-число (копейки), а слоты данных — это int. Отсюда 2. */
 	private static final int DATA_SIZE = 2;
 
-	/** Слот кнопки «Назад» в системной строке окон 9×6 (последний ряд, середина). */
-	public static final int BACK_SLOT = 49;
-
 	/** Слоты кнопок главного меню (средний ряд: 10, 13, 16). */
 	public static final int MAIN_SLOT_TRADER = 10;
 	public static final int MAIN_SLOT_SELL = 13;
 	public static final int MAIN_SLOT_BUY = 16;
 
+	/** Кнопки в системной строке окна торговца. */
+	public static final int TRADER_SLOT_CANCEL = 45;
+	public static final int TRADER_SLOT_INFO = 47;
+	public static final int TRADER_SLOT_TRADE = 49;
+
+	/** Кнопка «Назад» в окнах-заготовках. */
+	public static final int BACK_SLOT = 49;
+
 	private final WindowKind kind;
-	private final SimpleContainer container;
+	/** Предметы-кнопки. */
+	private final SimpleContainer buttonContainer;
+	/** Предметы, выставленные на продажу (у торговца — товар). */
+	private final SimpleContainer tradeContainer;
 	private final ContainerData data;
 	/** Ссылка на игрока есть только на сервере; на клиенте здесь null. */
 	private final ServerPlayer serverPlayer;
@@ -50,12 +63,22 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	public MarketplaceMenu(WindowKind kind, int syncId, Inventory inventory) {
 		super(MarketplaceMenus.typeOf(kind), syncId);
 		this.kind = kind;
-		this.container = new SimpleContainer(kind.containerSlots());
+		// Размер 0 у SimpleContainer допустим, но чтобы не думать об этом — минимум одна ячейка.
+		this.buttonContainer = new SimpleContainer(Math.max(1, kind.buttonSlots()));
+		this.tradeContainer = new SimpleContainer(Math.max(1, kind.tradeSlots()));
 		this.serverPlayer = inventory.player instanceof ServerPlayer player ? player : null;
 
-		// Верхняя часть окна: все слоты — кнопки.
-		for (int i = 0; i < kind.containerSlots(); i++) {
-			this.addSlot(new ActionSlot(this.container, i, 8 + (i % 9) * 18, 18 + (i / 9) * 18));
+		int total = kind.containerSlots();
+		int tradeSlots = kind.tradeSlots();
+
+		// Сначала слоты под товар — они работают как обычные.
+		for (int i = 0; i < tradeSlots; i++) {
+			this.addSlot(new Slot(this.tradeContainer, i, slotX(i), slotY(i)));
+		}
+
+		// Потом слоты-кнопки.
+		for (int i = tradeSlots; i < total; i++) {
+			this.addSlot(new ActionSlot(this.buttonContainer, i - tradeSlots, slotX(i), slotY(i)));
 		}
 
 		// Нижняя часть окна: инвентарь игрока (3 ряда + хотбар).
@@ -68,31 +91,51 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.updateBalance();
 	}
 
+	private static int slotX(int index) {
+		return 8 + (index % 9) * 18;
+	}
+
+	private static int slotY(int index) {
+		return 18 + (index / 9) * 18;
+	}
+
 	/** Раскладываем предметы-кнопки по своим слотам. */
 	private void fillButtons() {
 		if (this.kind == WindowKind.MAIN) {
 			this.setButton(MAIN_SLOT_TRADER, Items.EMERALD, "marketplace.gui.button.trader");
 			this.setButton(MAIN_SLOT_SELL, Items.CLOCK, "marketplace.gui.button.sell");
 			this.setButton(MAIN_SLOT_BUY, Items.CHEST, "marketplace.gui.button.buy");
-		} else {
-			this.setButton(BACK_SLOT, Items.ARROW, "marketplace.gui.button.back");
+			return;
 		}
+
+		if (this.kind == WindowKind.TRADER) {
+			this.setButton(TRADER_SLOT_CANCEL, Items.BARRIER, "marketplace.gui.button.cancel");
+			this.setButton(TRADER_SLOT_INFO, Items.PAPER, "marketplace.gui.button.total");
+			this.setButton(TRADER_SLOT_TRADE, Items.EMERALD, "marketplace.gui.button.trade");
+			return;
+		}
+
+		this.setButton(BACK_SLOT, Items.ARROW, "marketplace.gui.button.back");
 	}
 
-	private void setButton(int slot, Item item, String nameKey) {
+	/**
+	 * @param containerSlot номер слота в верхней части окна (как его видит игрок),
+	 *                      а не индекс внутри контейнера кнопок.
+	 */
+	private void setButton(int containerSlot, Item item, String nameKey) {
 		ItemStack stack = new ItemStack(item);
 		// Своё название предмета — игрок увидит его в подсказке при наведении.
 		stack.set(DataComponents.CUSTOM_NAME, Component.translatable(nameKey));
-		this.container.setItem(slot, stack);
+		this.buttonContainer.setItem(containerSlot - this.kind.tradeSlots(), stack);
 	}
 
 	/**
 	 * Клик по слоту. Слоты-кнопки перехватываем целиком: ни взять предмет, ни положить,
-	 * ни выбросить — только выполнить действие.
+	 * ни выбросить — только выполнить действие. Слоты с товаром работают как обычно.
 	 */
 	@Override
 	public void clicked(int slotId, int button, ContainerInput input, Player player) {
-		if (slotId >= 0 && slotId < this.kind.containerSlots()) {
+		if (this.isButtonSlot(slotId)) {
 			if (input == ContainerInput.PICKUP && button == 0) {
 				this.onButtonClick(slotId, player);
 			}
@@ -103,9 +146,14 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		super.clicked(slotId, button, input, player);
 	}
 
+	/** Является ли слот верхней части окна кнопкой. */
+	public boolean isButtonSlot(int slotIndex) {
+		return slotIndex >= this.kind.tradeSlots() && slotIndex < this.kind.containerSlots();
+	}
+
 	/** Что делать при нажатии на кнопку. */
 	private void onButtonClick(int slotId, Player player) {
-		// Окна открывает только сервер: на клиенте serverPlayer пустой.
+		// Окна открывает и сделки проводит только сервер: на клиенте serverPlayer пустой.
 		if (!(player instanceof ServerPlayer serverPlayer)) {
 			return;
 		}
@@ -118,22 +166,116 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			} else if (slotId == MAIN_SLOT_BUY) {
 				MarketplaceMenus.open(serverPlayer, WindowKind.BUY);
 			}
-		} else if (slotId == BACK_SLOT) {
+
+			return;
+		}
+
+		if (this.kind == WindowKind.TRADER) {
+			if (slotId == TRADER_SLOT_CANCEL) {
+				// Возврат в главное меню; товар вернётся в инвентарь сам (см. removed).
+				MarketplaceMenus.open(serverPlayer, WindowKind.MAIN);
+			} else if (slotId == TRADER_SLOT_TRADE) {
+				this.tradeToTrader(serverPlayer);
+			}
+
+			// Кнопка «итоговая цена» ничего не делает — она только показывает подсказку.
+			return;
+		}
+
+		if (slotId == BACK_SLOT) {
 			MarketplaceMenus.open(serverPlayer, WindowKind.MAIN);
 		}
 	}
 
+	/** Сделка с торговцем: товар исчезает, деньги начисляются по цене с уценкой. */
+	private void tradeToTrader(ServerPlayer player) {
+		MinecraftServer server = player.level().getServer();
+
+		if (server == null) {
+			return;
+		}
+
+		TraderService.Offer offer = TraderService.take(this.tradeContainer, this.kind.tradeSlots());
+
+		if (offer.isEmpty()) {
+			return;
+		}
+
+		MarketplaceEconomy.addBalance(server, player.getUUID(), offer.payout());
+		this.broadcastChanges();
+
+		player.sendSystemMessage(Component.translatable("marketplace.gui.trader.sold",
+				Component.literal(String.valueOf(offer.itemCount())), money(offer.payout())));
+	}
+
 	@Override
 	public ItemStack quickMoveStack(Player player, int slotIndex) {
-		// Shift-клик пока ничего не делает: слоты-кнопки предметы не принимают,
-		// а слоты продажи появятся на следующих этапах.
-		return ItemStack.EMPTY;
+		int tradeSlots = this.kind.tradeSlots();
+		int containerSlots = this.kind.containerSlots();
+
+		// В главном меню shift-клик ничего не делает: там одни кнопки.
+		if (tradeSlots == 0 || slotIndex < 0 || slotIndex >= this.slots.size()) {
+			return ItemStack.EMPTY;
+		}
+
+		Slot slot = this.slots.get(slotIndex);
+
+		if (!slot.hasItem()) {
+			return ItemStack.EMPTY;
+		}
+
+		ItemStack stack = slot.getItem();
+		ItemStack moved = stack.copy();
+
+		if (slotIndex < containerSlots) {
+			// Из окна торговца — назад в инвентарь.
+			if (!this.moveItemStackTo(stack, containerSlots, this.slots.size(), true)) {
+				return ItemStack.EMPTY;
+			}
+		} else if (!this.moveItemStackTo(stack, 0, tradeSlots, false)) {
+			// Из инвентаря — в окно торговца.
+			return ItemStack.EMPTY;
+		}
+
+		if (stack.isEmpty()) {
+			slot.setByPlayer(ItemStack.EMPTY);
+		} else {
+			slot.setChanged();
+		}
+
+		return moved;
 	}
 
 	@Override
 	public boolean stillValid(Player player) {
 		// Окно не привязано к блоку, поэтому всегда доступно.
 		return true;
+	}
+
+	/**
+	 * Окно закрыли, а товар остался — возвращаем его игроку (или выбрасываем, если не влезает).
+	 * Так предметы не пропадают, если игрок вышел из игры, не нажав «Торговать».
+	 */
+	@Override
+	public void removed(Player player) {
+		super.removed(player);
+
+		// На клиенте ничего не делаем: там serverPlayer пустой, и предметы продублировались бы.
+		if (this.serverPlayer == null) {
+			return;
+		}
+
+		for (int i = 0; i < this.kind.tradeSlots(); i++) {
+			ItemStack stack = this.tradeContainer.getItem(i);
+
+			if (stack.isEmpty()) {
+				continue;
+			}
+
+			this.tradeContainer.setItem(i, ItemStack.EMPTY);
+			// Штатный способ вернуть предметы: что не влезет в инвентарь — упадёт под игроком.
+			player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+		}
 	}
 
 	@Override
@@ -168,5 +310,19 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 	public WindowKind getKind() {
 		return this.kind;
+	}
+
+	/** Сколько слотов отведено под товар (нужно клиенту для подсказок и подсчётов). */
+	public int tradeSlotCount() {
+		return this.kind.tradeSlots();
+	}
+
+	/** Что сейчас выставлено на продажу — для подсказки кнопки «итоговая цена». */
+	public TraderService.Offer currentOffer() {
+		return TraderService.evaluate(this.tradeContainer, this.kind.tradeSlots());
+	}
+
+	private static Component money(double amount) {
+		return Component.literal(MoneyFormat.format(amount)).withStyle(ChatFormatting.GREEN);
 	}
 }

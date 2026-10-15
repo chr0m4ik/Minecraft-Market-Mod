@@ -41,6 +41,14 @@ public class MarketplaceScreen extends AbstractContainerScreen<MarketplaceMenu> 
 		super(menu, inventory, title, WindowKind.IMAGE_WIDTH, menu.getKind().imageHeight());
 	}
 
+	/**
+	 * Наведён ли курсор на слот-кнопку. Нужно подсказкам предметов: у кнопок своя подсказка,
+	 * а не цена.
+	 */
+	public boolean isHoveringButton() {
+		return this.hoveredSlot != null && this.menu.isButtonSlot(this.hoveredSlot.index);
+	}
+
 	@Override
 	public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 		super.extractBackground(graphics, mouseX, mouseY, partialTick);
