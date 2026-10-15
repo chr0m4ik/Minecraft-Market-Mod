@@ -1,0 +1,53 @@
+plugins {
+	// Loom для НЕобфусцированных версий игры (Minecraft 26.1 и новее).
+	// Для старых версий используется отдельный плагин net.fabricmc.fabric-loom-remap.
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+repositories {
+	// Отдельные репозитории не нужны: Loom сам подключает Fabric, Mojang и Maven Central.
+}
+
+loom {
+	// Делим код на общий (src/main) и клиентский (src/client).
+	// Так клиентский код (окна, рендер) физически не попадёт в серверную часть.
+	splitEnvironmentSourceSets()
+
+	mods {
+		"marketplace" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+dependencies {
+	// Строки mappings здесь нет намеренно: с Minecraft 26.1 игра не обфусцирована,
+	// поэтому Yarn и Mojang mappings больше не нужны.
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+// Подставляем версию мода в fabric.mod.json при сборке.
+processResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+// Компилируем под Java 25 (требование Minecraft 26.3).
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	// Вместе с модом собираем jar с исходниками (удобно для отладки).
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}

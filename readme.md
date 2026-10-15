@@ -1,0 +1,63 @@
+# Minecraft Marketplace Mod
+
+Внутриигровая экономика для Minecraft Java Edition **26.3** (Fabric): рынок, продажа и покупка предметов за доллары, динамические цены, слоты продажи, глобальные события и киты.
+
+Мод рассчитан на одиночную игру и LAN. Все игровые окна собраны **из ванильных элементов** — свои текстуры не используются: окна выглядят как сундук и двойной сундук, а роль кнопок играют предметы в слотах (их нельзя забрать, но клик по ним выполняет действие).
+
+---
+
+## Что нужно для запуска
+
+| Компонент | Версия |
+|---|---|
+| Minecraft | 26.3 |
+| Java | 25 (обязательно) |
+| Fabric Loader | 0.19.5 |
+| Fabric API | 0.163.0+26.3 |
+
+---
+
+## Разработка
+
+### Требования
+
+- **JDK 25** — установлен в `Z:\Android\JDK\25`.
+- **Кеш Gradle** — папка `Z:\gradle-home` (чтобы не забивать диск `C:`). Скачанные Minecraft, ассеты и библиотеки (2–4 ГБ) лежат там.
+- **VS Code** с расширениями `vscjava.vscode-java-pack` и `vscjava.vscode-gradle`.
+
+Все настройки JDK и кеша уже прописаны в проекте: `.vscode/settings.json`, `.vscode/tasks.json` и `gradle.properties` (`org.gradle.java.home`). Глобальные переменные системы при этом не меняются — Android-проекты на этой машине не затрагиваются.
+
+### Как запустить игру из VS Code
+
+**Способ 1 (основной).** `Ctrl+Shift+P` → `Tasks: Run Task` → **Запустить Minecraft (runClient)**.
+
+**Способ 2.** Панель Gradle в левой части окна (значок слона) → `Tasks` → `fabric` → `runClient`.
+
+**Способ 3.** Во встроенном терминале VS Code: `.\gradlew runClient`.
+
+Логи игры: `run/logs/latest.log`. Признак того, что мод загрузился — строка `Loading Minecraft Marketplace Mod`.
+
+### Сборка jar
+
+`Ctrl+Shift+P` → `Tasks: Run Task` → **Собрать мод (build)**, либо `.\gradlew build`.
+
+Готовый файл появится в `build/libs/marketplace-<версия>.jar`.
+
+---
+
+## Структура проекта
+
+```
+src/main/java/        — общий код (работает и на клиенте, и на сервере): экономика, команды, сохранения
+src/main/resources/   — fabric.mod.json, иконка, локализация, данные (цены, киты)
+src/client/java/      — только клиент: окна (GUI), рендер, подсказки предметов
+gradle.properties     — версии Minecraft / Fabric / Loom и путь к JDK
+```
+
+---
+
+## Если что-то не работает
+
+1. Смотри `run/logs/latest.log`, ищи строки `ERROR`, `FATAL`, `Exception`.
+2. Если Gradle не видит JDK — проверь путь в `gradle.properties` (`org.gradle.java.home`).
+3. Если VS Code показывает ложные ошибки в коде — `Ctrl+Shift+P` → `Java: Clean Java Language Server Workspace`.

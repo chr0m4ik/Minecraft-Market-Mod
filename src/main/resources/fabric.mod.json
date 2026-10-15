@@ -1,0 +1,27 @@
+{
+	"schemaVersion": 1,
+	"id": "marketplace",
+	"version": "${version}",
+	"name": "Minecraft Marketplace Mod",
+	"description": "Внутриигровая экономика: продажа и покупка предметов за доллары, динамические цены, слоты продажи, события и киты.",
+	"authors": [
+		"chr0m4ik"
+	],
+	"license": "All-Rights-Reserved",
+	"icon": "assets/marketplace/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.chr0m4ik.marketplace.MarketplaceMod"
+		],
+		"client": [
+			"com.chr0m4ik.marketplace.client.MarketplaceClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
