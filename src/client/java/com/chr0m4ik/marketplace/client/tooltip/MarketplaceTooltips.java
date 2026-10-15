@@ -5,6 +5,7 @@ import com.chr0m4ik.marketplace.client.screen.MarketplaceScreen;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.economy.TraderService;
 import com.chr0m4ik.marketplace.economy.TraderPrices;
+import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenu;
 import com.chr0m4ik.marketplace.menu.WindowKind;
 import com.chr0m4ik.marketplace.price.ItemPrices;
@@ -71,7 +72,7 @@ public final class MarketplaceTooltips {
 			}
 
 			if (menu.getKind() == WindowKind.BUY_ITEM) {
-				addBuyLines(lines, screen, menu, stack);
+				addBuyLines(lines, marketplace, menu, stack);
 				return;
 			}
 
