@@ -87,7 +87,7 @@
 
 	"marketplace.hud.balance": "Balance: %s",
 	"marketplace.hud.inventory": "Inventory: %s"
-	"marketplace.gui.category": "Category: %s",
+,	"marketplace.gui.category": "Category: %s",
 	"marketplace.gui.category.kits": "Kits",
 	"marketplace.gui.category.weapons": "Weapons",
 	"marketplace.gui.category.armor": "Armor",
@@ -99,4 +99,5 @@
 	"marketplace.gui.category.materials": "Materials",
 	"marketplace.gui.category.count": "Items: %s",
 	"marketplace.gui.buy.list.title": "Shop — items",
-	"marketplace.gui.buy.item.title": "Buy an item",}
+	"marketplace.gui.buy.item.title": "Buy an item"
+}
