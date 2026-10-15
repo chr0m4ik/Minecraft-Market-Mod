@@ -928,7 +928,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
-		if (this.kind == WindowKind.CONFIRM) {
+		// Возвращать предметы в инвентарь имеет смысл только у торговца: там в слотах лежат
+		// вещи игрока. В остальных окнах (список товаров магазина, подтверждение) слоты
+		// служат только для показа, и «возвращать» их нельзя — иначе товары выпадут на пол.
+		if (this.kind != WindowKind.TRADER) {
 			return;
 		}
 
