@@ -169,7 +169,7 @@ public final class ShopCatalog {
 		}
 	}
 
-	/** Книги зачарований: по книге на каждое зачарование (максимального уровня). */
+	/** Книги зачарований: по книге на каждое зачарование и на каждый его уровень. */
 	private static void addBooks(List<ItemStack> stacks) {
 		if (registries == null) {
 			stacks.add(new ItemStack(Items.ENCHANTED_BOOK));
@@ -177,11 +177,13 @@ public final class ShopCatalog {
 		}
 
 		registries.lookup(Registries.ENCHANTMENT).ifPresent(lookup -> lookup.listElements().forEach(enchantment -> {
-			ItemStack stack = new ItemStack(Items.ENCHANTED_BOOK);
-			ItemEnchantments.Mutable enchantments = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
-			enchantments.set(enchantment, enchantment.value().getMaxLevel());
-			stack.set(DataComponents.STORED_ENCHANTMENTS, enchantments.toImmutable());
-			stacks.add(stack);
+			for (int level = 1; level <= enchantment.value().getMaxLevel(); level++) {
+				ItemStack stack = new ItemStack(Items.ENCHANTED_BOOK);
+				ItemEnchantments.Mutable enchantments = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
+				enchantments.set(enchantment, level);
+				stack.set(DataComponents.STORED_ENCHANTMENTS, enchantments.toImmutable());
+				stacks.add(stack);
+			}
 		}));
 	}
 
