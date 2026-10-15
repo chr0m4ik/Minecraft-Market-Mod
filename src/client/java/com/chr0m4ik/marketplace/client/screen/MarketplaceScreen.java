@@ -49,6 +49,11 @@ public class MarketplaceScreen extends AbstractContainerScreen<MarketplaceMenu> 
 		return this.hoveredSlot != null && this.menu.isButtonSlot(this.hoveredSlot.index);
 	}
 
+	/** Номер слота под курсором ({@code -1}, если курсор ни на чём). */
+	public int getHoveredSlotIndex() {
+		return this.hoveredSlot == null ? -1 : this.hoveredSlot.index;
+	}
+
 	@Override
 	public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 		super.extractBackground(graphics, mouseX, mouseY, partialTick);

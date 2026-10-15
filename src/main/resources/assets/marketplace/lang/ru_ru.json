@@ -24,6 +24,18 @@
 	"marketplace.gui.market.listed": "Выставлено ордеров: %s",
 	"marketplace.gui.slot.bought": "Куплен новый слот за %s",
 	"marketplace.gui.slot.noMoney": "Не хватает денег: слот стоит %s",
+	"marketplace.gui.slot.locked": "Закрытая ячейка — купите слот",
+	"marketplace.gui.market.cancelled": "Ордер снят: %s возвращён в инвентарь",
+
+	"marketplace.time.minutes": "%s мин",
+	"marketplace.time.hours": "%s ч %s мин",
+	"marketplace.tooltip.market.orders": "За все ордера: %s (%s шт.)",
+	"marketplace.tooltip.market.stagedMoney": "За неподтверждённые: %s (%s шт.)",
+	"marketplace.tooltip.market.markup": "Наценка: x%s",
+	"marketplace.tooltip.market.take": "Забрать предмет: Shift + лкм",
+	"marketplace.tooltip.market.time": "Продастся через ~%s",
+	"marketplace.tooltip.market.staged": "Ещё не подтверждено — кнопка «К оформлению»",
+	"marketplace.tooltip.slot.price": "Цена следующего слота: %s",
 
 	"marketplace.tooltip.price.unit": "Цена: %s",
 	"marketplace.tooltip.price.stack": "Всего: %s",

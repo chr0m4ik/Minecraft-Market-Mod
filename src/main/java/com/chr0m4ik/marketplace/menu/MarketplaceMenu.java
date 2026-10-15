@@ -22,6 +22,7 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -45,7 +46,13 @@ import java.util.UUID;
  */
 public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Баланс передаём как одно long-число (копейки), а слоты данных — это int. Отсюда 2. */
-	private static final int DATA_SIZE = 10;
+	private static final int DATA_SIZE = 12 + MarketService.SLOTS;
+
+	/** С какого места в данных начинаются минуты до конца продажи по каждой ячейке. */
+	private static final int CELL_DATA_START = 10;
+
+	/** Где лежит цена следующего слота (это тоже long, поэтому две ячейки). */
+	private static final int NEXT_SLOT_PRICE = 10 + MarketService.SLOTS;
 
 	/** Слоты кнопок главного меню (средний ряд: 10, 13, 16). */
 	public static final int MAIN_SLOT_TRADER = 10;
@@ -96,11 +103,16 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		int total = kind.containerSlots();
 		int tradeSlots = kind.tradeSlots();
 
-		// Сначала слоты под товар. В окне подтверждения их нельзя брать — только смотреть.
+		// Сначала слоты под товар. В окне подтверждения их нельзя брать — только смотреть,
+		// а закрытые ячейки рынка вообще ничего не принимают.
 		for (int i = 0; i < tradeSlots; i++) {
-			this.addSlot(kind.readOnlySlots()
-					? new ActionSlot(this.tradeContainer, i, slotX(i), slotY(i))
-					: new Slot(this.tradeContainer, i, slotX(i), slotY(i)));
+			if (kind.readOnlySlots()) {
+				this.addSlot(new ActionSlot(this.tradeContainer, i, slotX(i), slotY(i)));
+			} else if (kind == WindowKind.SELL) {
+				this.addSlot(new MarketSlot(this, this.tradeContainer, i, slotX(i), slotY(i)));
+			} else {
+				this.addSlot(new Slot(this.tradeContainer, i, slotX(i), slotY(i)));
+			}
 		}
 
 		// Потом слоты-кнопки.
@@ -120,8 +132,9 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	}
 
 	/**
-	 * Заполняет ячейки рынка тем, что уже лежит в сейве: подтверждённые ордера и неподтверждённые
-	 * предметы. Контейнер окна живёт только пока окно открыто, поэтому «реестр» — это сейв.
+	 * Заполняет ячейки рынка тем, что уже лежит в сейве: подтверждённые ордера, неподтверждённые
+	 * предметы и красные панели на некупленных ячейках. Контейнер окна живёт только пока окно
+	 * открыто, поэтому «реестр» — это сейв.
 	 */
 	private void loadMarketCells() {
 		if (this.serverPlayer == null || !this.hasMarketCells()) {
@@ -130,12 +143,31 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 		MarketplaceState state = MarketplaceEconomy.state(this.serverPlayer.level().getServer());
 		UUID playerId = this.serverPlayer.getUUID();
+		int unlocked = MarketService.unlockedSlots(state, playerId);
 
 		for (int i = 0; i < this.kind.tradeSlots(); i++) {
+			if (i >= unlocked) {
+				this.tradeContainer.setItem(i, lockedPane());
+				continue;
+			}
+
 			MarketOrder order = state.order(playerId, i);
 			ItemStack staged = state.staging(playerId).get(i);
 			this.tradeContainer.setItem(i, order != null ? order.stack() : (staged == null ? ItemStack.EMPTY : staged));
 		}
+	}
+
+	/** Красная панель — «ячейка не куплена». */
+	private static ItemStack lockedPane() {
+		// В 26.3 цветные предметы лежат в наборе ColorCollection, поэтому берём цвет через pick.
+		ItemStack pane = new ItemStack(Items.STAINED_GLASS_PANE.pick(DyeColor.RED));
+		pane.set(DataComponents.CUSTOM_NAME, Component.translatable("marketplace.gui.slot.locked"));
+		return pane;
+	}
+
+	/** Открыта ли эта ячейка рынка (данные приходят с сервера, поэтому работает и на клиенте). */
+	public boolean isCellUnlocked(int cell) {
+		return cell < this.data.get(9);
 	}
 
 	/** Есть ли в этом окне ячейки рынка. */
@@ -151,9 +183,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 		MarketplaceState state = MarketplaceEconomy.state(this.serverPlayer.level().getServer());
 		UUID playerId = this.serverPlayer.getUUID();
+		int unlocked = MarketService.unlockedSlots(state, playerId);
 		Map<Integer, ItemStack> items = new HashMap<>();
 
-		for (int i = 0; i < this.kind.tradeSlots(); i++) {
+		for (int i = 0; i < Math.min(this.kind.tradeSlots(), unlocked); i++) {
 			if (state.order(playerId, i) != null) {
 				continue;
 			}
@@ -166,6 +199,42 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		state.setStaging(playerId, items);
+	}
+
+	/**
+	 * Забрать предмет из ячейки рынка: подтверждённый ордер снимается, неподтверждённый предмет
+	 * просто возвращается в инвентарь.
+	 */
+	private void takeMarketCell(Player player, int cell) {
+		if (this.serverPlayer == null || cell < 0 || cell >= this.kind.tradeSlots()
+				|| !this.isCellUnlocked(cell)) {
+			return;
+		}
+
+		MarketplaceState state = MarketplaceEconomy.state(this.serverPlayer.level().getServer());
+		UUID playerId = this.serverPlayer.getUUID();
+		MarketOrder order = state.order(playerId, cell);
+		ItemStack stack;
+
+		if (order != null) {
+			state.removeOrder(playerId, cell);
+			stack = order.stack();
+			player.sendSystemMessage(Component.translatable("marketplace.gui.market.cancelled",
+					stack.getHoverName()).withStyle(ChatFormatting.YELLOW));
+		} else {
+			stack = this.tradeContainer.getItem(cell);
+
+			if (stack.isEmpty()) {
+				return;
+			}
+
+			this.tradeContainer.setItem(cell, ItemStack.EMPTY);
+		}
+
+		player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+		this.saveMarketCells();
+		this.updateData();
+		this.broadcastChanges();
 	}
 
 	private static int slotX(int index) {
@@ -201,9 +270,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		if (this.kind == WindowKind.CONFIRM) {
-			this.setButton(45, Items.BARRIER, "marketplace.gui.button.exit");
-			this.setButton(47, Items.GOLD_INGOT, "marketplace.gui.button.price");
-			this.setButton(49, Items.EMERALD, "marketplace.gui.button.confirm");
+			this.setButton(CONFIRM_SLOT_EXIT, Items.BARRIER, "marketplace.gui.button.exit");
+			this.setButtonWithArg(CONFIRM_SLOT_PRICE, Items.GOLD_INGOT, "marketplace.gui.button.price",
+					Component.literal("x" + markupText()));
+			this.setButton(CONFIRM_SLOT_CONFIRM, Items.EMERALD, "marketplace.gui.button.confirm");
 			return;
 		}
 
@@ -228,6 +298,24 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.buttonContainer.setItem(containerSlot - this.kind.tradeSlots(), stack);
 	}
 
+	/** Кнопка, в названии которой есть значение (например, текущая наценка). */
+	private void setButtonWithArg(int containerSlot, Item item, String nameKey, Component arg) {
+		ItemStack stack = new ItemStack(item);
+		stack.set(DataComponents.CUSTOM_NAME, Component.translatable(nameKey, arg));
+		this.buttonContainer.setItem(containerSlot - this.kind.tradeSlots(), stack);
+	}
+
+	/** Наценка в виде «1», «1.25», «1.5», «1.75», «2». */
+	private String markupText() {
+		double markup = this.markupValue();
+		return markup == Math.floor(markup) ? String.valueOf((int) markup) : String.valueOf(markup);
+	}
+
+	/** Наценка из данных окна (на сервере — из сейва, на клиенте — из синхронизированных данных). */
+	private double markupValue() {
+		return this.data.get(8) / 100.0;
+	}
+
 	/**
 	 * Клик по слоту. Слоты-кнопки перехватываем целиком: ни взять предмет, ни положить,
 	 * ни выбросить — только выполнить действие. Слоты с товаром работают как обычно.
@@ -239,6 +327,13 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				this.onButtonClick(slotId, player);
 			}
 
+			return;
+		}
+
+		// Shift-клик по ячейке рынка: забрать предмет или снять ордер.
+		if (input == ContainerInput.QUICK_MOVE && this.hasMarketCells()
+				&& slotId >= 0 && slotId < this.kind.tradeSlots()) {
+			this.takeMarketCell(player, slotId);
 			return;
 		}
 
@@ -329,7 +424,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	private void cycleMarkup(ServerPlayer player) {
 		MarketplaceState state = MarketplaceEconomy.state(player.level().getServer());
 		state.setMarkup(player.getUUID(), MarketService.nextMarkup(state.markup(player.getUUID())));
-		this.updateData();
+		// Переоткрываем окно, чтобы в названии кнопки сразу появилась новая наценка.
+		MarketplaceMenus.open(player, WindowKind.CONFIRM);
 	}
 
 	/** Подтверждение: неподтверждённые предметы становятся ордерами. */
@@ -549,6 +645,25 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.data.set(7, stagedCount);
 		this.data.set(8, (int) Math.round(state.markup(playerId) * 100.0));
 		this.data.set(9, MarketService.unlockedSlots(state, playerId));
+		setMoney(NEXT_SLOT_PRICE, MarketService.slotPrice(state, playerId));
+
+		// Сколько минут осталось каждому ордеру (нужно для подсказок в ячейках).
+		long now = GameTime.now(server);
+
+		for (int i = 0; i < Math.min(MarketService.SLOTS, DATA_SIZE - CELL_DATA_START); i++) {
+			MarketOrder order = state.order(playerId, i);
+			this.data.set(CELL_DATA_START + i,
+					order == null ? -1 : (int) Math.min(Integer.MAX_VALUE, order.ticksLeft(now) / 1200L));
+		}
+	}
+
+	/** Сколько минут осталось продаваться ордеру в этой ячейке ({@code -1} — ордера нет). */
+	public int getCellMinutes(int cell) {
+		if (cell < 0 || cell >= DATA_SIZE - CELL_DATA_START) {
+			return -1;
+		}
+
+		return this.data.get(CELL_DATA_START + cell);
 	}
 
 	/** Кладёт сумму в копейках в две ячейки данных (числа там только int). */
@@ -594,6 +709,11 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Сколько ячеек рынка открыто. */
 	public int getUnlockedSlots() {
 		return this.data.get(9);
+	}
+
+	/** Цена следующего слота рынка. */
+	public double getNextSlotPrice() {
+		return money(NEXT_SLOT_PRICE);
 	}
 
 	public WindowKind getKind() {

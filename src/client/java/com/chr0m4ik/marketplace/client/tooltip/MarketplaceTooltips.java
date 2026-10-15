@@ -52,12 +52,35 @@ public final class MarketplaceTooltips {
 			MarketplaceMenu menu = marketplace.getMenu();
 
 			if (marketplace.isHoveringButton()) {
-				// Кнопка «итоговая цена» — показываем сводку по выставленному товару.
+				// У кнопок своя подсказка: у бумаги — сводка, у остальных её просто нет.
 				if (menu.getKind() == WindowKind.TRADER && stack.is(Items.PAPER)) {
 					addTraderSummary(lines, menu);
+				} else if (menu.getKind() == WindowKind.SELL && stack.is(Items.PAPER)) {
+					addMarketSummary(lines, menu);
+				} else if (menu.getKind() == WindowKind.BUY_SLOT && stack.is(Items.PAPER)) {
+					lines.add(Component.translatable("marketplace.tooltip.slot.price",
+							money(menu.getNextSlotPrice())).withStyle(ChatFormatting.GOLD));
 				}
 
 				return;
+			}
+
+			if (menu.getKind() == WindowKind.SELL) {
+				// В ячейке рынка: либо ордер (видно, сколько осталось), либо неподтверждённый предмет.
+				int cell = marketplace.getHoveredSlotIndex();
+				int minutes = menu.getCellMinutes(cell);
+
+				if (minutes >= 0) {
+					lines.add(Component.translatable("marketplace.tooltip.market.time", time(minutes))
+							.withStyle(ChatFormatting.AQUA));
+				} else if (!menu.isCellUnlocked(cell)) {
+					lines.add(Component.translatable("marketplace.gui.slot.locked")
+							.withStyle(ChatFormatting.RED));
+					return;
+				} else {
+					lines.add(Component.translatable("marketplace.tooltip.market.staged")
+							.withStyle(ChatFormatting.GRAY));
+				}
 			}
 
 			if (menu.getKind() == WindowKind.TRADER) {
@@ -132,8 +155,36 @@ public final class MarketplaceTooltips {
 				money(MoneyFormat.round(offer.payout()))).withStyle(ChatFormatting.GREEN));
 	}
 
+	/** Подсказка кнопки-справки на рынке: сколько дадут за ордера и за неподтверждённые предметы. */
+	private static void addMarketSummary(List<Component> lines, MarketplaceMenu menu) {
+		lines.add(Component.translatable("marketplace.tooltip.market.orders",
+				money(menu.getOrdersPayout()), count(menu.getOrdersCount())).withStyle(ChatFormatting.GOLD));
+		lines.add(Component.translatable("marketplace.tooltip.market.stagedMoney",
+				money(menu.getStagedPayout()), count(menu.getStagedCount())).withStyle(ChatFormatting.GREEN));
+		lines.add(Component.translatable("marketplace.tooltip.market.markup", markup(menu.getMarkup()))
+				.withStyle(ChatFormatting.YELLOW));
+		lines.add(Component.translatable("marketplace.tooltip.market.take").withStyle(ChatFormatting.GRAY));
+	}
+
 	private static Component money(double amount) {
 		return Component.literal(MoneyFormat.format(amount));
+	}
+
+	private static Component count(int value) {
+		return Component.literal(String.valueOf(value));
+	}
+
+	private static Component markup(double value) {
+		return Component.literal(value == Math.floor(value) ? String.valueOf((int) value) : String.valueOf(value));
+	}
+
+	/** Время до конца продажи: минуты или часы с минутами. */
+	private static Component time(int minutes) {
+		if (minutes < 60) {
+			return Component.translatable("marketplace.time.minutes", count(minutes));
+		}
+
+		return Component.translatable("marketplace.time.hours", count(minutes / 60), count(minutes % 60));
 	}
 
 	private static Component stacks(double amount) {
