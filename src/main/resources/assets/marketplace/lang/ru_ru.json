@@ -1,0 +1,11 @@
+{
+	"marketplace.command.help.header": "Minecraft Marketplace — команды:",
+	"marketplace.command.help.money.get": "/market money get [игрок] — посмотреть баланс",
+	"marketplace.command.help.money.set": "/market money set <игрок> <сумма> — установить баланс",
+	"marketplace.command.help.money.add": "/market money add <игрок> <сумма> — изменить баланс (отрицательная сумма вычитает)",
+
+	"marketplace.command.money.balance.self": "Твой баланс: %s",
+	"marketplace.command.money.balance.other": "Баланс %s: %s",
+	"marketplace.command.money.set": "Баланс %s установлен: %s",
+	"marketplace.command.money.changed": "Баланс %s изменён на %s. Теперь: %s"
+}

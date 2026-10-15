@@ -1,5 +1,6 @@
 package com.chr0m4ik.marketplace;
 
+import com.chr0m4ik.marketplace.command.MarketplaceCommands;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
@@ -20,7 +21,9 @@ public class MarketplaceMod implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("Loading Minecraft Marketplace Mod");
 
-		// Дальше здесь появятся: регистрация команд, загрузка цен, подписка на события.
+		MarketplaceCommands.register();
+
+		// Дальше здесь появятся: загрузка цен, подписка на события.
 	}
 
 	/**
