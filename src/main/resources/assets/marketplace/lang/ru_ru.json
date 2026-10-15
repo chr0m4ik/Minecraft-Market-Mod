@@ -15,6 +15,7 @@
 	"marketplace.command.help.header": "Minecraft Marketplace — команды:",
 	"marketplace.command.help.open": "/market — открыть меню рынка",
 	"marketplace.command.help.price": "/market price <предмет> [количество] — узнать цену",
+	"marketplace.command.help.price.hand": "/market price hand — цена предмета в руке",
 	"marketplace.command.help.money.get": "/market money get [игрок] — посмотреть баланс",
 	"marketplace.command.help.money.set": "/market money set <игрок> <сумма> — установить баланс",
 	"marketplace.command.help.money.add": "/market money add <игрок> <сумма> — изменить баланс (отрицательная сумма вычитает)",
@@ -26,6 +27,9 @@
 
 	"marketplace.command.price.item": "%s — базовая цена %s",
 	"marketplace.command.price.itemCount": "%s × %s — базовая цена %s (%s за штуку)",
+	"marketplace.command.price.hand": "В руке: %s — %s",
+	"marketplace.command.price.handCount": "В руке: %s × %s — %s (%s за штуку)",
+	"marketplace.command.price.handEmpty": "В руке ничего нет — 0$",
 	"marketplace.command.price.buy": "Купить: %s",
 	"marketplace.command.price.cannotBuy": "Купить нельзя — только продать",
 	"marketplace.command.price.sell": "Продажа: рынок %s (с наценкой до %s), торговец %s",

@@ -76,6 +76,8 @@ public final class MarketplaceCommands {
 					.then(moneyAdd);
 
 			LiteralArgumentBuilder<CommandSourceStack> price = Commands.literal("price")
+					.then(Commands.literal("hand")
+							.executes(MarketplaceCommands::showHandPrice))
 					.then(Commands.argument(ARG_ITEM, ItemArgument.item(registryAccess))
 							.executes(MarketplaceCommands::showPrice)
 							.then(Commands.argument(ARG_COUNT, IntegerArgumentType.integer(1, 9999))
@@ -105,6 +107,8 @@ public final class MarketplaceCommands {
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.open")
 				.withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.price")
+				.withStyle(ChatFormatting.GRAY), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.help.price.hand")
 				.withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.money.get")
 				.withStyle(ChatFormatting.GRAY), false);
@@ -172,18 +176,16 @@ public final class MarketplaceCommands {
 
 	/** {@code /market price <предмет>} — показать цену одного предмета. */
 	private static int showPrice(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-		return sendPrice(context, 1);
+		return sendItemPrice(context, 1);
 	}
 
 	/** {@code /market price <предмет> <количество>} — цена сразу нескольких штук. */
 	private static int showPriceForCount(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-		return sendPrice(context, IntegerArgumentType.getInteger(context, ARG_COUNT));
+		return sendItemPrice(context, IntegerArgumentType.getInteger(context, ARG_COUNT));
 	}
 
-	private static int sendPrice(CommandContext<CommandSourceStack> context, int count) throws CommandSyntaxException {
-		CommandSourceStack source = context.getSource();
+	private static int sendItemPrice(CommandContext<CommandSourceStack> context, int count) throws CommandSyntaxException {
 		ItemStack stack = ItemArgument.getItem(context, ARG_ITEM).createItemStack(1);
-		Item item = stack.getItem();
 		double unit = ItemPrices.priceOf(stack);
 		double total = unit * count;
 
@@ -192,6 +194,39 @@ public final class MarketplaceCommands {
 				: Component.translatable("marketplace.command.price.itemCount", stack.getHoverName(),
 						Component.literal(String.valueOf(count)), money(total), money(unit));
 
+		sendPriceReport(context.getSource(), stack.getItem(), title, total);
+
+		return 1;
+	}
+
+	/** {@code /market price hand} — цена всего, что лежит в руке (в правой руке). */
+	private static int showHandPrice(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		CommandSourceStack source = context.getSource();
+		ServerPlayer player = source.getPlayerOrException();
+		ItemStack stack = player.getMainHandItem();
+
+		if (stack.isEmpty()) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.price.handEmpty")
+					.withStyle(ChatFormatting.GRAY), false);
+
+			return 0;
+		}
+
+		double unit = ItemPrices.priceOf(stack.copyWithCount(1));
+		double total = ItemPrices.priceOf(stack);
+
+		MutableComponent title = stack.getCount() == 1
+				? Component.translatable("marketplace.command.price.hand", stack.getHoverName(), money(total))
+				: Component.translatable("marketplace.command.price.handCount", stack.getHoverName(),
+						Component.literal(String.valueOf(stack.getCount())), money(total), money(unit));
+
+		sendPriceReport(source, stack.getItem(), title, total);
+
+		return 1;
+	}
+
+	/** Общий вывод цены: заголовок, покупка и продажа. */
+	private static void sendPriceReport(CommandSourceStack source, Item item, MutableComponent title, double total) {
 		source.sendSuccess(() -> title.withStyle(ChatFormatting.GOLD), false);
 
 		if (ItemPrices.isBuyable(item)) {
@@ -210,7 +245,5 @@ public final class MarketplaceCommands {
 			source.sendSuccess(() -> Component.translatable("marketplace.command.price.notLoaded")
 					.withStyle(ChatFormatting.RED), false);
 		}
-
-		return 1;
 	}
 }

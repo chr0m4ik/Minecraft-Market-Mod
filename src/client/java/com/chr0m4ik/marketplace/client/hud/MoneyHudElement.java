@@ -7,22 +7,18 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 
 /**
- * Плашка с деньгами на HUD (в правом верхнем углу).
+ * Плашка с деньгами на HUD: у правого края, по центру экрана.
  *
  * <p>Две строки: сколько денег на счету и сколько стоит всё, что лежит в инвентаре
  * (по цене продажи за 1x). Данные присылает сервер — см. {@code MarketplaceStatusSync}.
  *
- * <p>Фон — ванильные спрайты подсказки, своих текстур у мода нет.
+ * <p>Фон — как у чата: чёрный с прозрачностью из настроек игрока, без своих текстур.
  */
 public class MoneyHudElement implements HudElement {
-	private static final Identifier PLATE_BACKGROUND = Identifier.withDefaultNamespace("tooltip/background");
-	private static final Identifier PLATE_FRAME = Identifier.withDefaultNamespace("tooltip/frame");
-
 	private static final int PADDING = 4;
 	private static final int MARGIN = 4;
 	private static final int LINE_HEIGHT = 10;
@@ -46,10 +42,12 @@ public class MoneyHudElement implements HudElement {
 		int width = Math.max(font.width(balanceLine), font.width(inventoryLine)) + PADDING * 2;
 		int height = LINE_HEIGHT * 2 + PADDING * 2;
 		int x = graphics.guiWidth() - width - MARGIN;
-		int y = MARGIN;
+		int y = (graphics.guiHeight() - height) / 2;
 
-		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, PLATE_BACKGROUND, x, y, width, height);
-		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, PLATE_FRAME, x, y, width, height);
+		// Фон как у чата: тот же цвет и та же настройка прозрачности.
+		float opacity = client.options.textBackgroundOpacity().get().floatValue();
+		graphics.fill(x, y, x + width, y + height, ARGB.black(opacity));
+
 		graphics.text(font, balanceLine, x + PADDING, y + PADDING, BALANCE_COLOR, true);
 		graphics.text(font, inventoryLine, x + PADDING, y + PADDING + LINE_HEIGHT, INVENTORY_COLOR, true);
 	}

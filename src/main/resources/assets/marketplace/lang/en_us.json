@@ -15,6 +15,7 @@
 	"marketplace.command.help.header": "Minecraft Marketplace — commands:",
 	"marketplace.command.help.open": "/market — open the market menu",
 	"marketplace.command.help.price": "/market price <item> [count] — show the price",
+	"marketplace.command.help.price.hand": "/market price hand — price of the held item",
 	"marketplace.command.help.money.get": "/market money get [player] — show balance",
 	"marketplace.command.help.money.set": "/market money set <player> <amount> — set balance",
 	"marketplace.command.help.money.add": "/market money add <player> <amount> — change balance (negative amount subtracts)",
@@ -26,6 +27,9 @@
 
 	"marketplace.command.price.item": "%s — base price %s",
 	"marketplace.command.price.itemCount": "%s × %s — base price %s (%s each)",
+	"marketplace.command.price.hand": "In hand: %s — %s",
+	"marketplace.command.price.handCount": "In hand: %s × %s — %s (%s each)",
+	"marketplace.command.price.handEmpty": "Nothing in hand — 0$",
 	"marketplace.command.price.buy": "Buy for: %s",
 	"marketplace.command.price.cannotBuy": "Not for sale — sell only",
 	"marketplace.command.price.sell": "Sell: market %s (up to %s with markup), trader %s",
