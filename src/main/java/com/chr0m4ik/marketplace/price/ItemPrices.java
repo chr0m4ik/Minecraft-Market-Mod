@@ -187,18 +187,6 @@ public final class ItemPrices {
 		return total;
 	}
 
-	/** Сколько стоит всё, что лежит в инвентаре игрока (по цене продажи за 1x). */
-	public static double priceOfInventory(Inventory inventory) {
-		ensureLoaded();
-		double total = 0.0;
-
-		for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-			total += priceOf(inventory.getItem(slot));
-		}
-
-		return total;
-	}
-
 	/** Есть ли предмет в прайсе. */
 	public static boolean isPriced(Item item) {
 		ensureLoaded();

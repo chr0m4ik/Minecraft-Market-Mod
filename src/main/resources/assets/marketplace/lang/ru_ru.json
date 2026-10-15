@@ -14,6 +14,8 @@
 
 	"marketplace.tooltip.price.unit": "Цена: %s",
 	"marketplace.tooltip.price.stack": "Всего: %s",
+	"marketplace.tooltip.market.sold": "Продано на рынке: %s стаков — цена снижена",
+	"marketplace.tooltip.market.bonus": "Рынок активен: %s к цене",
 	"marketplace.tooltip.trader.count": "Товара: %s шт.",
 	"marketplace.tooltip.trader.full": "Обычная цена: %s",
 	"marketplace.tooltip.trader.discounted": "С уценкой у торговца: %s",

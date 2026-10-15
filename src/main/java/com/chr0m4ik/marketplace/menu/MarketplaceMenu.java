@@ -9,6 +9,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Prediction;
+import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -330,9 +331,9 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		return this.kind.tradeSlots();
 	}
 
-	/** Что сейчас выставлено на продажу — для подсказки кнопки «итоговая цена». */
-	public TraderService.Offer currentOffer() {
-		return TraderService.evaluate(this.tradeContainer, this.kind.tradeSlots());
+	/** Контейнер с товаром — по нему клиент считает итоговую цену в подсказке. */
+	public Container getTradeContainer() {
+		return this.tradeContainer;
 	}
 
 	private static Component money(double amount) {

@@ -13,21 +13,14 @@ import java.util.UUID;
 /**
  * Сделка с торговцем.
  *
- * <p>Торговец платит {@code цена × }{@link ItemPrices#TRADER_MULTIPLIER} — то есть 75% от базовой
- * цены — и за один игровой день берёт ограниченное количество каждого предмета
- * (см. {@link TraderLimits}). Здесь только расчёт и выдача товара, никакого интерфейса.
+ * <p>Торговец платит {@code цена × }{@link ItemPrices#TRADER_MULTIPLIER} (75% от базовой),
+ * с поправкой на состояние рынка ({@link MarketPrices}): то, что игрок уже продавал, дешевеет,
+ * а остальное дорожает. За один игровой день торговец берёт ограниченное количество каждого
+ * предмета (см. {@link TraderLimits}).
  */
 public final class TraderService {
-	/** Длительность игрового дня в тиках. */
-	private static final long TICKS_PER_DAY = 24_000L;
-
 	/** Что выставлено на продажу. */
-	public record Offer(int itemCount, double fullPrice) {
-		/** Сколько заплатит торговец (с уценкой). */
-		public double payout() {
-			return MoneyFormat.round(this.fullPrice * ItemPrices.TRADER_MULTIPLIER);
-		}
-
+	public record Offer(int itemCount, double marketValue, double proceeds) {
 		public boolean isEmpty() {
 			return this.itemCount == 0;
 		}
@@ -44,10 +37,11 @@ public final class TraderService {
 		// Класс только со статическими методами.
 	}
 
-	/** Считает выставленный товар, ничего не забирая. */
-	public static Offer evaluate(Container container, int slots) {
+	/** Считает выставленный товар по текущему рынку, ничего не забирая. */
+	public static Offer evaluate(MarketPrices market, Container container, int slots) {
 		int count = 0;
-		double price = 0.0;
+		double marketValue = 0.0;
+		double proceeds = 0.0;
 
 		for (int i = 0; i < slots; i++) {
 			ItemStack stack = container.getItem(i);
@@ -57,10 +51,11 @@ public final class TraderService {
 			}
 
 			count += stack.getCount();
-			price += ItemPrices.priceOf(stack);
+			marketValue += market.marketPrice(stack);
+			proceeds += market.saleProceeds(stack, ItemPrices.TRADER_MULTIPLIER);
 		}
 
-		return new Offer(count, price);
+		return new Offer(count, marketValue, proceeds);
 	}
 
 	/**
@@ -70,10 +65,14 @@ public final class TraderService {
 	public static Sale sell(MinecraftServer server, ServerPlayer player, Container container, int slots) {
 		MarketplaceState state = MarketplaceEconomy.state(server);
 		UUID playerId = player.getUUID();
-		state.refreshTraderDay(playerId, currentDay(server));
+		long now = GameTime.now(server);
+		state.refreshTraderDay(playerId, GameTime.day(server));
+
+		// Цены берём один раз до сделки: внутри одной сделки они не меняются.
+		MarketPrices market = state.marketSnapshot(now);
 
 		int soldItems = 0;
-		double fullPrice = 0.0;
+		double payout = 0.0;
 		boolean limitReached = false;
 
 		for (int i = 0; i < slots; i++) {
@@ -98,25 +97,23 @@ public final class TraderService {
 				limitReached = true;
 			}
 
-			fullPrice += ItemPrices.priceOf(stack.copyWithCount(sellCount));
+			payout += market.saleProceeds(stack.copyWithCount(sellCount), ItemPrices.TRADER_MULTIPLIER);
 			soldItems += sellCount;
-			state.addSoldStacks(playerId, item, (double) sellCount / maxStack);
+
+			double soldStacks = (double) sellCount / maxStack;
+			state.addSoldStacks(playerId, item, soldStacks);
+			state.addMarketSale(item, soldStacks, now);
 
 			int rest = stack.getCount() - sellCount;
 			container.setItem(i, rest > 0 ? stack.copyWithCount(rest) : ItemStack.EMPTY);
 		}
 
-		double payout = MoneyFormat.round(fullPrice * ItemPrices.TRADER_MULTIPLIER);
+		payout = MoneyFormat.round(payout);
 
 		if (payout > 0.0) {
 			MarketplaceEconomy.addBalance(server, playerId, payout);
 		}
 
 		return new Sale(soldItems, payout, limitReached);
-	}
-
-	/** Номер текущего игрового дня. Считается по времени мира, поэтому переживает перезапуск. */
-	public static long currentDay(MinecraftServer server) {
-		return server.overworld().getLevelData().getGameTime() / TICKS_PER_DAY;
 	}
 }

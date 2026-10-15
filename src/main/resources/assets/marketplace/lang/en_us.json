@@ -14,6 +14,8 @@
 
 	"marketplace.tooltip.price.unit": "Price: %s",
 	"marketplace.tooltip.price.stack": "Total: %s",
+	"marketplace.tooltip.market.sold": "Sold on the market: %s stacks — price is lower",
+	"marketplace.tooltip.market.bonus": "Market is active: %s to the price",
 	"marketplace.tooltip.trader.count": "Items: %s",
 	"marketplace.tooltip.trader.full": "Full price: %s",
 	"marketplace.tooltip.trader.discounted": "With trader discount: %s",

@@ -31,8 +31,8 @@ const SMELT_MARKUP = 1.15;
  * он попадёт в tools/craft-cheats.txt — это значит, что на нём можно зарабатывать.
  */
 const LOCKED = new Set([
-	// Шаблон незеритового апгрейда: заказчик просил 150 000, хотя дублирование
-	// (7 алмазов + шаблон → 2 шаблона) выходит дешевле.
+	// Шаблон незеритового апгрейда: заказчик просил 100 000, чтобы наценка была, но небольшая
+	// (дублирование шаблона выходит около 92 500, то есть прибыль ~7 500 за штуку).
 	'minecraft:netherite_upgrade_smithing_template',
 ]);
 
@@ -190,7 +190,7 @@ const BASE = {
 	'minecraft:savanna_village_map': 6000, 'minecraft:taiga_village_map': 6000,
 	'minecraft:snowy_village_map': 6000, 'minecraft:swamp_hut_map': 12000,
 	'minecraft:warm_ocean_ruins_map': 8000, 'minecraft:disc_fragment_5': 20000,
-	'minecraft:goat_horn': 15000, 'minecraft:netherite_upgrade_smithing_template': 150000,
+	'minecraft:goat_horn': 15000, 'minecraft:netherite_upgrade_smithing_template': 100000,
 	'minecraft:flow_banner_pattern': 5000, 'minecraft:globe_banner_pattern': 5000,
 	'minecraft:guster_banner_pattern': 5000, 'minecraft:piglin_banner_pattern': 5000,
 
@@ -574,6 +574,6 @@ console.log('\n=== без цены (проверить: должны быть т
 console.log('  ' + leftovers.join('\n  '));
 fs.writeFileSync('tools/leftovers.txt', leftovers.join('\n') + '\n', 'utf8');
 
-const top = [...sorted.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
+const top = Object.entries(sorted).sort((a, b) => b[1] - a[1]).slice(0, 15);
 console.log('\n=== самые дорогие ===');
 for (const [item, price] of top) console.log('  ' + item.padEnd(52) + price + '$');
