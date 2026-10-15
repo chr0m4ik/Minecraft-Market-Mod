@@ -7,6 +7,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -21,6 +22,7 @@ import net.minecraft.world.item.enchantment.ItemEnchantments;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -80,6 +82,9 @@ public final class ShopCatalog {
 	/** Доступ к реестрам мира: зачарования в 26.3 лежат в динамическом реестре, вне мира их не видно. */
 	private static HolderLookup.Provider registries;
 
+	/** Порядок предметов из креативного инвентаря (строится один раз). */
+	private static Map<Item, Integer> CREATIVE_ORDER;
+
 	private ShopCatalog() {
 		// Класс только со статическими методами.
 	}
@@ -124,7 +129,7 @@ public final class ShopCatalog {
 			}
 		}
 
-		stacks.sort(Comparator.comparing(ShopCatalog::sortKey));
+		stacks.sort(Comparator.comparingInt(ShopCatalog::creativeOrder).thenComparing(ShopCatalog::details));
 		List<ItemStack> result = List.copyOf(stacks);
 		CACHE.put(category, result);
 		return result;
@@ -187,9 +192,30 @@ public final class ShopCatalog {
 		}));
 	}
 
-	/** Ключ сортировки: сначала по названию предмета, потом по цене. */
-	private static String sortKey(ItemStack stack) {
-		return stack.getHoverName().getString() + "\u0000" + BuiltInRegistries.ITEM.getKey(stack.getItem());
+	/**
+	 * Порядок предметов как в креативном инвентаре: обходим ванильные вкладки по очереди и
+	 * запоминаем, какой предмет где стоял. Так список в магазине выглядит привычно.
+	 */
+	private static int creativeOrder(ItemStack stack) {
+		if (CREATIVE_ORDER == null) {
+			Map<Item, Integer> order = new HashMap<>();
+			int index = 0;
+
+			for (CreativeModeTab tab : BuiltInRegistries.CREATIVE_MODE_TAB) {
+				for (ItemStack display : tab.getDisplayItems()) {
+					order.putIfAbsent(display.getItem(), index++);
+				}
+			}
+
+			CREATIVE_ORDER = order;
+		}
+
+		return CREATIVE_ORDER.getOrDefault(stack.getItem(), Integer.MAX_VALUE);
+	}
+
+	/** Дополнительный ключ для предметов, у которых порядок одинаков (книги, зелья, стрелы). */
+	private static String details(ItemStack stack) {
+		return stack.getHoverName().getString() + "\u0000" + stack.getComponents();
 	}
 
 	/** Сколько страниц в разделе (минимум одна, чтобы окно не было пустым). */
