@@ -5,6 +5,7 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Сколько добавляют к цене зачарования.
@@ -48,6 +49,21 @@ public final class EnchantmentPrices {
 			"minecraft:aqua_affinity", 150_000.0
 	);
 
+	/**
+	 * Сокровища: их нельзя получить из стола зачаровывания, только из лута, поэтому цена вдвое выше.
+	 * Список взят из тега игры {@code minecraft:treasure}; проклятия сюда не входят — у них своя цена.
+	 */
+	private static final Set<String> TREASURE = Set.of(
+			"minecraft:mending",
+			"minecraft:frost_walker",
+			"minecraft:soul_speed",
+			"minecraft:swift_sneak",
+			"minecraft:wind_burst"
+	);
+
+	/** Во сколько раз дороже сокровища. */
+	private static final double TREASURE_MULTIPLIER = 2.0;
+
 	private EnchantmentPrices() {
 		// Класс только со статическими методами.
 	}
@@ -76,7 +92,8 @@ public final class EnchantmentPrices {
 			return special;
 		}
 
-		return valueOf(holder.value(), level);
+		double price = valueOf(holder.value(), level);
+		return TREASURE.contains(id) ? price * TREASURE_MULTIPLIER : price;
 	}
 
 	/** Цена по весу зачарования (для зачарований без особой цены). */
