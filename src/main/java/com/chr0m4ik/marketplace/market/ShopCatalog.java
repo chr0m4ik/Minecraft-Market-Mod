@@ -45,6 +45,7 @@ public final class ShopCatalog {
 		BOOKS("marketplace.gui.category.books", () -> Items.ENCHANTED_BOOK),
 		FOOD("marketplace.gui.category.food", () -> Items.BREAD),
 		MATERIALS("marketplace.gui.category.materials", () -> Items.IRON_INGOT),
+		OTHER("marketplace.gui.category.other", () -> Items.OAK_BOAT),
 		SPAWN_EGGS("marketplace.gui.category.spawnEggs", () -> Items.CHICKEN_SPAWN_EGG),
 		RARE("marketplace.gui.category.rare", () -> Items.NETHER_STAR);
 
@@ -89,13 +90,18 @@ public final class ShopCatalog {
 			case KITS -> {
 				// Киты появятся на этапе 8.
 			}
-			case POTIONS -> addPotions(stacks, false);
+			case POTIONS -> {
+				addPotions(stacks, true);
+				addOminousBottles(stacks);
+			}
 			case ARROWS -> addArrows(stacks);
 			case BOOKS -> addBooks(stacks);
 			default -> {
 				for (Item item : BuiltInRegistries.ITEM) {
 					// Недоступные в выживании предметы (барьер, бедрок, свет и прочее) в магазин не берём.
-					if (ItemPrices.isBuyable(item) && categoryOf(item) == category) {
+					// Подписанные книги в магазине не нужны вовсе.
+					if (ItemPrices.isBuyable(item) && item != Items.WRITTEN_BOOK && item != Items.WRITABLE_BOOK
+							&& categoryOf(item) == category) {
 						stacks.add(new ItemStack(item));
 					}
 				}
@@ -124,6 +130,11 @@ public final class ShopCatalog {
 		ItemStack stack = new ItemStack(item);
 		stack.set(DataComponents.POTION_CONTENTS, new PotionContents(potion));
 		return stack;
+	}
+
+	/** Зелье дурного знамения. Варианты по силе добавлю отдельно (у них особый компонент). */
+	private static void addOminousBottles(List<ItemStack> stacks) {
+		stacks.add(new ItemStack(Items.OMINOUS_BOTTLE));
 	}
 
 	/** Стрелы: обычная, спектральная и все стрелы с эффектом. */
@@ -170,8 +181,23 @@ public final class ShopCatalog {
 			return Category.BOOKS;
 		}
 
-		if (item == Items.POTION || item == Items.SPLASH_POTION || item == Items.LINGERING_POTION) {
+		if (item == Items.POTION || item == Items.SPLASH_POTION || item == Items.LINGERING_POTION
+				|| item == Items.OMINOUS_BOTTLE) {
 			return Category.POTIONS;
+		}
+
+		// Ключи испытаний и шаблон незеритового апгрейда — к редким предметам.
+		if (id.equals("trial_key") || id.equals("ominous_trial_key")
+				|| id.equals("netherite_upgrade_smithing_template")) {
+			return Category.RARE;
+		}
+
+		// Всякая мелочь: лодки, красители, карты, вагонетки, мешки, узоры флагов, черепки.
+		if (id.endsWith("_boat") || id.endsWith("_raft") || id.endsWith("_chest_boat")
+				|| id.endsWith("_dye") || id.endsWith("_map") || id.equals("map") || id.equals("filled_map")
+				|| id.endsWith("_minecart") || id.equals("bundle") || id.endsWith("_bundle")
+				|| id.endsWith("_banner_pattern") || id.endsWith("_pottery_sherd") || id.equals("brick")) {
+			return Category.OTHER;
 		}
 
 		if (item == Items.ARROW || item == Items.SPECTRAL_ARROW || item == Items.TIPPED_ARROW) {
@@ -224,7 +250,8 @@ public final class ShopCatalog {
 	private static boolean isArmor(String id) {
 		return id.endsWith("_helmet") || id.endsWith("_chestplate") || id.endsWith("_leggings")
 				|| id.endsWith("_boots") || id.endsWith("_horse_armor") || id.endsWith("_nautilus_armor")
-				|| id.equals("elytra") || id.equals("turtle_helmet") || id.endsWith("_wolf_armor");
+				|| id.equals("elytra") || id.equals("turtle_helmet") || id.equals("wolf_armor")
+				|| id.endsWith("_wolf_armor") || id.endsWith("_harness");
 	}
 
 	private static boolean isTool(String id) {
