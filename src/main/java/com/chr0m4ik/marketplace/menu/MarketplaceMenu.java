@@ -686,6 +686,9 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				int index = slotId - BUY_SLOT_FIRST_CATEGORY;
 
 				if (index >= 0 && index < ShopCatalog.Category.values().length) {
+					// Запоминаем выбранный раздел — по нему откроется список товаров.
+					MarketService.setShop(serverPlayer.getUUID(),
+							MarketService.shop(serverPlayer.getUUID()).withCategory(index));
 					MarketplaceMenus.open(serverPlayer, WindowKind.BUY_LIST);
 				}
 			}
