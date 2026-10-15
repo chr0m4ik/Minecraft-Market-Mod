@@ -2,9 +2,9 @@ package com.chr0m4ik.marketplace.client.tooltip;
 
 import com.chr0m4ik.marketplace.client.ClientMarketplaceStatus;
 import com.chr0m4ik.marketplace.client.screen.MarketplaceScreen;
-import com.chr0m4ik.marketplace.economy.MarketPrices;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.economy.TraderService;
+import com.chr0m4ik.marketplace.economy.TraderPrices;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenu;
 import com.chr0m4ik.marketplace.menu.WindowKind;
 import com.chr0m4ik.marketplace.price.ItemPrices;
@@ -21,16 +21,16 @@ import net.minecraft.world.item.TooltipFlag;
 import java.util.List;
 
 /**
- * Дописывает в подсказки предметов цену с учётом состояния рынка
- * (см. {@link MarketPrices}: что продают — дешевеет, остальное дорожает).
+ * Дописывает в подсказки предметов их цену.
  *
  * <p>Правила:
  * <ul>
- *     <li>обычная цена — везде вне окна торговца;</li>
- *     <li>в окне торговца — цена с уценкой ({@link ItemPrices#TRADER_MULTIPLIER});</li>
+ *     <li>везде, кроме окна торговца, цена обычная (базовая). Динамика цен — особенность только
+ *     торговца, на рынок и покупку она не влияет;</li>
+ *     <li>в окне торговца показывается его цена: 75% от базовой с его надбавками и уценками
+ *     (см. {@link TraderPrices});</li>
  *     <li>у кнопок цены нет, а у кнопки «итоговая цена» подсказка показывает сводку по товару.</li>
  * </ul>
- * Данные рынка клиент получает от сервера, базовые цены читает из файла мода.
  */
 public final class MarketplaceTooltips {
 	private MarketplaceTooltips() {
@@ -47,7 +47,6 @@ public final class MarketplaceTooltips {
 		}
 
 		Screen screen = Minecraft.getInstance().gui.screen();
-		MarketPrices market = ClientMarketplaceStatus.market();
 
 		if (screen instanceof MarketplaceScreen marketplace) {
 			MarketplaceMenu menu = marketplace.getMenu();
@@ -55,25 +54,24 @@ public final class MarketplaceTooltips {
 			if (marketplace.isHoveringButton()) {
 				// Кнопка «итоговая цена» — показываем сводку по выставленному товару.
 				if (menu.getKind() == WindowKind.TRADER && stack.is(Items.PAPER)) {
-					addTraderSummary(lines, menu, market);
+					addTraderSummary(lines, menu);
 				}
 
 				return;
 			}
 
-			// В окне торговца цены показываем с уценкой.
-			double multiplier = menu.getKind() == WindowKind.TRADER ? ItemPrices.TRADER_MULTIPLIER : 1.0;
-			addPriceLines(lines, stack, market, multiplier, menu.getKind() == WindowKind.TRADER);
-
-			return;
+			if (menu.getKind() == WindowKind.TRADER) {
+				addTraderPriceLines(lines, stack);
+				return;
+			}
 		}
 
-		addPriceLines(lines, stack, market, 1.0, false);
+		addBasePriceLines(lines, stack);
 	}
 
-	private static void addPriceLines(List<Component> lines, ItemStack stack, MarketPrices market,
-			double multiplier, boolean withMarketInfo) {
-		double unit = market.saleProceeds(stack.copyWithCount(1), multiplier);
+	/** Обычная цена: так платят рынок и покупка. */
+	private static void addBasePriceLines(List<Component> lines, ItemStack stack) {
+		double unit = ItemPrices.priceOf(stack.copyWithCount(1));
 
 		if (unit <= 0.0) {
 			return;
@@ -83,38 +81,55 @@ public final class MarketplaceTooltips {
 				.withStyle(ChatFormatting.GREEN));
 
 		if (stack.getCount() > 1) {
-			lines.add(Component.translatable("marketplace.tooltip.price.stack",
-					money(market.saleProceeds(stack, multiplier))).withStyle(ChatFormatting.GOLD));
-		}
-
-		// Объясняем, почему цена необычная: этот предмет много продавали или рынок в целом активен.
-		double sold = market.soldStacks(stack.getItem());
-
-		if (sold > 0.01) {
-			lines.add(Component.translatable("marketplace.tooltip.market.sold", stacks(sold))
-					.withStyle(ChatFormatting.RED));
-		}
-
-		if (withMarketInfo) {
-			double bonus = market.bonus(stack.getItem());
-
-			if (bonus > 0.0001) {
-				lines.add(Component.translatable("marketplace.tooltip.market.bonus", percent(bonus))
-						.withStyle(ChatFormatting.AQUA));
-			}
+			lines.add(Component.translatable("marketplace.tooltip.price.stack", money(ItemPrices.priceOf(stack)))
+					.withStyle(ChatFormatting.GOLD));
 		}
 	}
 
-	/** Подсказка кнопки «итоговая цена»: сколько товара, обычная цена и цена с уценкой. */
-	private static void addTraderSummary(List<Component> lines, MarketplaceMenu menu, MarketPrices market) {
-		TraderService.Offer offer = TraderService.evaluate(market, menu.getTradeContainer(), menu.tradeSlotCount());
+	/** Цена торговца: его надбавки, уценки и доля 75%. */
+	private static void addTraderPriceLines(List<Component> lines, ItemStack stack) {
+		TraderPrices trader = ClientMarketplaceStatus.traderPrices();
+		double unit = trader.payout(stack.copyWithCount(1));
+
+		if (unit <= 0.0) {
+			return;
+		}
+
+		lines.add(Component.translatable("marketplace.tooltip.price.unit", money(unit))
+				.withStyle(ChatFormatting.GREEN));
+
+		if (stack.getCount() > 1) {
+			lines.add(Component.translatable("marketplace.tooltip.price.stack", money(trader.payout(stack)))
+					.withStyle(ChatFormatting.GOLD));
+		}
+
+		// Объясняем, почему торговец даёт не как обычно.
+		double sold = trader.soldStacks(stack.getItem());
+
+		if (sold > 0.01) {
+			lines.add(Component.translatable("marketplace.tooltip.trader.sold", stacks(sold))
+					.withStyle(ChatFormatting.RED));
+		}
+
+		double bonus = trader.bonus(stack.getItem());
+
+		if (bonus > 0.0001) {
+			lines.add(Component.translatable("marketplace.tooltip.trader.bonus", percent(bonus))
+					.withStyle(ChatFormatting.AQUA));
+		}
+	}
+
+	/** Подсказка кнопки «итоговая цена»: сколько товара, обычная цена и сколько дадут на руки. */
+	private static void addTraderSummary(List<Component> lines, MarketplaceMenu menu) {
+		TraderService.Offer offer = TraderService.evaluate(ClientMarketplaceStatus.traderPrices(),
+				menu.getTradeContainer(), menu.tradeSlotCount());
 
 		lines.add(Component.translatable("marketplace.tooltip.trader.count",
 				Component.literal(String.valueOf(offer.itemCount()))).withStyle(ChatFormatting.GRAY));
-		lines.add(Component.translatable("marketplace.tooltip.trader.full", money(offer.marketValue()))
+		lines.add(Component.translatable("marketplace.tooltip.trader.full", money(offer.normalValue()))
 				.withStyle(ChatFormatting.GOLD));
 		lines.add(Component.translatable("marketplace.tooltip.trader.discounted",
-				money(MoneyFormat.round(offer.proceeds()))).withStyle(ChatFormatting.GREEN));
+				money(MoneyFormat.round(offer.payout()))).withStyle(ChatFormatting.GREEN));
 	}
 
 	private static Component money(double amount) {

@@ -48,7 +48,8 @@ public class MarketplaceClient implements ClientModInitializer {
 
 		// Состояние с сервера: баланс и стоимость инвентаря.
 		ClientPlayNetworking.registerGlobalReceiver(MarketplaceStatusPayload.TYPE, (payload, context) ->
-				ClientMarketplaceStatus.update(payload.balanceCents(), payload.inventoryCents(), payload.market()));
+				ClientMarketplaceStatus.update(payload.balanceCents(), payload.inventoryCents(),
+						payload.traderSales()));
 
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ClientMarketplaceStatus.clear());
 

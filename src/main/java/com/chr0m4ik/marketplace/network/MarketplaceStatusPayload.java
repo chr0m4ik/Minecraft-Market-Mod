@@ -9,17 +9,17 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import java.util.List;
 
 /**
- * Пакет «состояние игрока»: баланс, стоимость инвентаря и текущее состояние рынка.
+ * Пакет «состояние игрока»: баланс, стоимость инвентаря и закупки торговца.
  *
- * <p>Нужен плашке на HUD и подсказкам предметов: клиент должен знать, что игрок уже продавал,
- * чтобы показывать те же цены, что и сервер.
+ * <p>Нужен плашке на HUD и подсказкам предметов: клиент должен знать, что торговец уже покупал,
+ * чтобы показывать у него те же цены, что и сервер.
  *
  * <p>Деньги передаём в копейках (целыми числами), чтобы не терять точность.
  */
 public record MarketplaceStatusPayload(
 		long balanceCents,
 		long inventoryCents,
-		List<MarketEntry> market
+		List<SaleEntry> traderSales
 ) implements CustomPacketPayload {
 	public static final CustomPacketPayload.Type<MarketplaceStatusPayload> TYPE =
 			new CustomPacketPayload.Type<>(MarketplaceMod.id("status"));
@@ -27,7 +27,7 @@ public record MarketplaceStatusPayload(
 	public static final StreamCodec<RegistryFriendlyByteBuf, MarketplaceStatusPayload> CODEC = StreamCodec.composite(
 			ByteBufCodecs.VAR_LONG, MarketplaceStatusPayload::balanceCents,
 			ByteBufCodecs.VAR_LONG, MarketplaceStatusPayload::inventoryCents,
-			MarketEntry.CODEC.apply(ByteBufCodecs.list()), MarketplaceStatusPayload::market,
+			SaleEntry.CODEC.apply(ByteBufCodecs.list()), MarketplaceStatusPayload::traderSales,
 			MarketplaceStatusPayload::new
 	);
 
@@ -36,12 +36,12 @@ public record MarketplaceStatusPayload(
 		return TYPE;
 	}
 
-	/** Одна строка рынка: сколько стаков предмета продано. */
-	public record MarketEntry(String itemId, double stacks) {
-		public static final StreamCodec<RegistryFriendlyByteBuf, MarketEntry> CODEC = StreamCodec.composite(
-				ByteBufCodecs.STRING_UTF8, MarketEntry::itemId,
-				ByteBufCodecs.DOUBLE, MarketEntry::stacks,
-				MarketEntry::new
+	/** Одна строка закупок торговца: сколько стаков предмета он купил. */
+	public record SaleEntry(String itemId, double stacks) {
+		public static final StreamCodec<RegistryFriendlyByteBuf, SaleEntry> CODEC = StreamCodec.composite(
+				ByteBufCodecs.STRING_UTF8, SaleEntry::itemId,
+				ByteBufCodecs.DOUBLE, SaleEntry::stacks,
+				SaleEntry::new
 		);
 	}
 }

@@ -14,15 +14,15 @@
 
 	"marketplace.tooltip.price.unit": "Price: %s",
 	"marketplace.tooltip.price.stack": "Total: %s",
-	"marketplace.tooltip.market.sold": "Sold on the market: %s stacks — price is lower",
-	"marketplace.tooltip.market.bonus": "Market is active: %s to the price",
+	"marketplace.tooltip.trader.sold": "The trader already bought this: %s stacks — pays less",
+	"marketplace.tooltip.trader.bonus": "The trader pays %s extra for active trading",
 	"marketplace.tooltip.trader.count": "Items: %s",
 	"marketplace.tooltip.trader.full": "Full price: %s",
 	"marketplace.tooltip.trader.discounted": "With trader discount: %s",
 
 	"marketplace.gui.trader.sold": "Sold to trader: %s items for %s",
 	"marketplace.gui.trader.limit": "The trader will not buy that much today — some items stayed in the window",
-	"marketplace.death.lost": "Death cost you %s — that is 5%% of your balance, but no more than 10,000,000$",
+	"marketplace.death.lost": "Lost on death: %s",
 
 	"key.category.marketplace.main": "Minecraft Marketplace",
 	"key.marketplace.open": "Open market",

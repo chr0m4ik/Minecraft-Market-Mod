@@ -32,19 +32,19 @@ public class MarketplaceState extends SavedData {
 	private static final String LIMITS_KEY = "trader_limits";
 	private static final String DAY_KEY = "day";
 	private static final String SOLD_KEY = "sold";
-	/** Ключ в NBT, под которым лежит история продаж (для динамики цен). */
-	private static final String MARKET_KEY = "market";
-	private static final String MARKET_AT_KEY = "at";
+	/** Ключ в NBT, под которым лежит история продаж торговцу (для его динамики цен). */
+	private static final String TRADER_SALES_KEY = "trader_sales";
+	private static final String SOLD_AT_KEY = "at";
 
 	private final Map<UUID, Double> balances = new HashMap<>();
 	/** Игрок → (id предмета → сколько стаков уже сдано за день). */
 	private final Map<UUID, Map<String, Double>> soldToday = new HashMap<>();
 	/** Игрок → номер игрового дня, к которому относятся данные выше. */
 	private final Map<UUID, Long> limitDay = new HashMap<>();
-	/** id предмета → сколько стаков продано (рынок общий для всего мира). */
-	private final Map<String, Double> marketSold = new HashMap<>();
+	/** id предмета → сколько стаков куплено торговцем (у торговца своя динамика цен). */
+	private final Map<String, Double> traderSold = new HashMap<>();
 	/** id предмета → когда это значение последний раз обновлялось. */
-	private final Map<String, Long> marketSoldAt = new HashMap<>();
+	private final Map<String, Long> traderSoldAt = new HashMap<>();
 
 	public MarketplaceState() {
 	}
@@ -114,20 +114,20 @@ public class MarketplaceState extends SavedData {
 		return BuiltInRegistries.ITEM.getKey(item).toString();
 	}
 
-	// --- Рынок: история продаж для динамики цен ---
+	// --- Торговец: история закупок для его динамики цен ---
 
 	/**
-	 * Сколько стаков предмета продано на текущий момент. Цены восстанавливаются линейно:
-	 * за один игровой день после продажи надбавка и скидка полностью исчезают.
+	 * Сколько стаков предмета торговец купил на текущий момент. Его цены восстанавливаются
+	 * линейно: за один игровой день после продажи надбавка и уценка полностью исчезают.
 	 */
-	public double marketSold(String itemId, long now) {
-		Double sold = marketSold.get(itemId);
+	public double traderSold(String itemId, long now) {
+		Double sold = traderSold.get(itemId);
 
 		if (sold == null) {
 			return 0.0;
 		}
 
-		long updatedAt = marketSoldAt.getOrDefault(itemId, now);
+		long updatedAt = traderSoldAt.getOrDefault(itemId, now);
 		long elapsed = Math.max(0L, now - updatedAt);
 
 		if (elapsed >= GameTime.TICKS_PER_DAY) {
@@ -137,20 +137,20 @@ public class MarketplaceState extends SavedData {
 		return sold * (1.0 - (double) elapsed / GameTime.TICKS_PER_DAY);
 	}
 
-	/** Записывает, что предмет продали ещё на столько-то стаков. */
-	public void addMarketSale(Item item, double stacks, long now) {
+	/** Записывает, что торговец купил предмет ещё на столько-то стаков. */
+	public void addTraderSale(Item item, double stacks, long now) {
 		String id = itemId(item);
-		marketSold.put(id, marketSold(id, now) + stacks);
-		marketSoldAt.put(id, now);
+		traderSold.put(id, traderSold(id, now) + stacks);
+		traderSoldAt.put(id, now);
 		setDirty();
 	}
 
-	/** Текущее состояние рынка: что и сколько продано, с учётом восстановления. */
-	public MarketPrices marketSnapshot(long now) {
+	/** Текущие цены торговца: что и сколько он купил, с учётом восстановления. */
+	public TraderPrices traderSnapshot(long now) {
 		Map<Item, Double> sold = new HashMap<>();
 
-		for (String id : marketSold.keySet()) {
-			double stacks = marketSold(id, now);
+		for (String id : traderSold.keySet()) {
+			double stacks = traderSold(id, now);
 
 			if (stacks <= 0.0001) {
 				continue;
@@ -160,7 +160,7 @@ public class MarketplaceState extends SavedData {
 			item.ifPresent(value -> sold.put(value, stacks));
 		}
 
-		return MarketPrices.of(sold);
+		return TraderPrices.of(sold);
 	}
 
 	private static Optional<Item> resolveItem(String id) {
@@ -214,12 +214,12 @@ public class MarketplaceState extends SavedData {
 			state.soldToday.put(playerId.get(), sold);
 		}
 
-		CompoundTag storedMarket = tag.getCompoundOrEmpty(MARKET_KEY);
+		CompoundTag storedMarket = tag.getCompoundOrEmpty(TRADER_SALES_KEY);
 
 		for (String itemKey : storedMarket.keySet()) {
 			CompoundTag entry = storedMarket.getCompoundOrEmpty(itemKey);
-			state.marketSold.put(itemKey, entry.getDoubleOr(SOLD_KEY, 0.0));
-			state.marketSoldAt.put(itemKey, entry.getLongOr(MARKET_AT_KEY, 0L));
+			state.traderSold.put(itemKey, entry.getDoubleOr(SOLD_KEY, 0.0));
+			state.traderSoldAt.put(itemKey, entry.getLongOr(SOLD_AT_KEY, 0L));
 		}
 
 		return state;
@@ -249,14 +249,14 @@ public class MarketplaceState extends SavedData {
 
 		CompoundTag storedMarket = new CompoundTag();
 
-		for (Map.Entry<String, Double> entry : state.marketSold.entrySet()) {
+		for (Map.Entry<String, Double> entry : state.traderSold.entrySet()) {
 			CompoundTag itemTag = new CompoundTag();
 			itemTag.putDouble(SOLD_KEY, entry.getValue());
-			itemTag.putLong(MARKET_AT_KEY, state.marketSoldAt.getOrDefault(entry.getKey(), 0L));
+			itemTag.putLong(SOLD_AT_KEY, state.traderSoldAt.getOrDefault(entry.getKey(), 0L));
 			storedMarket.put(entry.getKey(), itemTag);
 		}
 
-		tag.put(MARKET_KEY, storedMarket);
+		tag.put(TRADER_SALES_KEY, storedMarket);
 		return tag;
 	}
 
