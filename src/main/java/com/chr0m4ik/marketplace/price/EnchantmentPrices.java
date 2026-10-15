@@ -4,6 +4,8 @@ import net.minecraft.core.Holder;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 
+import java.util.Map;
+
 /**
  * Сколько добавляют к цене зачарования.
  *
@@ -25,6 +27,22 @@ public final class EnchantmentPrices {
 	/** Насколько дороже становится предмет за каждое следующее зачарование. */
 	private static final double COMPLEXITY_STEP = 0.25;
 
+	/**
+	 * Во сколько раз дороже каждый следующий уровень зачарования.
+	 * В наковальне книга следующего уровня получается слиянием двух книг предыдущего, поэтому
+	 * рост двойной, плюс 10% за потраченный опыт и износ наковальни: 2 × 1,1 = 2,2.
+	 */
+	private static final double LEVEL_STEP = 2.2;
+
+	/**
+	 * Особые цены: проклятия по весу выходят дорогими, а на деле они только мешают,
+	 * поэтому цена у них своя и фиксированная.
+	 */
+	private static final Map<String, Double> SPECIAL = Map.of(
+			"minecraft:curse_of_binding", 100_000.0,
+			"minecraft:curse_of_vanishing", 250_000.0
+	);
+
 	private EnchantmentPrices() {
 		// Класс только со статическими методами.
 	}
@@ -38,16 +56,28 @@ public final class EnchantmentPrices {
 		double sum = 0.0;
 
 		for (Holder<Enchantment> holder : enchantments.keySet()) {
-			sum += valueOf(holder.value(), enchantments.getLevel(holder));
+			sum += valueOf(holder, enchantments.getLevel(holder));
 		}
 
 		return sum * complexity(enchantments.size());
 	}
 
 	/** Цена одного зачарования на конкретном уровне. */
+	public static double valueOf(Holder<Enchantment> holder, int level) {
+		String id = holder.unwrapKey().map(key -> key.identifier().toString()).orElse("");
+		Double special = SPECIAL.get(id);
+
+		if (special != null) {
+			return special;
+		}
+
+		return valueOf(holder.value(), level);
+	}
+
+	/** Цена по весу зачарования (для зачарований без особой цены). */
 	public static double valueOf(Enchantment enchantment, int level) {
 		int weight = Math.max(1, enchantment.getWeight());
-		return BASE_VALUE * (COMMON_WEIGHT / weight) * level;
+		return BASE_VALUE * (COMMON_WEIGHT / weight) * Math.pow(LEVEL_STEP, Math.max(0, level - 1));
 	}
 
 	/**
