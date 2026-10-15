@@ -7,6 +7,7 @@ import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.economy.TraderService;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.chr0m4ik.marketplace.market.MarketService;
+import com.chr0m4ik.marketplace.market.ShopCatalog;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -86,6 +87,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	public static final int SLOT_WINDOW_CANCEL = 10;
 	public static final int SLOT_WINDOW_INFO = 13;
 	public static final int SLOT_WINDOW_CONFIRM = 16;
+
+	/** Кнопки меню разделов магазина: выход снизу, разделы — в средней строке (9…17). */
+	public static final int BUY_SLOT_EXIT = 22;
+	public static final int BUY_SLOT_FIRST_CATEGORY = 9;
 
 	/** Кнопка «Назад» в окнах-заготовках. */
 	public static final int BACK_SLOT = 49;
@@ -355,7 +360,31 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
+		if (this.kind == WindowKind.BUY) {
+			// Меню разделов: девять иконок по центру и выход снизу.
+			ShopCatalog.Category[] categories = ShopCatalog.Category.values();
+
+			for (int i = 0; i < categories.length && i < 9; i++) {
+				ItemStack button = new ItemStack(categories[i].icon());
+				button.set(DataComponents.CUSTOM_NAME, Component.translatable("marketplace.gui.category",
+						Component.translatable(categories[i].titleKey())));
+				button.set(DataComponents.LORE, new ItemLore(List.of(
+						Component.translatable("marketplace.gui.category.count",
+								Component.literal(String.valueOf(ShopCatalog.items(categories[i]).size())))
+								.withStyle(ChatFormatting.GRAY))));
+				this.setButtonStack(9 + i, button);
+			}
+
+			this.setButton(BUY_SLOT_EXIT, Items.BARRIER, "marketplace.gui.button.exit");
+			return;
+		}
+
 		this.setButton(BACK_SLOT, Items.ARROW, "marketplace.gui.button.back");
+	}
+
+	/** Кладёт готовый предмет-кнопку в системный слот (номер — как его видит игрок). */
+	private void setButtonStack(int containerSlot, ItemStack stack) {
+		this.buttonContainer.setItem(containerSlot - this.kind.tradeSlots(), stack);
 	}
 
 	/**
@@ -527,6 +556,21 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				this.buyNextSlot(serverPlayer);
 			} else if (slotId == SLOT_WINDOW_CANCEL) {
 				MarketplaceMenus.open(serverPlayer, WindowKind.SELL);
+			}
+
+			return;
+		}
+
+		if (this.kind == WindowKind.BUY) {
+			if (slotId == BUY_SLOT_EXIT) {
+				MarketplaceMenus.open(serverPlayer, WindowKind.MAIN);
+			} else {
+				// Разделы идут подряд со сдвигом: 9 — первый, 17 — девятый.
+				int index = slotId - BUY_SLOT_FIRST_CATEGORY;
+
+				if (index >= 0 && index < ShopCatalog.Category.values().length) {
+					MarketplaceMenus.open(serverPlayer, WindowKind.BUY_LIST);
+				}
 			}
 
 			return;

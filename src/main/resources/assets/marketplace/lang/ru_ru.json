@@ -87,4 +87,16 @@
 
 	"marketplace.hud.balance": "Баланс: %s",
 	"marketplace.hud.inventory": "Инвентарь: %s"
-}
+	"marketplace.gui.category": "Раздел: %s",
+	"marketplace.gui.category.kits": "Киты",
+	"marketplace.gui.category.weapons": "Оружие",
+	"marketplace.gui.category.armor": "Броня",
+	"marketplace.gui.category.blocks": "Блоки",
+	"marketplace.gui.category.potions": "Зелья",
+	"marketplace.gui.category.food": "Еда",
+	"marketplace.gui.category.rare": "Редкие предметы",
+	"marketplace.gui.category.tools": "Инструменты",
+	"marketplace.gui.category.materials": "Материалы",
+	"marketplace.gui.category.count": "Предметов: %s",
+	"marketplace.gui.buy.list.title": "Магазин — товары",
+	"marketplace.gui.buy.item.title": "Покупка предмета",}
