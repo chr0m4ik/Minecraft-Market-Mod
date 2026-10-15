@@ -31,8 +31,10 @@ import net.minecraft.world.item.component.ItemLore;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -98,6 +100,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	private final ServerPlayer serverPlayer;
 	/** Включён ли безопасный режим снятия ордеров (кнопка-мишень). */
 	private boolean targetMode;
+	/** Ячейки, которые сейчас показывают подтверждённый ордер (по ним ловим момент продажи). */
+	private final Set<Integer> orderCells = new HashSet<>();
 
 	public MarketplaceMenu(WindowKind kind, int syncId, Inventory inventory) {
 		super(MarketplaceMenus.typeOf(kind), syncId);
@@ -156,6 +160,11 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 			MarketOrder order = state.order(playerId, i);
 			ItemStack staged = state.staging(playerId).get(i);
+
+			if (order != null) {
+				this.orderCells.add(i);
+			}
+
 			this.tradeContainer.setItem(i, order != null ? order.stack() : (staged == null ? ItemStack.EMPTY : staged));
 		}
 	}
@@ -273,8 +282,14 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 			if (i >= unlocked) {
 				expected = lockedPane();
+				this.orderCells.remove(i);
 			} else if (state.order(playerId, i) != null) {
 				expected = state.order(playerId, i).stack();
+				this.orderCells.add(i);
+			} else if (this.orderCells.remove(i)) {
+				// Ордер продался, пока окно открыто: ячейку сразу освобождаем,
+				// иначе предмет можно было бы утащить второй раз.
+				expected = ItemStack.EMPTY;
 			}
 
 			if (expected != null && !ItemStack.matches(this.tradeContainer.getItem(i), expected)) {

@@ -38,8 +38,8 @@ public class MarketplaceScreen extends AbstractContainerScreen<MarketplaceMenu> 
 	/** Насколько плашка отступает вправо от окна. */
 	private static final int PLATE_MARGIN = 6;
 
-	/** Полупрозрачная зелёная подсветка ячеек рынка, которые ещё не подтвердили. */
-	private static final int STAGED_TINT = 0x5500FF00;
+	/** Золотая обводка ячеек, которые уже выставлены на продажу. */
+	private static final int ORDER_FRAME = 0xFFFFD700;
 
 	public MarketplaceScreen(MarketplaceMenu menu, Inventory inventory, Component title) {
 		super(menu, inventory, title, WindowKind.IMAGE_WIDTH, menu.getKind().imageHeight());
@@ -93,8 +93,8 @@ public class MarketplaceScreen extends AbstractContainerScreen<MarketplaceMenu> 
 	}
 
 	/**
-	 * Подсвечивает зелёным предметы, которые игрок только что положил и ещё не подтвердил.
-	 * Так видно, что уже выставлено на продажу (ордер), а что пока лежит «на столе».
+	 * Обводит золотом ячейки с подтверждёнными ордерами: сразу видно, что предмет уже выставлен
+	 * на продажу (его нельзя утащить без кнопки-мишени), а не просто лежит и ждёт подтверждения.
 	 */
 	private void extractStagedCells(GuiGraphicsExtractor graphics) {
 		if (this.menu.getKind() != WindowKind.SELL) {
@@ -102,15 +102,16 @@ public class MarketplaceScreen extends AbstractContainerScreen<MarketplaceMenu> 
 		}
 
 		for (int i = 0; i < this.menu.tradeSlotCount(); i++) {
-			ItemStack stack = this.menu.getTradeContainer().getItem(i);
-
-			if (stack.isEmpty() || this.menu.isCellOrder(i)) {
+			if (!this.menu.isCellOrder(i) || this.menu.getTradeContainer().getItem(i).isEmpty()) {
 				continue;
 			}
 
-			int x = this.leftPos + 8 + (i % 9) * 18;
-			int y = this.topPos + 18 + (i / 9) * 18;
-			graphics.fill(x, y, x + 16, y + 16, STAGED_TINT);
+			int x = this.leftPos + 8 + (i % 9) * 18 - 1;
+			int y = this.topPos + 18 + (i / 9) * 18 - 1;
+			graphics.fill(x, y, x + 18, y + 1, ORDER_FRAME);
+			graphics.fill(x, y + 17, x + 18, y + 18, ORDER_FRAME);
+			graphics.fill(x, y + 1, x + 1, y + 17, ORDER_FRAME);
+			graphics.fill(x + 17, y + 1, x + 18, y + 17, ORDER_FRAME);
 		}
 	}
 
