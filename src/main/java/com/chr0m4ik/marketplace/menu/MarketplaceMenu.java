@@ -92,9 +92,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	public static final int SLOT_WINDOW_INFO = 13;
 	public static final int SLOT_WINDOW_CONFIRM = 16;
 
-	/** Кнопки меню разделов магазина: выход снизу, разделы — в средней строке (9…17). */
-	public static final int BUY_SLOT_EXIT = 22;
-	public static final int BUY_SLOT_FIRST_CATEGORY = 9;
+	/** Кнопки меню разделов магазина: выход снизу по центру, разделы — прямоугольником по центру. */
+	public static final int BUY_SLOT_EXIT = 49;
+	public static final int BUY_GRID_ROWS = 3;
+	public static final int BUY_GRID_COLUMNS = 7;
 
 	/** Кнопки списка товаров: выход, предыдущая и следующая страницы. */
 	public static final int BUY_LIST_EXIT = 45;
@@ -394,18 +395,22 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		if (this.kind == WindowKind.BUY) {
-			// Меню разделов: девять иконок по центру и выход снизу.
+			// Разделы выкладываем прямоугольником по центру окна.
 			ShopCatalog.Category[] categories = ShopCatalog.Category.values();
+			int index = 0;
 
-			for (int i = 0; i < categories.length && i < 9; i++) {
-				ItemStack button = new ItemStack(categories[i].icon());
-				button.set(DataComponents.CUSTOM_NAME, Component.translatable("marketplace.gui.category",
-						Component.translatable(categories[i].titleKey())));
-				button.set(DataComponents.LORE, new ItemLore(List.of(
-						Component.translatable("marketplace.gui.category.count",
-								Component.literal(String.valueOf(ShopCatalog.items(categories[i]).size())))
-								.withStyle(ChatFormatting.GRAY))));
-				this.setButtonStack(9 + i, button);
+			for (int row = 1; row <= BUY_GRID_ROWS && index < categories.length; row++) {
+				for (int col = 1; col <= BUY_GRID_COLUMNS && index < categories.length; col++) {
+					ItemStack button = new ItemStack(categories[index].icon());
+					button.set(DataComponents.CUSTOM_NAME, Component.translatable("marketplace.gui.category",
+							Component.translatable(categories[index].titleKey())));
+					button.set(DataComponents.LORE, new ItemLore(List.of(
+							Component.translatable("marketplace.gui.category.count",
+									Component.literal(String.valueOf(ShopCatalog.items(categories[index]).size())))
+									.withStyle(ChatFormatting.GRAY))));
+					this.setButtonStack(row * 9 + col, button);
+					index++;
+				}
 			}
 
 			this.setButton(BUY_SLOT_EXIT, Items.BARRIER, "marketplace.gui.button.exit");
@@ -682,14 +687,18 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			if (slotId == BUY_SLOT_EXIT) {
 				MarketplaceMenus.open(serverPlayer, WindowKind.MAIN);
 			} else {
-				// Разделы идут подряд со сдвигом: 9 — первый, 17 — девятый.
-				int index = slotId - BUY_SLOT_FIRST_CATEGORY;
+				// Разделы лежат прямоугольником по центру: строки 1…3, столбцы 1…7.
+				int row = slotId / 9;
+				int col = slotId % 9;
 
-				if (index >= 0 && index < ShopCatalog.Category.values().length) {
-					// Запоминаем выбранный раздел — по нему откроется список товаров.
-					MarketService.setShop(serverPlayer.getUUID(),
-							MarketService.shop(serverPlayer.getUUID()).withCategory(index));
-					MarketplaceMenus.open(serverPlayer, WindowKind.BUY_LIST);
+				if (row >= 1 && row <= BUY_GRID_ROWS && col >= 1 && col <= BUY_GRID_COLUMNS) {
+					int index = (row - 1) * BUY_GRID_COLUMNS + (col - 1);
+
+					if (index < ShopCatalog.Category.values().length) {
+						MarketService.setShop(serverPlayer.getUUID(),
+								MarketService.shop(serverPlayer.getUUID()).withCategory(index));
+						MarketplaceMenus.open(serverPlayer, WindowKind.BUY_LIST);
+					}
 				}
 			}
 

@@ -10,6 +10,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -20,11 +22,15 @@ import java.util.Map;
 /**
  * Каталог магазина: на какие разделы делятся предметы и что лежит в каждом разделе.
  *
- * <p>Раздел определяется по самому предмету — ничего вручную перечислять не нужно:
- * дорогие предметы попадают в «Редкие», блоки — в «Блоки», еда — в «Еду» и так далее.
+ * <p>Раздел определяется по самому предмету, вручную ничего перечислять не нужно.
+ * Некоторые разделы собираются особым образом: зелья, стрелы с эффектом и книги зачарований
+ * в игре представлены одним предметом с разным содержимым, поэтому для них перебираются
+ * варианты из реестров.
+ *
+ * <p>Предметы, которые нельзя купить (недоступные в выживании), в магазин не попадают.
  */
 public final class ShopCatalog {
-	/** Сколько предметов показываем на одной странице: 45 ячеек (9×5). */
+	/** Сколько товаров показываем на одной странице: 45 ячеек (9×5). */
 	public static final int PAGE_SIZE = 45;
 
 	/** Разделы магазина. Иконка — предмет, которым раздел показывается в меню. */
@@ -32,12 +38,15 @@ public final class ShopCatalog {
 		KITS("marketplace.gui.category.kits", () -> Items.SHULKER_BOX),
 		WEAPONS("marketplace.gui.category.weapons", () -> Items.DIAMOND_SWORD),
 		ARMOR("marketplace.gui.category.armor", () -> Items.DIAMOND_CHESTPLATE),
+		TOOLS("marketplace.gui.category.tools", () -> Items.DIAMOND_PICKAXE),
 		BLOCKS("marketplace.gui.category.blocks", () -> Items.BRICKS),
 		POTIONS("marketplace.gui.category.potions", () -> Items.POTION),
+		ARROWS("marketplace.gui.category.arrows", () -> Items.SPECTRAL_ARROW),
+		BOOKS("marketplace.gui.category.books", () -> Items.ENCHANTED_BOOK),
 		FOOD("marketplace.gui.category.food", () -> Items.BREAD),
-		RARE("marketplace.gui.category.rare", () -> Items.NETHER_STAR),
-		TOOLS("marketplace.gui.category.tools", () -> Items.DIAMOND_PICKAXE),
-		MATERIALS("marketplace.gui.category.materials", () -> Items.IRON_INGOT);
+		MATERIALS("marketplace.gui.category.materials", () -> Items.IRON_INGOT),
+		SPAWN_EGGS("marketplace.gui.category.spawnEggs", () -> Items.CHICKEN_SPAWN_EGG),
+		RARE("marketplace.gui.category.rare", () -> Items.NETHER_STAR);
 
 		private final String titleKey;
 		private final java.util.function.Supplier<Item> icon;
@@ -56,22 +65,17 @@ public final class ShopCatalog {
 		}
 	}
 
-	/** С какого цены предмет считается редким. */
+	/** С какой цены предмет считается редким. */
 	private static final double RARE_PRICE = 1_000_000.0;
 
-	/** Кэш: раздел → предметы (отсортированы по цене, от дешёвых к дорогим). */
+	/** Кэш: раздел → товары (отсортированы по названию, как в креативном инвентаре). */
 	private static final Map<Category, List<ItemStack>> CACHE = new EnumMap<>(Category.class);
 
 	private ShopCatalog() {
 		// Класс только со статическими методами.
 	}
 
-	/**
-	 * Товары раздела. Список строится один раз и сортируется по цене.
-	 *
-	 * <p>Зелья — особый случай: в игре это один предмет ({@code minecraft:potion}) с разным
-	 * содержимым, поэтому перебираем виды зелий из реестра, а не предметы.
-	 */
+	/** Товары раздела. Список строится один раз. */
 	public static List<ItemStack> items(Category category) {
 		List<ItemStack> cached = CACHE.get(category);
 
@@ -81,24 +85,67 @@ public final class ShopCatalog {
 
 		List<ItemStack> stacks = new ArrayList<>();
 
-		if (category == Category.POTIONS) {
-			for (Holder<Potion> potion : BuiltInRegistries.POTION.listElements().toList()) {
-				ItemStack stack = new ItemStack(Items.POTION);
-				stack.set(DataComponents.POTION_CONTENTS, new PotionContents(potion));
-				stacks.add(stack);
+		switch (category) {
+			case KITS -> {
+				// Киты появятся на этапе 8.
 			}
-		} else if (category != Category.KITS) {
-			for (Item item : BuiltInRegistries.ITEM) {
-				if (categoryOf(item) == category) {
-					stacks.add(new ItemStack(item));
+			case POTIONS -> addPotions(stacks, false);
+			case ARROWS -> addArrows(stacks);
+			case BOOKS -> addBooks(stacks);
+			default -> {
+				for (Item item : BuiltInRegistries.ITEM) {
+					// Недоступные в выживании предметы (барьер, бедрок, свет и прочее) в магазин не берём.
+					if (ItemPrices.isBuyable(item) && categoryOf(item) == category) {
+						stacks.add(new ItemStack(item));
+					}
 				}
 			}
 		}
 
-		stacks.sort(Comparator.comparingDouble(ItemPrices::priceOf));
+		stacks.sort(Comparator.comparing(ShopCatalog::sortKey));
 		List<ItemStack> result = List.copyOf(stacks);
 		CACHE.put(category, result);
 		return result;
+	}
+
+	/** Зелья: обычные, брызгающие и туманные (флаг — только брызгающие и туманные). */
+	private static void addPotions(List<ItemStack> stacks, boolean splashOnly) {
+		for (Holder<Potion> potion : BuiltInRegistries.POTION.listElements().toList()) {
+			stacks.add(potionStack(Items.POTION, potion));
+
+			if (splashOnly) {
+				stacks.add(potionStack(Items.SPLASH_POTION, potion));
+				stacks.add(potionStack(Items.LINGERING_POTION, potion));
+			}
+		}
+	}
+
+	private static ItemStack potionStack(Item item, Holder<Potion> potion) {
+		ItemStack stack = new ItemStack(item);
+		stack.set(DataComponents.POTION_CONTENTS, new PotionContents(potion));
+		return stack;
+	}
+
+	/** Стрелы: обычная, спектральная и все стрелы с эффектом. */
+	private static void addArrows(List<ItemStack> stacks) {
+		stacks.add(new ItemStack(Items.ARROW));
+		stacks.add(new ItemStack(Items.SPECTRAL_ARROW));
+
+		for (Holder<Potion> potion : BuiltInRegistries.POTION.listElements().toList()) {
+			ItemStack stack = new ItemStack(Items.TIPPED_ARROW);
+			stack.set(DataComponents.POTION_CONTENTS, new PotionContents(potion));
+			stacks.add(stack);
+		}
+	}
+
+	/** Книги зачарований: пока обычная книга (варианты по зачарованиям добавлю отдельно). */
+	private static void addBooks(List<ItemStack> stacks) {
+		stacks.add(new ItemStack(Items.ENCHANTED_BOOK));
+	}
+
+	/** Ключ сортировки: сначала по названию предмета, потом по цене. */
+	private static String sortKey(ItemStack stack) {
+		return stack.getHoverName().getString() + "\u0000" + BuiltInRegistries.ITEM.getKey(stack.getItem());
 	}
 
 	/** Сколько страниц в разделе (минимум одна, чтобы окно не было пустым). */
@@ -118,12 +165,34 @@ public final class ShopCatalog {
 	public static Category categoryOf(Item item) {
 		String id = BuiltInRegistries.ITEM.getKey(item).getPath();
 
-		// Редкое — всё, что дорого: так на отдельной полке оказываются маяки, шалкеры, незерит.
+		// Книги зачарований, зелья и стрелы собираются отдельно (switch в items).
+		if (item == Items.ENCHANTED_BOOK) {
+			return Category.BOOKS;
+		}
+
+		if (item == Items.POTION || item == Items.SPLASH_POTION || item == Items.LINGERING_POTION) {
+			return Category.POTIONS;
+		}
+
+		if (item == Items.ARROW || item == Items.SPECTRAL_ARROW || item == Items.TIPPED_ARROW) {
+			return Category.ARROWS;
+		}
+
+		if (id.endsWith("_spawn_egg") || item == Items.SPAWNER || id.endsWith("spawner")
+				|| item == Items.VAULT) {
+			return Category.SPAWN_EGGS;
+		}
+
+		// Головы и черепа — к редким, а не к блокам.
+		if (id.endsWith("_head") || id.endsWith("_skull")) {
+			return Category.RARE;
+		}
+
 		if (ItemPrices.priceOf(item) >= RARE_PRICE) {
 			return Category.RARE;
 		}
 
-		if (isWeapon(id)) {
+		if (isWeapon(id) || item == Items.END_CRYSTAL) {
 			return Category.WEAPONS;
 		}
 
@@ -133,10 +202,6 @@ public final class ShopCatalog {
 
 		if (isTool(id)) {
 			return Category.TOOLS;
-		}
-
-		if (isPotion(id)) {
-			return Category.POTIONS;
 		}
 
 		if (new ItemStack(item).has(DataComponents.FOOD)) {
@@ -151,9 +216,9 @@ public final class ShopCatalog {
 	}
 
 	private static boolean isWeapon(String id) {
-		return id.endsWith("_sword") || id.endsWith("_axe") || id.equals("bow") || id.equals("crossbow")
-				|| id.equals("trident") || id.equals("mace") || id.equals("shield") || id.equals("arrow")
-				|| id.endsWith("_arrow") || id.equals("spectral_arrow") || id.equals("firework_rocket");
+		return id.endsWith("_sword") || id.endsWith("_axe") || id.endsWith("_spear") || id.equals("bow")
+				|| id.equals("crossbow") || id.equals("trident") || id.equals("mace") || id.equals("shield")
+				|| id.equals("firework_rocket");
 	}
 
 	private static boolean isArmor(String id) {
@@ -167,12 +232,6 @@ public final class ShopCatalog {
 				|| id.equals("fishing_rod") || id.equals("flint_and_steel") || id.endsWith("_bucket")
 				|| id.equals("brush") || id.equals("spyglass") || id.equals("compass")
 				|| id.equals("recovery_compass") || id.equals("clock") || id.equals("name_tag")
-				|| id.equals("lead") || id.equals("carrot_on_a_stick") || id.equals("warped_fungus_on_a_stick")
-				|| id.endsWith("_on_a_stick");
-	}
-
-	private static boolean isPotion(String id) {
-		return id.equals("potion") || id.equals("splash_potion") || id.equals("lingering_potion")
-				|| id.equals("tipped_arrow") || id.equals("ominous_bottle") || id.equals("experience_bottle");
+				|| id.equals("lead") || id.endsWith("_on_a_stick");
 	}
 }
