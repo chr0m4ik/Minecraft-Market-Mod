@@ -103,9 +103,9 @@ const BASE = {
 	'minecraft:heavy_core': 20000000, 'minecraft:ominous_bottle': 100000, 'minecraft:ominous_trial_key': 75000,
 	'minecraft:trial_key': 25000,
 	'minecraft:experience_bottle': 5000, 'minecraft:enchanted_golden_apple': 50000000,
-	'minecraft:name_tag': 5000, 'minecraft:saddle': 10000, 'minecraft:elytra': 200000000000,
+	'minecraft:name_tag': 5000, 'minecraft:saddle': 10000, 'minecraft:elytra': 20000000000,
 	'minecraft:totem_of_undying': 100000000, 'minecraft:nether_star': 2000000000,
-	'minecraft:dragon_egg': 5000000000, 'minecraft:spawner': 3000000000,
+	'minecraft:dragon_egg': 5000000000, 'minecraft:spawner': 10000000000,
 	'minecraft:trial_spawner': 2000000000, 'minecraft:vault': 2000000000, 'minecraft:end_portal_frame': 10000000,
 	'minecraft:budding_amethyst': 1, 'minecraft:reinforced_deepslate': 1, 'minecraft:petrified_oak_slab': 1,
 
@@ -210,6 +210,70 @@ const BASE = {
 };
 
 // ---------------------------------------------------------------------------
+// Яйца призыва: в выживании их не получить, поэтому цена зависит от того, насколько
+// полезен моб. Ориентиры заказчика: курица — 1B, визер-скелет — несколько десятков
+// миллиардов. Чтобы поменять цену, достаточно перенести id в другую группу.
+// ---------------------------------------------------------------------------
+const SPAWN_EGG_TIERS = [
+	{
+		price: 1_000_000_000,
+		what: 'обычные мирные мобы',
+		ids: [
+			'chicken', 'cow', 'pig', 'sheep', 'rabbit', 'mooshroom', 'cod', 'salmon', 'pufferfish',
+			'tropical_fish', 'bat', 'parrot', 'cat', 'ocelot', 'wolf', 'fox', 'bee', 'squid',
+			'glow_squid', 'dolphin', 'turtle', 'tadpole', 'frog', 'goat', 'camel', 'llama', 'donkey',
+			'mule', 'horse', 'panda', 'polar_bear', 'snow_golem', 'skeleton_horse', 'zombie_horse',
+			'trader_llama', 'axolotl', 'armadillo', 'allay', 'sniffer', 'strider',
+		],
+	},
+	{
+		price: 3_000_000_000,
+		what: 'простые враждебные мобы',
+		ids: [
+			'zombie', 'skeleton', 'creeper', 'spider', 'cave_spider', 'silverfish', 'endermite', 'slime',
+			'husk', 'stray', 'drowned', 'phantom', 'magma_cube', 'zombie_villager', 'bogged', 'parched',
+			'sulfur_cube', 'creaking',
+		],
+	},
+	{
+		price: 8_000_000_000,
+		what: 'мобы, с которых идут ценные фермы',
+		ids: [
+			'witch', 'pillager', 'vindicator', 'vex', 'guardian', 'blaze', 'ghast', 'enderman', 'ravager',
+			'hoglin', 'zoglin', 'piglin', 'piglin_brute', 'zombified_piglin', 'breeze', 'copper_golem',
+			'iron_golem', 'camel_husk', 'nautilus', 'zombie_nautilus', 'happy_ghast', 'villager',
+			'wandering_trader',
+		],
+	},
+	{
+		price: 25_000_000_000,
+		what: 'очень ценные мобы',
+		ids: ['shulker', 'elder_guardian', 'evoker', 'warden'],
+	},
+	{
+		price: 40_000_000_000,
+		what: 'визер-скелет (черепа для маяка)',
+		ids: ['wither_skeleton'],
+	},
+	{
+		price: 200_000_000_000,
+		what: 'визер (босс)',
+		ids: ['wither'],
+	},
+	{
+		price: 500_000_000_000,
+		what: 'дракон Края (босс)',
+		ids: ['ender_dragon'],
+	},
+];
+
+for (const tier of SPAWN_EGG_TIERS) {
+	for (const mob of tier.ids) {
+		BASE['minecraft:' + mob + '_spawn_egg'] = tier.price;
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Предметы, которых в выживании не получить: продать можно только за 1$,
 // купить нельзя вообще. Спавнеры и яйца призыва сюда НЕ входят — они дорогие и покупаются.
 // ---------------------------------------------------------------------------
@@ -230,7 +294,6 @@ const NOT_BUYABLE = [
 
 // Шаблоны: семейства предметов с одинаковой ценой (проверяются, если нет явной цены).
 const PATTERNS = [
-	{ what: 'яйца призыва', match: /_spawn_egg$/, price: 1500000000 },
 	{ what: 'брёвна и древесина', match: /(_log|_wood|_stem|_hyphae)$/, price: 4 },
 	{ what: 'обтёсанное дерево', match: /^minecraft:stripped_/, price: 4 },
 	{ what: 'саженцы и листва', match: /(_sapling|_leaves|_propagule)$/, price: 1 },
