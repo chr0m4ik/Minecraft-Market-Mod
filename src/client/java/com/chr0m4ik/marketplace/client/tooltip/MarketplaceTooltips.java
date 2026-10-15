@@ -53,6 +53,12 @@ public final class MarketplaceTooltips {
 			MarketplaceMenu menu = marketplace.getMenu();
 
 			if (marketplace.isHoveringButton()) {
+				// Предмет по центру окна покупки лежит в слоте-кнопке, поэтому цену показываем здесь.
+				if (menu.getKind() == WindowKind.BUY_ITEM) {
+					addBuyLines(lines, marketplace, menu, stack);
+					return;
+				}
+
 				// У кнопок своя подсказка: у бумаги — сводка, у остальных её просто нет.
 				if (menu.getKind() == WindowKind.TRADER && stack.is(Items.PAPER)) {
 					addTraderSummary(lines, menu);
