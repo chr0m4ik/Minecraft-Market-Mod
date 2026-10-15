@@ -19,6 +19,7 @@
 	"marketplace.tooltip.trader.discounted": "With trader discount: %s",
 
 	"marketplace.gui.trader.sold": "Sold to trader: %s items for %s",
+	"marketplace.gui.trader.limit": "The trader will not buy that much today — some items stayed in the window",
 
 	"key.category.marketplace.main": "Minecraft Marketplace",
 	"key.marketplace.open": "Open market",

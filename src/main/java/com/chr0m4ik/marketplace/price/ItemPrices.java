@@ -11,6 +11,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BundleContents;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 
 import java.io.IOException;
@@ -54,6 +56,9 @@ public final class ItemPrices {
 
 	/** Самая большая наценка на рынке (модификатор x2). */
 	public static final double MAX_MARKET_MARKUP = 2.0;
+
+	/** Насколько глубоко разворачиваем содержимое контейнеров (защита от зацикливания). */
+	private static final int MAX_CONTENT_DEPTH = 8;
 
 	private static final Codec<Map<String, Double>> PRICES_CODEC = Codec.unboundedMap(Codec.STRING, Codec.DOUBLE);
 	private static final Codec<List<String>> NAMES_CODEC = Codec.STRING.listOf();
@@ -126,9 +131,13 @@ public final class ItemPrices {
 		return prices.getOrDefault(item, UNKNOWN_PRICE);
 	}
 
-	/** Базовая цена всего стака, включая зачарования. */
+	/** Базовая цена всего стака, включая зачарования и содержимое контейнеров. */
 	public static double priceOf(ItemStack stack) {
-		if (stack.isEmpty()) {
+		return priceOf(stack, 0);
+	}
+
+	private static double priceOf(ItemStack stack, int depth) {
+		if (stack.isEmpty() || depth > MAX_CONTENT_DEPTH) {
 			return 0.0;
 		}
 
@@ -149,7 +158,33 @@ public final class ItemPrices {
 			price += EnchantmentPrices.valueOf(stored);
 		}
 
+		// Содержимое шалкеров, бочек и мешков тоже стоит денег.
+		price += contentsPrice(stack, depth);
+
 		return price;
+	}
+
+	/** Стоимость того, что лежит внутри предмета (шалкер, мешок). */
+	private static double contentsPrice(ItemStack stack, int depth) {
+		double total = 0.0;
+
+		ItemContainerContents container = stack.get(DataComponents.CONTAINER);
+
+		if (container != null) {
+			for (ItemStack inside : container.itemCopies().toList()) {
+				total += priceOf(inside, depth + 1);
+			}
+		}
+
+		BundleContents bundle = stack.get(DataComponents.BUNDLE_CONTENTS);
+
+		if (bundle != null) {
+			for (ItemStack inside : bundle.itemCopies().toList()) {
+				total += priceOf(inside, depth + 1);
+			}
+		}
+
+		return total;
 	}
 
 	/** Сколько стоит всё, что лежит в инвентаре игрока (по цене продажи за 1x). */

@@ -19,6 +19,7 @@
 	"marketplace.tooltip.trader.discounted": "С уценкой у торговца: %s",
 
 	"marketplace.gui.trader.sold": "Продано торговцу: %s шт. на %s",
+	"marketplace.gui.trader.limit": "Сегодня торговец больше не берёт столько — часть товара осталась в окне",
 
 	"key.category.marketplace.main": "Minecraft Marketplace",
 	"key.marketplace.open": "Открыть рынок",

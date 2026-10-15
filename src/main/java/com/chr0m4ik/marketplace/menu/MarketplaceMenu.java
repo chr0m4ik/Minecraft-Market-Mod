@@ -195,17 +195,30 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
-		TraderService.Offer offer = TraderService.take(this.tradeContainer, this.kind.tradeSlots());
+		TraderService.Sale sale = TraderService.sell(server, player, this.tradeContainer, this.kind.tradeSlots());
 
-		if (offer.isEmpty()) {
+		if (sale.isEmpty()) {
+			if (sale.limitReached()) {
+				sendLimitMessage(player);
+			}
+
 			return;
 		}
 
-		MarketplaceEconomy.addBalance(server, player.getUUID(), offer.payout());
 		this.broadcastChanges();
 
 		player.sendSystemMessage(Component.translatable("marketplace.gui.trader.sold",
-				Component.literal(String.valueOf(offer.itemCount())), money(offer.payout())));
+				Component.literal(String.valueOf(sale.itemCount())), money(sale.payout())));
+
+		if (sale.limitReached()) {
+			sendLimitMessage(player);
+		}
+	}
+
+	/** Сообщение о том, что торговец больше не берёт столько за сегодня. */
+	private static void sendLimitMessage(ServerPlayer player) {
+		player.sendSystemMessage(Component.translatable("marketplace.gui.trader.limit")
+				.withStyle(ChatFormatting.RED));
 	}
 
 	@Override

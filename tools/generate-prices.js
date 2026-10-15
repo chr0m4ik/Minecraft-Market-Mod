@@ -22,6 +22,30 @@ const OUT = process.argv[2] || 'src/main/resources/data/marketplace/prices.json'
 /** Наценка на крафт: собранный предмет стоит на 5% дороже своих ингредиентов. */
 const CRAFT_MARKUP = 1.05;
 
+/** Наценка на переплавку (печка, коптильня и так далее): +15%, как просил заказчик. */
+const SMELT_MARKUP = 1.15;
+
+/**
+ * Цены, которые расчёт из рецептов НЕ понижает. Сюда попадает только то, что заказчик
+ * задал вручную осознанно. Внимание: если предмет можно скрафтить дешевле его цены,
+ * он попадёт в tools/craft-cheats.txt — это значит, что на нём можно зарабатывать.
+ */
+const LOCKED = new Set([
+	// Шаблон незеритового апгрейда: заказчик просил 150 000, хотя дублирование
+	// (7 алмазов + шаблон → 2 шаблона) выходит дешевле.
+	'minecraft:netherite_upgrade_smithing_template',
+]);
+
+/** Сколько стаков предмета торговец готов купить за один игровой день. */
+const TRADER_DEFAULT_LIMIT = 30;
+const TRADER_LIMIT_TIERS = [
+	{ maxPrice: 100_000, stacks: 30 },
+	{ maxPrice: 1_000_000, stacks: 10 },
+	{ maxPrice: 10_000_000, stacks: 5 },
+	{ maxPrice: 100_000_000, stacks: 2 },
+	{ maxPrice: Infinity, stacks: 1 },
+];
+
 /** Цена предмета, для которого ничего не нашлось (креативные и служебные вещи). */
 const JUNK_PRICE = 1;
 
@@ -48,30 +72,32 @@ const BASE = {
 	'minecraft:sponge': 500, 'minecraft:wet_sponge': 400, 'minecraft:cobweb': 5, 'minecraft:bedrock': 1,
 
 	// --- обычные ресурсы: 5–50$ ---
-	'minecraft:coal': 5, 'minecraft:charcoal': 5, 'minecraft:coal_ore': 8, 'minecraft:deepslate_coal_ore': 8,
-	'minecraft:raw_iron': 20, 'minecraft:iron_ingot': 25, 'minecraft:iron_ore': 22, 'minecraft:deepslate_iron_ore': 22,
-	'minecraft:raw_copper': 8, 'minecraft:copper_ingot': 10, 'minecraft:copper_ore': 9, 'minecraft:deepslate_copper_ore': 9,
-	'minecraft:raw_gold': 35, 'minecraft:gold_ingot': 40, 'minecraft:gold_ore': 38, 'minecraft:deepslate_gold_ore': 38,
-	'minecraft:nether_gold_ore': 38, 'minecraft:redstone': 8, 'minecraft:redstone_ore': 10,
-	'minecraft:deepslate_redstone_ore': 10, 'minecraft:lapis_lazuli': 15, 'minecraft:lapis_ore': 18,
-	'minecraft:deepslate_lapis_ore': 18, 'minecraft:quartz': 12, 'minecraft:nether_quartz_ore': 14,
-	'minecraft:amethyst_shard': 20, 'minecraft:amethyst_block': 80, 'minecraft:echo_shard': 20000,
+	// Цены на ископаемые подняты в 10 раз (просьба заказчика). Слитков здесь нет намеренно:
+	// они считаются переплавкой от руды, а переплавка дороже сырья на 15% (см. SMELT_MARKUP).
+	'minecraft:coal': 50, 'minecraft:coal_ore': 80, 'minecraft:deepslate_coal_ore': 80,
+	'minecraft:raw_iron': 200, 'minecraft:iron_ore': 220, 'minecraft:deepslate_iron_ore': 220,
+	'minecraft:raw_copper': 80, 'minecraft:copper_ore': 90, 'minecraft:deepslate_copper_ore': 90,
+	'minecraft:raw_gold': 350, 'minecraft:gold_ore': 380, 'minecraft:deepslate_gold_ore': 380,
+	'minecraft:nether_gold_ore': 380, 'minecraft:redstone': 80, 'minecraft:redstone_ore': 100,
+	'minecraft:deepslate_redstone_ore': 100, 'minecraft:lapis_lazuli': 150, 'minecraft:lapis_ore': 180,
+	'minecraft:deepslate_lapis_ore': 180, 'minecraft:quartz': 120, 'minecraft:nether_quartz_ore': 140,
+	'minecraft:amethyst_shard': 200, 'minecraft:amethyst_block': 800, 'minecraft:echo_shard': 20000,
 	'minecraft:glowstone_dust': 10, 'minecraft:blaze_powder': 30, 'minecraft:gunpowder': 6,
 	'minecraft:flint': 3, 'minecraft:paper': 3, 'minecraft:string': 3, 'minecraft:feather': 2,
 	'minecraft:leather': 5, 'minecraft:rabbit_hide': 3, 'minecraft:bone': 3, 'minecraft:slime_ball': 8,
-	'minecraft:spider_eye': 10, 'minecraft:rotten_flesh': 1, 'minecraft:ink_sac': 3, 'minecraft:glow_ink_sac': 15,
-	'minecraft:honeycomb': 15, 'minecraft:honey_bottle': 20, 'minecraft:sugar_cane': 2, 'minecraft:bamboo': 1,
-	'minecraft:kelp': 1, 'minecraft:dried_kelp': 2, 'minecraft:sea_pickle': 5, 'minecraft:sweet_berries': 2,
-	'minecraft:glow_berries': 5, 'minecraft:nether_wart': 10, 'minecraft:wheat': 2, 'minecraft:wheat_seeds': 1,
-	'minecraft:beetroot': 2, 'minecraft:beetroot_seeds': 1, 'minecraft:carrot': 2, 'minecraft:potato': 2,
-	'minecraft:poisonous_potato': 1, 'minecraft:melon_seeds': 1, 'minecraft:pumpkin_seeds': 1,
-	'minecraft:pumpkin': 3, 'minecraft:carved_pumpkin': 3, 'minecraft:melon': 3, 'minecraft:melon_slice': 1,
-	'minecraft:apple': 3, 'minecraft:cocoa_beans': 3, 'minecraft:cactus': 2, 'minecraft:dead_bush': 1,
+	'minecraft:spider_eye': 10, 'minecraft:rotten_flesh': 10, 'minecraft:ink_sac': 3, 'minecraft:glow_ink_sac': 15,
+	'minecraft:honeycomb': 15, 'minecraft:honey_bottle': 200, 'minecraft:sugar_cane': 2, 'minecraft:bamboo': 1,
+	'minecraft:kelp': 10, 'minecraft:dried_kelp': 20, 'minecraft:sea_pickle': 5, 'minecraft:sweet_berries': 20,
+	'minecraft:glow_berries': 50, 'minecraft:nether_wart': 10, 'minecraft:wheat': 20, 'minecraft:wheat_seeds': 1,
+	'minecraft:beetroot': 20, 'minecraft:beetroot_seeds': 1, 'minecraft:carrot': 20, 'minecraft:potato': 20,
+	'minecraft:poisonous_potato': 10, 'minecraft:melon_seeds': 1, 'minecraft:pumpkin_seeds': 1,
+	'minecraft:pumpkin': 3, 'minecraft:carved_pumpkin': 3, 'minecraft:melon': 3, 'minecraft:melon_slice': 10,
+	'minecraft:apple': 1000, 'minecraft:cocoa_beans': 3, 'minecraft:cactus': 2, 'minecraft:dead_bush': 1,
 	'minecraft:egg': 2, 'minecraft:turtle_egg': 5000, 'minecraft:armadillo_scute': 500,
 	'minecraft:nautilus_shell': 100000, 'minecraft:prismarine_shard': 50, 'minecraft:prismarine_crystals': 80,
 	'minecraft:heart_of_the_sea': 500000, 'minecraft:scute': 150, 'minecraft:phantom_membrane': 800,
 	'minecraft:rabbit_foot': 300, 'minecraft:magma_cream': 25, 'minecraft:blaze_rod': 150,
-	'minecraft:ender_pearl': 400, 'minecraft:chorus_fruit': 50, 'minecraft:popped_chorus_fruit': 55,
+	'minecraft:ender_pearl': 400, 'minecraft:chorus_fruit': 500, 'minecraft:popped_chorus_fruit': 550,
 	'minecraft:shulker_shell': 50000000, 'minecraft:dragon_breath': 200000, 'minecraft:ghast_tear': 150000,
 	'minecraft:wither_skeleton_skull': 600000, 'minecraft:trident': 250000, 'minecraft:breeze_rod': 400000,
 	'minecraft:heavy_core': 20000000, 'minecraft:ominous_bottle': 100000, 'minecraft:ominous_trial_key': 75000,
@@ -84,10 +110,13 @@ const BASE = {
 	'minecraft:budding_amethyst': 1, 'minecraft:reinforced_deepslate': 1, 'minecraft:petrified_oak_slab': 1,
 
 	// --- редкие ископаемые: 1000–50000$ ---
-	'minecraft:diamond': 3000, 'minecraft:diamond_ore': 3200, 'minecraft:deepslate_diamond_ore': 3200,
+	'minecraft:diamond': 5000, 'minecraft:diamond_ore': 5200, 'minecraft:deepslate_diamond_ore': 5200,
+	// Изумруды заказчик просил не трогать.
 	'minecraft:emerald': 3500, 'minecraft:emerald_ore': 3700, 'minecraft:deepslate_emerald_ore': 3700,
-	'minecraft:ancient_debris': 4000, 'minecraft:netherite_scrap': 5000, 'minecraft:netherite_ingot': 30000,
-	'minecraft:raw_iron_block': 180, 'minecraft:raw_copper_block': 72, 'minecraft:raw_gold_block': 315,
+	// Незерит и всё, что из него делают, дороже примерно втрое. Раньше слиток стоил 30 000,
+	// значит руда должна стоить так, чтобы после переплавки и крафта вышло около 90 000.
+	'minecraft:ancient_debris': 18000,
+	'minecraft:raw_iron_block': 1800, 'minecraft:raw_copper_block': 720, 'minecraft:raw_gold_block': 3150,
 
 	// --- еда и прочее, что нельзя вывести из рецептов ---
 	'minecraft:potion': 250, 'minecraft:splash_potion': 400,
@@ -133,9 +162,11 @@ const BASE = {
 	'minecraft:pearlescent_froglight': 50, 'minecraft:bee_nest': 200, 'minecraft:bell': 500,
 
 	// --- еда, рыба и ведра: 5–100$ ---
-	'minecraft:beef': 20, 'minecraft:porkchop': 20, 'minecraft:chicken': 15, 'minecraft:mutton': 20,
-	'minecraft:rabbit': 20, 'minecraft:cod': 15, 'minecraft:salmon': 20, 'minecraft:tropical_fish': 25,
-	'minecraft:pufferfish': 30, 'minecraft:milk_bucket': 100, 'minecraft:water_bucket': 85,
+	// Еда подорожала в 10 раз (просьба заказчика). Яблоко — отдельная цена: оно редкое
+	// и нужно для золотых яблок.
+	'minecraft:beef': 200, 'minecraft:porkchop': 200, 'minecraft:chicken': 150, 'minecraft:mutton': 200,
+	'minecraft:rabbit': 200, 'minecraft:cod': 150, 'minecraft:salmon': 200, 'minecraft:tropical_fish': 250,
+	'minecraft:pufferfish': 300, 'minecraft:milk_bucket': 100, 'minecraft:water_bucket': 85,
 	'minecraft:lava_bucket': 95, 'minecraft:powder_snow_bucket': 90, 'minecraft:turtle_scute': 200,
 	'minecraft:turtle_helmet': 5000, 'minecraft:sniffer_egg': 500000,
 
@@ -144,10 +175,10 @@ const BASE = {
 	'minecraft:chainmail_leggings': 4500, 'minecraft:chainmail_boots': 2500,
 	'minecraft:leather_horse_armor': 2000, 'minecraft:copper_horse_armor': 3000,
 	'minecraft:iron_horse_armor': 8000, 'minecraft:golden_horse_armor': 12000,
-	'minecraft:diamond_horse_armor': 30000, 'minecraft:netherite_horse_armor': 300000,
+	'minecraft:diamond_horse_armor': 30000, 'minecraft:netherite_horse_armor': 900000,
 	'minecraft:copper_nautilus_armor': 5000, 'minecraft:iron_nautilus_armor': 12000,
 	'minecraft:golden_nautilus_armor': 18000, 'minecraft:diamond_nautilus_armor': 45000,
-	'minecraft:netherite_nautilus_armor': 400000,
+	'minecraft:netherite_nautilus_armor': 1200000,
 
 	// --- карты, шаблоны и редкие находки ---
 	'minecraft:map': 250, 'minecraft:filled_map': 3000, 'minecraft:buried_treasure_map': 10000,
@@ -159,7 +190,7 @@ const BASE = {
 	'minecraft:savanna_village_map': 6000, 'minecraft:taiga_village_map': 6000,
 	'minecraft:snowy_village_map': 6000, 'minecraft:swamp_hut_map': 12000,
 	'minecraft:warm_ocean_ruins_map': 8000, 'minecraft:disc_fragment_5': 20000,
-	'minecraft:goat_horn': 15000, 'minecraft:netherite_upgrade_smithing_template': 500000,
+	'minecraft:goat_horn': 15000, 'minecraft:netherite_upgrade_smithing_template': 150000,
 	'minecraft:flow_banner_pattern': 5000, 'minecraft:globe_banner_pattern': 5000,
 	'minecraft:guster_banner_pattern': 5000, 'minecraft:piglin_banner_pattern': 5000,
 
@@ -218,8 +249,6 @@ const PATTERNS = [
 	{ what: 'кровати', match: /_bed$/, price: 20 },
 	{ what: 'цветы', match: /(_flower|_tulip|_orchid|_blossom|_lily|_daisy|_rose|_dandelion|_poppy|_allium|_violet)$/, price: 2 },
 	{ what: 'кораллы', match: /(_coral|_coral_block|_coral_fan)$/, price: 5 },
-	{ what: 'рыба', match: /(_cod|_salmon|_tropical_fish|_pufferfish)$/, price: 15 },
-	{ what: 'сырое мясо', match: /^minecraft:raw_(beef|porkchop|chicken|mutton|rabbit)$/, price: 20 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -348,11 +377,14 @@ const evaluate = (recipe) => {
 		}
 
 		case 'minecraft:stonecutting':
+			return wrap(recipe, sum([recipe.ingredient]));
+
 		case 'minecraft:smelting':
 		case 'minecraft:blasting':
 		case 'minecraft:smoking':
 		case 'minecraft:campfire_cooking':
-			return wrap(recipe, sum([recipe.ingredient]));
+			// Переплавка дороже сырья на 15%, а не на 5%.
+			return wrap(recipe, sum([recipe.ingredient]), SMELT_MARKUP);
 
 		case 'minecraft:crafting_transmute':
 		case 'minecraft:crafting_dye':
@@ -372,9 +404,14 @@ const evaluate = (recipe) => {
 	}
 };
 
-const wrap = (recipe, cost) => {
+const wrap = (recipe, cost, markup) => {
 	if (cost === null || !recipe.result || !recipe.result.id) return null;
-	return { cost, id: recipe.result.id, count: recipe.result.count ?? 1 };
+	return {
+		cost,
+		id: recipe.result.id,
+		count: recipe.result.count ?? 1,
+		markup: markup ?? CRAFT_MARKUP,
+	};
 };
 
 // Несколько проходов: сначала считаются предметы из базовых, потом из уже посчитанных.
@@ -391,7 +428,8 @@ for (let pass = 0; pass < MAX_PASSES; pass++) {
 		// Явную цену не поднимаем, но можем опустить: если предмет дешевле скрафтить,
 		// чем купить его ингредиенты, оставлять высокую цену нельзя — игрок начнёт
 		// покупать сырьё, крафтить и продавать, то есть печатать деньги.
-		const candidate = (info.cost * CRAFT_MARKUP) / info.count;
+		if (LOCKED.has(info.id)) continue;
+		const candidate = (info.cost * info.markup) / info.count;
 		const current = prices.get(info.id);
 		// Считаем улучшением только заметное изменение: некоторые рецепты (например,
 		// дублирование шаблонов брони) сходятся бесконечно медленно, и без порога
@@ -478,6 +516,23 @@ fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, JSON.stringify(result, null, '\t') + '\n', 'utf8');
 
 // ---------------------------------------------------------------------------
+// Лимиты торговца: почти все предметы — 30 стаков в день. Чем дороже предмет,
+// тем он реже, поэтому торговец берёт его меньше. В файл пишем только отличия
+// от общего лимита, чтобы список было удобно читать.
+// ---------------------------------------------------------------------------
+const limits = {};
+for (const [item, price] of Object.entries(sorted)) {
+	const tier = TRADER_LIMIT_TIERS.find((candidate) => price <= candidate.maxPrice);
+
+	if (tier.stacks !== TRADER_DEFAULT_LIMIT) {
+		limits[item] = tier.stacks;
+	}
+}
+
+const LIMITS_OUT = path.join(path.dirname(OUT), 'trader_limits.json');
+fs.writeFileSync(LIMITS_OUT, JSON.stringify({ default: TRADER_DEFAULT_LIMIT, limits }, null, '\t') + '\n', 'utf8');
+
+// ---------------------------------------------------------------------------
 // 5. Отчёт.
 // ---------------------------------------------------------------------------
 const byPrice = [...prices.values()];
@@ -494,6 +549,7 @@ if (missingNotBuyable.length > 0) {
 	console.log('  в игре нет таких предметов (убраны из списка): ' + missingNotBuyable.join(', '));
 }
 console.log('выгодных перепродаж крафтом: ' + cheats.length + ' (см. tools/craft-cheats.txt)');
+console.log('лимиты торговца: ' + Object.keys(limits).length + ' предметов с уменьшенным лимитом (файл ' + LIMITS_OUT + ')');
 console.log('файл: ' + OUT);
 
 const show = (title, list) => {

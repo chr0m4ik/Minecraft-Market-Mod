@@ -3,6 +3,8 @@ package com.chr0m4ik.marketplace;
 import com.chr0m4ik.marketplace.command.MarketplaceCommands;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.network.MarketplaceNetworking;
+import com.chr0m4ik.marketplace.price.ItemPrices;
+import com.chr0m4ik.marketplace.price.TraderLimits;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
@@ -26,6 +28,11 @@ public class MarketplaceMod implements ModInitializer {
 		MarketplaceCommands.register();
 		MarketplaceMenus.initialize();
 		MarketplaceNetworking.registerServer();
+
+		// Читаем прайс и лимиты сразу при загрузке: если файлы повреждены, это видно в логе,
+		// а не при первой сделке.
+		ItemPrices.ensureLoaded();
+		TraderLimits.ensureLoaded();
 
 		// Дальше здесь появятся: подписка на события, слоты продажи, киты.
 	}
