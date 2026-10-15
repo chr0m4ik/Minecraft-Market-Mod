@@ -22,6 +22,7 @@
 
 	"marketplace.gui.trader.sold": "Продано торговцу: %s шт. на %s",
 	"marketplace.gui.trader.limit": "Сегодня торговец больше не берёт столько — часть товара осталась в окне",
+	"marketplace.death.lost": "Смерть обошлась в %s — это 5%% от баланса, но не больше 10 000 000$",
 
 	"key.category.marketplace.main": "Minecraft Marketplace",
 	"key.marketplace.open": "Открыть рынок",

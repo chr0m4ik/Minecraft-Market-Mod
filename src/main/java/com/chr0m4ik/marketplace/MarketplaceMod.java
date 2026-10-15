@@ -1,11 +1,17 @@
 package com.chr0m4ik.marketplace;
 
 import com.chr0m4ik.marketplace.command.MarketplaceCommands;
+import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
+import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.network.MarketplaceNetworking;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import com.chr0m4ik.marketplace.price.TraderLimits;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +39,20 @@ public class MarketplaceMod implements ModInitializer {
 		// а не при первой сделке.
 		ItemPrices.ensureLoaded();
 		TraderLimits.ensureLoaded();
+
+		// Смерть игрока: теряется часть денег, а не весь кошелёк.
+		ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
+			if (!(entity instanceof ServerPlayer player)) {
+				return;
+			}
+
+			double lost = MarketplaceEconomy.applyDeathPenalty(player);
+
+			if (lost > 0.0) {
+				player.sendSystemMessage(Component.translatable("marketplace.death.lost",
+						Component.literal(MoneyFormat.format(lost))).withStyle(ChatFormatting.RED));
+			}
+		});
 
 		// Дальше здесь появятся: подписка на события, слоты продажи, киты.
 	}

@@ -1,6 +1,8 @@
 package com.chr0m4ik.marketplace.economy;
 
+import com.chr0m4ik.marketplace.MarketplaceMod;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.UUID;
 
@@ -17,6 +19,12 @@ import java.util.UUID;
  * </ul>
  */
 public final class MarketplaceEconomy {
+	/** Доля денег, которую игрок теряет при смерти. */
+	public static final double DEATH_LOSS_RATE = 0.05;
+
+	/** Сколько максимум можно потерять за одну смерть. */
+	public static final double DEATH_LOSS_LIMIT = 10_000_000.0;
+
 	private MarketplaceEconomy() {
 		// Класс только со статическими методами.
 	}
@@ -45,6 +53,41 @@ public final class MarketplaceEconomy {
 	public static double addBalance(MinecraftServer server, UUID playerId, double amount) {
 		double current = getBalance(server, playerId);
 		return setBalance(server, playerId, current + amount);
+	}
+
+	/**
+	 * Смерть игрока: он теряет часть денег — {@value #DEATH_LOSS_RATE} от баланса, но не больше
+	 * {@value #DEATH_LOSS_LIMIT} за одну смерть. Так несколько миллиардов, накопленных за долгую
+	 * игру, не пропадают из-за одной ошибки.
+	 *
+	 * <p>В креативе и режиме наблюдателя деньги не теряются: там их и не тратят.
+	 *
+	 * @return сколько денег потеряно (0, если терять было нечего)
+	 */
+	public static double applyDeathPenalty(ServerPlayer player) {
+		if (player.isCreative() || player.isSpectator()) {
+			return 0.0;
+		}
+
+		MinecraftServer server = player.level().getServer();
+
+		if (server == null) {
+			return 0.0;
+		}
+
+		double balance = getBalance(server, player.getUUID());
+		double loss = MoneyFormat.round(Math.min(balance * DEATH_LOSS_RATE, DEATH_LOSS_LIMIT));
+
+		// Пишем в лог: если баланс вдруг окажется нулевым, причина будет видна сразу.
+		MarketplaceMod.LOGGER.info("Смерть игрока {}: баланс {}, потеряно {}",
+				player.getScoreboardName(), balance, loss);
+
+		if (loss <= 0.0) {
+			return 0.0;
+		}
+
+		setBalance(server, player.getUUID(), balance - loss);
+		return loss;
 	}
 
 	/**
