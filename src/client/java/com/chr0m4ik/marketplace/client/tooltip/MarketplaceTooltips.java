@@ -70,6 +70,11 @@ public final class MarketplaceTooltips {
 				return;
 			}
 
+			if (menu.getKind() == WindowKind.BUY_ITEM) {
+				addBuyLines(lines, screen, menu, stack);
+				return;
+			}
+
 			if (menu.getKind() == WindowKind.TRADER) {
 				addTraderPriceLines(lines, stack);
 				return;
@@ -172,6 +177,26 @@ public final class MarketplaceTooltips {
 				.withStyle(ChatFormatting.GOLD));
 		lines.add(Component.translatable("marketplace.tooltip.trader.discounted",
 				money(MoneyFormat.round(offer.payout()))).withStyle(ChatFormatting.GREEN));
+	}
+
+	/** Подсказка в окне покупки: цена за один стак и за всё выбранное количество. */
+	private static void addBuyLines(List<Component> lines, MarketplaceScreen screen,
+			MarketplaceMenu menu, ItemStack stack) {
+		if (screen.getHoveredSlotIndex() != MarketplaceMenu.BUY_ITEM_PREVIEW || stack.isEmpty()) {
+			return;
+		}
+
+		int maxStack = Math.max(1, stack.getItem().getDefaultMaxStackSize());
+		int index = Math.max(0, Math.min(menu.getShopQuantityIndex(), MarketService.QUANTITIES.length - 1));
+		int stacks = MarketService.QUANTITIES[index];
+		int count = stacks == 0 ? Math.max(1, maxStack / 2) : stacks * maxStack;
+
+		lines.add(Component.translatable("marketplace.tooltip.buy.unit",
+				money(MoneyFormat.round(ItemPrices.priceOf(stack) * maxStack * ItemPrices.BUY_MULTIPLIER)))
+				.withStyle(ChatFormatting.GOLD));
+		lines.add(Component.translatable("marketplace.tooltip.buy.total",
+				money(MoneyFormat.round(ItemPrices.priceOf(stack) * count * ItemPrices.BUY_MULTIPLIER)))
+				.withStyle(ChatFormatting.GREEN));
 	}
 
 	/** Подсказка кнопки-справки на рынке: сколько дадут за ордера и за неподтверждённые предметы. */

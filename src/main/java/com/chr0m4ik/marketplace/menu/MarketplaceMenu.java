@@ -978,6 +978,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.data.set(8, (int) Math.round(state.markup(playerId) * 100.0));
 		this.data.set(9, MarketService.unlockedSlots(state, playerId));
 
+		if (this.kind == WindowKind.BUY_ITEM) {
+			// Номер выбранного количества — клиент считает по нему цену в подсказке.
+			this.data.set(PAGE_DATA, MarketService.shop(playerId).quantityIndex());
+			return;
+		}
+
 		if (this.kind == WindowKind.BUY_LIST) {
 			// Данные для надписи «страница X из Y» справа вверху.
 			MarketService.ShopState shop = MarketService.shop(playerId);
@@ -1060,6 +1066,11 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 	/** Номер текущей страницы магазина (с единицы). */
 	public int getShopPage() {
+		return this.data.get(PAGE_DATA);
+	}
+
+	/** Номер выбранного количества в окне покупки. */
+	public int getShopQuantityIndex() {
 		return this.data.get(PAGE_DATA);
 	}
 
