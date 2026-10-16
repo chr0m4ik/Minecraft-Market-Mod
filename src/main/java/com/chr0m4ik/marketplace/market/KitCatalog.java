@@ -104,7 +104,22 @@ public final class KitCatalog {
 
 	/** Шалкер набора. */
 	private static ItemStack shulkerOf(Kit kit) {
-		return new ItemStack(Items.SHULKER_BOX);
+		String color = switch (kit.id()) {
+			case "pvp_pro" -> "light_blue";
+			case "pvp_extra" -> "blue";
+			case "pvp_crystal" -> "purple";
+			case "miner_dream" -> "gray";
+			case "lumberjack_dream" -> "green";
+			case "builder" -> "yellow";
+			case "glutton" -> "orange";
+			case "pro_set" -> "cyan";
+			case "legendary_set" -> "red";
+			default -> "white";
+		};
+
+		return BuiltInRegistries.ITEM.getOptional(Identifier.parse("minecraft:" + color + "_shulker_box"))
+				.map(ItemStack::new)
+				.orElseGet(() -> new ItemStack(Items.SHULKER_BOX));
 	}
 
 	/** Убирает курсив: игра делает изменённые названия курсивом. */

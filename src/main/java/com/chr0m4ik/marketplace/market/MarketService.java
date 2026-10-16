@@ -166,7 +166,7 @@ public final class MarketService {
 	 */
 	public record ShopState(int category, int page, ItemStack selected, int quantityIndex, boolean drop) {
 		public static ShopState initial() {
-			return new ShopState(0, 0, ItemStack.EMPTY, 1, false);
+			return new ShopState(0, 0, ItemStack.EMPTY, 0, false);
 		}
 
 		public ShopState withCategory(int value) {
@@ -179,7 +179,7 @@ public final class MarketService {
 
 		/** Выбрали предмет — количество и способ выдачи возвращаются к стандартным. */
 		public ShopState withSelected(ItemStack stack) {
-			return new ShopState(this.category, this.page, stack, 1, false);
+			return new ShopState(this.category, this.page, stack, 0, false);
 		}
 
 		public ShopState withQuantity(int value) {
@@ -242,7 +242,11 @@ public final class MarketService {
 		}
 
 		int count = state.count();
-		double cost = MoneyFormat.round(ItemPrices.priceOf(state.selected()) * count * ItemPrices.BUY_MULTIPLIER);
+		java.util.Optional<KitCatalog.Kit> kit = KitCatalog.kitOf(state.selected());
+		int amount = kit.isPresent() ? 1 : count;
+		double cost = MoneyFormat.round((kit.isPresent()
+				? KitCatalog.priceOf(kit.get())
+				: ItemPrices.priceOf(state.selected()) * ItemPrices.BUY_MULTIPLIER) * amount);
 
 		if (!player.isCreative() && !MarketplaceEconomy.trySpend(server, player.getUUID(), cost)) {
 			return false;
@@ -256,10 +260,12 @@ public final class MarketService {
 			ItemStack stack = state.selected().copyWithCount(part);
 			left -= part;
 
-			if (state.drop()) {
-				player.drop(stack, false, Prediction.SERVER_ONLY);
-			} else {
-				player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+			for (ItemStack piece : kit.map(KitCatalog::deliver).orElse(java.util.List.of(stack))) {
+				if (state.drop()) {
+					player.drop(piece, false, Prediction.SERVER_ONLY);
+				} else {
+					player.getInventory().placeItemBackInInventory(piece, Prediction.SERVER_ONLY);
+				}
 			}
 		}
 
