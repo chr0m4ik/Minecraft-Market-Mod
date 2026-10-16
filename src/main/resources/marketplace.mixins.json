@@ -4,7 +4,8 @@
 	"package": "com.chr0m4ik.marketplace.client.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
-		"MouseHandlerMixin"
+		"MouseHandlerMixin",
+		"AnvilScreenMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

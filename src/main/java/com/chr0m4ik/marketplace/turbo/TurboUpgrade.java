@@ -97,6 +97,52 @@ public final class TurboUpgrade {
 		return levelOfComponents(components.get(DataComponents.CUSTOM_DATA));
 	}
 
+	/** Это «Турбо печка» (любого уровня)? */
+	public static boolean isTurbo(ItemStack stack) {
+		return stack.is(TurboFurnace.ITEM);
+	}
+
+	/**
+	 * Уровень результата соединения двух печек в наковальне.
+	 *
+	 * <p>Соединяются только <b>две печки одного уровня</b>: 1+1 → 2, 2+2 → 3, 3+3 → 4.
+	 * Любая другая пара (разные уровни, максимальный уровень, не наша печка) результата не даёт —
+	 * наковальня просто ничего не показывает.
+	 *
+	 * @return {@code 0}, если соединения нет; иначе уровень результата ({@code 2..4})
+	 */
+	public static int resultLevel(ItemStack left, ItemStack right) {
+		int first = levelOf(left);
+		int second = levelOf(right);
+
+		if (first == 0 || first != second || first >= TurboFurnace.MAX_LEVEL) {
+			return 0;
+		}
+
+		return first + 1;
+	}
+
+	/**
+	 * Сколько уровней опыта стоит соединение — как согласовано с заказчиком:
+	 * 1+1 → 2 за 25 уровней, 2+2 → 3 за 50, 3+3 → 4 за 100.
+	 */
+	public static int levelCost(int newLevel) {
+		return switch (newLevel) {
+			case 2 -> 25;
+			case 3 -> 50;
+			case 4 -> 100;
+			default -> 0;
+		};
+	}
+
+	/** Результат соединения: одна печка уровнем выше, со своим названием и описанием. */
+	public static ItemStack upgraded(ItemStack base, int level) {
+		ItemStack result = base.copyWithCount(1);
+		setLevel(result, level);
+		decorate(result, level);
+		return result;
+	}
+
 	private static int clamp(int level) {
 		return Mth.clamp(level, 1, TurboFurnace.MAX_LEVEL);
 	}

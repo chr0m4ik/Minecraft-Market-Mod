@@ -6,7 +6,8 @@
 	"mixins": [
 		"BlockMixin",
 		"ServerPlayerGameModeMixin",
-		"TurboFurnaceSpeedMixin"
+		"TurboFurnaceSpeedMixin",
+		"AnvilMenuMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
