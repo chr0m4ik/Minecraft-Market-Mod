@@ -48,6 +48,7 @@
 
 	"marketplace.tooltip.price.unit": "Price: %s",
 	"marketplace.tooltip.price.stack": "Total: %s",
+	"marketplace.tooltip.event": "Event «%s»: price %s",
 	"marketplace.tooltip.trader.sold": "The trader already bought this: %s stacks — pays less",
 	"marketplace.tooltip.trader.bonus": "The trader pays %s extra for active trading",
 	"marketplace.tooltip.trader.count": "Items: %s",

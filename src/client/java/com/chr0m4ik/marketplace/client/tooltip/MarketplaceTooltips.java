@@ -6,6 +6,9 @@ import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.economy.TraderService;
 import com.chr0m4ik.marketplace.economy.TraderPrices;
+import com.chr0m4ik.marketplace.event.EventService;
+import com.chr0m4ik.marketplace.event.MarketEvent;
+import com.chr0m4ik.marketplace.event.MarketEvents;
 import com.chr0m4ik.marketplace.market.KitCatalog;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenu;
@@ -181,6 +184,32 @@ public final class MarketplaceTooltips {
 			lines.add(Component.translatable("marketplace.tooltip.price.stack", money(ItemPrices.priceOf(stack)))
 					.withStyle(ChatFormatting.GOLD));
 		}
+
+		addEventLines(lines, stack);
+	}
+
+	/**
+	 * Строка про крупный ивент: видно, что предмет под ивентом и на сколько процентов.
+	 * Множитель берётся тем же кодом, что и на сервере ({@link EventService}), поэтому строка
+	 * не расходится с тем, что игрок заплатит. Показывается везде: в инвентаре, магазине,
+	 * у торговца и на рынке.
+	 */
+	private static void addEventLines(List<Component> lines, ItemStack stack) {
+		MarketEvent event = EventService.current().orElse(null);
+
+		if (event == null) {
+			return;
+		}
+
+		double multiplier = EventService.multiplier(stack.getItem());
+
+		if (multiplier == 1.0) {
+			return;
+		}
+
+		lines.add(Component.translatable("marketplace.tooltip.event", event.name().title(),
+				Component.literal(MarketEvents.percentText(multiplier)))
+				.withStyle(ChatFormatting.LIGHT_PURPLE));
 	}
 
 	/** Цена торговца: его надбавки, уценки и доля 75%. */
@@ -214,6 +243,8 @@ public final class MarketplaceTooltips {
 			lines.add(Component.translatable("marketplace.tooltip.trader.bonus", percent(bonus))
 					.withStyle(ChatFormatting.AQUA));
 		}
+
+		addEventLines(lines, stack);
 	}
 
 	/** Подсказка кнопки «итоговая цена»: сколько товара, обычная цена и сколько дадут на руки. */

@@ -48,6 +48,7 @@
 
 	"marketplace.tooltip.price.unit": "Цена: %s",
 	"marketplace.tooltip.price.stack": "Всего: %s",
+	"marketplace.tooltip.event": "Ивент «%s»: цена %s",
 	"marketplace.tooltip.trader.sold": "Торговец уже брал это: %s стаков — даёт дешевле",
 	"marketplace.tooltip.trader.bonus": "Торговец доплачивает %s за активную торговлю",
 	"marketplace.tooltip.trader.count": "Товара: %s шт.",
