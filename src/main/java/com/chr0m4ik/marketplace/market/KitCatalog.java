@@ -45,7 +45,12 @@ import java.util.Optional;
  * Цены предметов берутся из общего прайса, поэтому наборы дорожают и дешевеют вместе с ним.
  *
  * <p>Набор выдаётся шалкером с содержимым. Если шлякеров нет — предметы кладутся в инвентарь,
- * и шалкер в цену не входит.
+ * и шалкер в цену не входит. Список {@code inventory} выдаётся игроку прямо в инвентарь
+ * (в цену он входит так же, как содержимое шлякеров).
+ *
+ * <p>Раскладка по ячейкам шлякера задаётся полями предмета {@code shulker} (номер с 1) и
+ * {@code slot} (ячейка 0…26). Без них предмет кладётся в первое свободное место. Предмет,
+ * которого больше размера стака, занимает несколько ячеек подряд.
  */
 public final class KitCatalog {
 	private static final String FILE_PATH = "/data/marketplace/kits.json";
@@ -53,11 +58,33 @@ public final class KitCatalog {
 	/** Оптовая скидка на набор. */
 	private static final double DISCOUNT = 0.95;
 
-	/** Один набор: id, предметы и сколько шлякеров нужно. */
-	public record Kit(String id, List<ItemStack> items, int shulkers) {
+	/** Ячеек в одном шлякере (9×3). */
+	private static final int CELLS_PER_SHULKER = 27;
+
+	/** Место не задано: кладём предмет в первое свободное место. */
+	private static final int AUTO = -1;
+
+	/** Предмет набора и его место в шлякере: шлякер с 1, ячейка 0…26 ({@link #AUTO} — любое). */
+	public record KitEntry(ItemStack stack, int shulker, int cell) {
+	}
+
+	/** Один набор: id, что выдать (с раскладкой), что выдать в инвентарь и сколько шлякеров нужно. */
+	public record Kit(String id, List<KitEntry> entries, List<ItemStack> inventory, int shulkers) {
 		/** Ключ перевода названия набора. */
 		public String nameKey() {
 			return "marketplace.kit." + this.id;
+		}
+
+		/** Всё, что получит игрок: содержимое шлякеров, а затем выдача в инвентарь. */
+		public List<ItemStack> items() {
+			List<ItemStack> all = new ArrayList<>(this.entries.size() + this.inventory.size());
+
+			for (KitEntry entry : this.entries) {
+				all.add(entry.stack());
+			}
+
+			all.addAll(this.inventory);
+			return List.copyOf(all);
 		}
 	}
 
@@ -188,6 +215,7 @@ public final class KitCatalog {
 	public static double priceOf(Kit kit) {
 		double sum = 0.0;
 
+		// Цену считаем по всем предметам набора: и по тем, что лежат в шлякерах, и по выдаче в инвентарь.
 		for (ItemStack item : kit.items()) {
 			sum += ItemPrices.priceOf(item);
 		}
@@ -202,24 +230,84 @@ public final class KitCatalog {
 			return List.copyOf(kit.items());
 		}
 
+		// Что не влезло в шлякеры (ошибка в данных) — отдаём в инвентарь, предметы не теряются.
+		List<ItemStack> overflow = new ArrayList<>();
+		List<List<ItemStack>> boxes = layout(kit, overflow);
 		List<ItemStack> result = new ArrayList<>();
-		int perShulker = 27;
-		int index = 0;
 
-		for (int box = 0; box < kit.shulkers() && index < kit.items().size(); box++) {
-			List<ItemStack> inside = new ArrayList<>();
-
-			while (index < kit.items().size() && inside.size() < perShulker) {
-				inside.add(kit.items().get(index));
-				index++;
-			}
-
+		for (List<ItemStack> inside : boxes) {
 			ItemStack shulker = shulkerOf(kit);
+			// fromItems сохраняет позиции: пустые ячейки остаются пустыми, раскладка не сдвигается.
 			shulker.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(inside));
 			result.add(shulker);
 		}
 
-		return result;
+		result.addAll(kit.inventory());
+		result.addAll(overflow);
+		return List.copyOf(result);
+	}
+
+	/**
+	 * Раскладывает содержимое набора по ячейкам шлякеров.
+	 *
+	 * @param overflow сюда попадут предметы, которым не хватило места (это уже ошибка в данных)
+	 */
+	private static List<List<ItemStack>> layout(Kit kit, List<ItemStack> overflow) {
+		List<List<ItemStack>> boxes = new ArrayList<>();
+
+		for (int box = 0; box < kit.shulkers(); box++) {
+			List<ItemStack> cells = new ArrayList<>(CELLS_PER_SHULKER);
+
+			for (int cell = 0; cell < CELLS_PER_SHULKER; cell++) {
+				cells.add(ItemStack.EMPTY);
+			}
+
+			boxes.add(cells);
+		}
+
+		for (KitEntry entry : kit.entries()) {
+			if (!place(boxes, entry)) {
+				overflow.add(entry.stack());
+			}
+		}
+
+		if (!overflow.isEmpty()) {
+			MarketplaceMod.LOGGER.warn("Набор {}: {} предмет(ов) не влезли в шлякеры и будут выданы в инвентарь",
+					kit.id(), overflow.size());
+		}
+
+		return boxes;
+	}
+
+	/**
+	 * Кладёт предмет в шлякер. Если место задано — ищем первое свободное начиная с него,
+	 * иначе — первое свободное во всём наборе. Так предмет из нескольких стаков (например,
+	 * 128 кристаллов = две ячейки по 64) занимает следующие свободные ячейки.
+	 *
+	 * @return {@code false}, если свободного места не осталось
+	 */
+	private static boolean place(List<List<ItemStack>> boxes, KitEntry entry) {
+		if (entry.shulker() >= 1 && entry.shulker() <= boxes.size()) {
+			List<ItemStack> box = boxes.get(entry.shulker() - 1);
+
+			for (int cell = Math.max(0, entry.cell()); cell < box.size(); cell++) {
+				if (box.get(cell).isEmpty()) {
+					box.set(cell, entry.stack());
+					return true;
+				}
+			}
+		}
+
+		for (List<ItemStack> box : boxes) {
+			for (int cell = 0; cell < box.size(); cell++) {
+				if (box.get(cell).isEmpty()) {
+					box.set(cell, entry.stack());
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	/** Найти набор по его иконке (магазин показывает и продаёт именно иконку). */
@@ -254,10 +342,17 @@ public final class KitCatalog {
 
 				for (JsonElement element : array) {
 					JsonObject object = element.getAsJsonObject();
-					loaded.add(new Kit(
-							object.get("id").getAsString(),
-							readItems(object.getAsJsonArray("items")),
-							object.has("shulkers") ? object.get("shulkers").getAsInt() : 0));
+					String id = object.get("id").getAsString();
+					int shulkers = object.has("shulkers") ? object.get("shulkers").getAsInt() : 0;
+					// Предметы в шлякерах — с раскладкой, выдача в инвентарь — просто списком.
+					List<KitEntry> entries = readEntries(object.getAsJsonArray("items"), shulkers, id);
+					List<ItemStack> inventory = object.has("inventory")
+							? readEntries(object.getAsJsonArray("inventory"), 0, id).stream()
+									.map(KitEntry::stack)
+									.toList()
+							: List.of();
+
+					loaded.add(new Kit(id, entries, inventory, shulkers));
 				}
 
 				kits = List.copyOf(loaded);
@@ -269,9 +364,12 @@ public final class KitCatalog {
 		}
 	}
 
-	/** Читает предметы одного набора. */
-	private static List<ItemStack> readItems(JsonArray array) {
-		List<ItemStack> items = new ArrayList<>();
+	/**
+	 * Читает предметы одного списка набора: содержимое шлякеров (с раскладкой) или выдачу
+	 * в инвентарь. Большие количества сразу режутся на нормальные стаки.
+	 */
+	private static List<KitEntry> readEntries(JsonArray array, int shulkers, String kitId) {
+		List<KitEntry> items = new ArrayList<>();
 
 		for (JsonElement element : array) {
 			JsonObject object = element.getAsJsonObject();
@@ -286,9 +384,27 @@ public final class KitCatalog {
 			Item entry = item.get();
 			int total = object.get("count").getAsInt();
 			int perStack = Math.max(1, entry.getDefaultMaxStackSize());
+			int shulker = object.has("shulker") ? object.get("shulker").getAsInt() : 0;
+			int cell = object.has("slot") ? object.get("slot").getAsInt() : AUTO;
+
+			// Ячейка без номера шлякера — значит первый шлякер.
+			if (cell != AUTO && shulker < 1) {
+				shulker = 1;
+			}
+
+			if (shulkers > 0 && shulker > shulkers) {
+				MarketplaceMod.LOGGER.warn("Набор {}: у предмета {} указан шлякер {}, а их всего {}",
+						kitId, id, shulker, shulkers);
+			}
+
+			if (cell >= CELLS_PER_SHULKER) {
+				MarketplaceMod.LOGGER.warn("Набор {}: у предмета {} указана ячейка {}, а в шлякере их {}",
+						kitId, id, cell, CELLS_PER_SHULKER);
+			}
 
 			// Большие количества режем на нормальные стаки: стак из 128 предметов игра
 			// отправить не может (именно из-за этого вылетал мир при покупке набора).
+			// Все получившиеся стаки идут подряд — в указанную ячейку и следующие за ней.
 			for (int left = total; left > 0; left -= perStack) {
 				ItemStack stack = new ItemStack(entry, Math.min(perStack, left));
 
@@ -303,7 +419,7 @@ public final class KitCatalog {
 							.ifPresent(holder -> stack.set(DataComponents.POTION_CONTENTS, new PotionContents(holder)));
 				}
 
-				items.add(stack);
+				items.add(new KitEntry(stack, shulker, cell));
 			}
 		}
 
