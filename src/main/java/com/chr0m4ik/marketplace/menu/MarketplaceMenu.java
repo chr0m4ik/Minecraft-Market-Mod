@@ -1,5 +1,6 @@
 package com.chr0m4ik.marketplace.menu;
 
+import com.chr0m4ik.marketplace.Diag;
 import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
@@ -232,6 +233,11 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.fillButtons();
 		this.loadMarketCells();
 		this.loadShopPage();
+
+		// ВРЕМЕННО (диагностика проблемы 1): что оказалось в слотах окна списка сразу после сборки.
+		if (this.serverPlayer != null && this.kind == WindowKind.BUY_LIST) {
+			Diag.dumpMenu("сервер: окно списка товаров собрано", this);
+		}
 	}
 
 	/** Заполняет ячейки окна списка товарами текущей страницы раздела. */
@@ -248,6 +254,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		ShopCatalog.Category[] categories = ShopCatalog.Category.values();
 		ShopCatalog.Category category = categories[Math.max(0, Math.min(shop.category(), categories.length - 1))];
 		List<ItemStack> page = ShopCatalog.page(category, shop.page());
+
+		// ВРЕМЕННО (диагностика проблемы 1): что сервер положил в окно списка товаров.
+		Diag.log("loadShopPage: раздел {} (индекс {}), страница {}, товаров на странице {}, всего в разделе {}",
+				category, shop.category(), shop.page(), page.size(), ShopCatalog.items(category).size());
 
 		for (int i = 0; i < this.kind.tradeSlots(); i++) {
 			this.tradeContainer.setItem(i, i < page.size() ? page.get(i).copy() : ItemStack.EMPTY);
@@ -842,6 +852,13 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 				if (row >= 1 && row <= BUY_GRID_ROWS && col >= 1 && col <= BUY_GRID_COLUMNS) {
 					int index = (row - 1) * BUY_GRID_COLUMNS + (col - 1);
+
+					// ВРЕМЕННО (диагностика проблемы 1): какой раздел выбран кликом по сетке.
+					Diag.log("клик по сетке разделов: слот {}, строка {}, столбец {}, индекс {} ({}), всего разделов {}",
+							slotId, row, col, index,
+							index < ShopCatalog.Category.values().length
+									? ShopCatalog.Category.values()[index].name() : "за пределами",
+							ShopCatalog.Category.values().length);
 
 					if (index < ShopCatalog.Category.values().length) {
 						MarketService.setShop(serverPlayer.getUUID(),

@@ -90,6 +90,10 @@ public final class SpecialCatalog {
 		ItemEnchantments.Mutable enchantments = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
 		enchantments.set(holder.get(), entry.level());
 		stack.set(DataComponents.STORED_ENCHANTMENTS, enchantments.toImmutable());
+		// Своё название, а не ванильное «Зачарованная книга»: иначе в разделе «Особые предметы»
+		// лежат шесть одинаковых книг без подписи, и понять, что это наши зачарования, нельзя.
+		stack.set(DataComponents.CUSTOM_NAME,
+				plain(Component.translatable(nameKey(entry)).withStyle(ChatFormatting.AQUA)));
 		stack.set(DataComponents.LORE, new ItemLore(loreOf(entry)));
 		return Optional.of(stack);
 	}
@@ -102,7 +106,12 @@ public final class SpecialCatalog {
 						.withStyle(ChatFormatting.GRAY)));
 	}
 
-	/** Название уровня: «Жилковый майнер I — область 5×5×5». */
+	/** Название книги: «Книга „Бур“ III». */
+	private static String nameKey(Entry entry) {
+		return "marketplace.special." + entry.path() + ".name." + entry.level();
+	}
+
+	/** Размер области уровня: «Область 7×7×7». */
 	private static String levelNameKey(Entry entry) {
 		return "marketplace.special." + entry.path() + ".level." + entry.level();
 	}

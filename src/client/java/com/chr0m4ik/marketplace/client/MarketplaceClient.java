@@ -59,6 +59,10 @@ public class MarketplaceClient implements ClientModInitializer {
 
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ClientMarketplaceStatus.clear());
 
+		// ВРЕМЕННО (диагностика проблемы 1): проба «путь игрока» — включается только переменной
+		// окружения MARKETPLACE_PROBE=1. Убрать после починки.
+		DiagShopProbe.register();
+
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			while (openMenuKey.consumeClick()) {
 				// Отправляем только если сервер умеет принимать наш пакет.
