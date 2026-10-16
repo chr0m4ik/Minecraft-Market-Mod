@@ -1,6 +1,7 @@
 package com.chr0m4ik.marketplace.price;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
+import com.chr0m4ik.marketplace.event.EventService;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
@@ -22,6 +23,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,9 +48,11 @@ import java.util.Set;
  * Покупка дороже самой выгодной продажи даже с учётом микро-дрейфа, поэтому «купить — продать»
  * всегда в убыток. Это же условие проверяется при старте мода.
  *
- * <p>К базовой цене стака добавляется микро-дрейф — фон ±3% ({@link PriceDrift}). Он встроен
- * именно здесь, поэтому работает одинаково везде: покупка в магазине, продажа торговцу, рынок,
- * подсказки предметов, HUD и стоимость наборов.
+ * <p>К базовой цене стака добавляется микро-дрейф — фон ±3% ({@link PriceDrift}) — и множитель
+ * крупного ивента, если предмет под него попал ({@code event/EventService}). Оба встроены именно
+ * здесь, поэтому работают одинаково везде: покупка в магазине, продажа торговцу, рынок, подсказки
+ * предметов, HUD и стоимость наборов. Ивент симметричен (опускает или поднимает и покупку, и
+ * продажу), поэтому «купить — продать» наживы не даёт: это проверяется при старте мода.
  *
  * <p><b>Что именно «дышит».</b> Множитель дрейфа берётся у предмета самого стака, то есть
  * {@code базовая цена предмета × множитель}. Зачарования дрейфу не подвержены. Содержимое
@@ -152,10 +156,11 @@ public final class ItemPrices {
 		}
 
 		ensureLoaded();
-		// Базовая цена «дышит» (микро-дрейф): множитель берётся у предмета самого стака.
-		// Зачарования добавляются ниже без дрейфа, а содержимое контейнеров считается
-		// своими предметами — у каждого из них собственный множитель дрейфа.
-		double price = basePriceOf(stack) * PriceDrift.multiplier(stack.getItem()) * stack.getCount();
+		// Базовая цена «дышит» (микро-дрейф) и попадает под крупный ивент: оба множителя берутся
+		// у предмета самого стака. Зачарования добавляются ниже без множителей, а содержимое
+		// контейнеров считается своими предметами — у каждого из них собственные множители.
+		double price = basePriceOf(stack) * PriceDrift.multiplier(stack.getItem())
+				* EventService.multiplier(stack.getItem()) * stack.getCount();
 
 		// Зачарования на самом предмете.
 		ItemEnchantments enchantments = stack.get(DataComponents.ENCHANTMENTS);
@@ -233,6 +238,24 @@ public final class ItemPrices {
 	public static boolean isLoaded() {
 		ensureLoaded();
 		return loaded;
+	}
+
+	/**
+	 * Все предметы, которые есть в прайсе и которые можно купить, в порядке реестра.
+	 * Нужно ивентам: из этого списка выбираются цели ({@code event/EventService}).
+	 * Список собирается по требованию — ивент выбирается редко, кэш тут не нужен.
+	 */
+	public static List<Item> buyableItems() {
+		ensureLoaded();
+		List<Item> result = new ArrayList<>();
+
+		for (Item item : BuiltInRegistries.ITEM) {
+			if (prices.containsKey(item) && !notBuyable.contains(item)) {
+				result.add(item);
+			}
+		}
+
+		return List.copyOf(result);
 	}
 
 	/** Сколько предметов в прайсе — для проверок и логов. */
