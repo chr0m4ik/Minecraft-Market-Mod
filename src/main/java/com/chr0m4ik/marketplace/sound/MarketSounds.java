@@ -2,6 +2,7 @@ package com.chr0m4ik.marketplace.sound;
 
 import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
@@ -103,10 +104,12 @@ public final class MarketSounds {
 
 	/**
 	 * Ванильный звук, заданный обычной константой ({@code SoundEvents.EXPERIENCE_ORB_PICKUP}
-	 * и подобные): в пакет он уходит как «прямой» держатель — так делает и сама игра.
+	 * и подобные). В держатель его превращаем так же, как сама игра
+	 * ({@code Level#playSeededSound}): зарегистрированный звук становится ссылкой на реестр,
+	 * а не «прямым» значением.
 	 */
 	public static void play(ServerPlayer player, SoundEvent sound, float volume, float pitch) {
-		play(player, Holder.direct(sound), volume, pitch);
+		play(player, BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound), volume, pitch);
 	}
 
 	/**
