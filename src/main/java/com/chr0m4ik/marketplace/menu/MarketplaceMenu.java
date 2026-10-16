@@ -1,6 +1,5 @@
 package com.chr0m4ik.marketplace.menu;
 
-import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
@@ -10,7 +9,6 @@ import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
 import com.chr0m4ik.marketplace.market.KitCatalog;
-import com.chr0m4ik.marketplace.price.ItemPrices;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -952,8 +950,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		MarketService.ShopState shop = MarketService.shop(player.getUUID());
-		double cost = MoneyFormat.round(ItemPrices.priceOf(shop.selected()) * shop.count()
-				* EconomyConfig.buyMultiplier());
+		double cost = MarketService.costOf(shop);
 
 		if (MarketService.buy(server, player, shop)) {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.buy.bought",

@@ -240,7 +240,29 @@ public final class MarketService {
 	}
 
 	/**
+	 * Сколько стоит выбранное в магазине, без списания денег. Набор считается по своей цене
+	 * (множитель покупки к нему не применяется), обычный предмет — по цене стака с множителем.
+	 */
+	public static double costOf(ShopState state) {
+		if (state.selected().isEmpty()) {
+			return 0.0;
+		}
+
+		java.util.Optional<KitCatalog.Kit> kit = KitCatalog.kitOf(state.selected());
+
+		if (kit.isPresent()) {
+			return MoneyFormat.round(KitCatalog.priceOf(kit.get()));
+		}
+
+		return MoneyFormat.round(ItemPrices.priceOf(state.selected())
+				* EconomyConfig.buyMultiplier() * state.count());
+	}
+
+	/**
 	 * Покупка: списывает деньги и выдаёт предметы. В креативе покупка бесплатная.
+	 *
+	 * <p>Набор («кит») выдаётся ровно один: цена набора считается за один набор и не умножается
+	 * на выбранное количество, поэтому «пачку» наборов купить нельзя.
 	 *
 	 * @return {@code false}, если денег не хватило
 	 */
@@ -251,13 +273,20 @@ public final class MarketService {
 
 		int count = state.count();
 		java.util.Optional<KitCatalog.Kit> kit = KitCatalog.kitOf(state.selected());
-		int amount = kit.isPresent() ? 1 : count;
-		double cost = MoneyFormat.round((kit.isPresent()
-				? KitCatalog.priceOf(kit.get())
-				: ItemPrices.priceOf(state.selected()) * EconomyConfig.buyMultiplier()) * amount);
+		double cost = costOf(state);
 
 		if (!player.isCreative() && !MarketplaceEconomy.trySpend(server, player.getUUID(), cost)) {
 			return false;
+		}
+
+		if (kit.isPresent()) {
+			// Шалкеры набора приходят с содержимым (раскладка — в kits.json), а те наборы,
+			// у которых шлякеров нет, выдаются предметами в инвентарь.
+			for (ItemStack piece : KitCatalog.deliver(kit.get())) {
+				give(player, state, piece);
+			}
+
+			return true;
 		}
 
 		int maxStack = Math.max(1, state.selected().getItem().getDefaultMaxStackSize());
@@ -267,17 +296,19 @@ public final class MarketService {
 			int part = Math.min(left, maxStack);
 			ItemStack stack = state.selected().copyWithCount(part);
 			left -= part;
-
-			for (ItemStack piece : kit.map(KitCatalog::deliver).orElse(java.util.List.of(stack))) {
-				if (state.drop()) {
-					player.drop(piece, false, Prediction.SERVER_ONLY);
-				} else {
-					player.getInventory().placeItemBackInInventory(piece, Prediction.SERVER_ONLY);
-				}
-			}
+			give(player, state, stack);
 		}
 
 		return true;
+	}
+
+	/** Выдаёт предмет так, как выбрал игрок: в инвентарь или на землю под ногами. */
+	private static void give(ServerPlayer player, ShopState state, ItemStack stack) {
+		if (state.drop()) {
+			player.drop(stack, false, Prediction.SERVER_ONLY);
+		} else {
+			player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+		}
 	}
 
 	/**

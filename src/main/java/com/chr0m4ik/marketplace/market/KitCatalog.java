@@ -12,6 +12,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.ChatFormatting;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
@@ -21,6 +22,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -66,6 +68,13 @@ public final class KitCatalog {
 
 	/** Ячеек в одном шлякере (9×3). */
 	private static final int CELLS_PER_SHULKER = 27;
+
+	/**
+	 * Метка набора в {@code custom_data} предмета-иконки. По ней магазин находит набор при
+	 * покупке: сверять подсказки нельзя — в них лежит цена, а она меняется вместе с
+	 * микро-дрейфом (из-за этого покупка набора выдавала пустой шлякер).
+	 */
+	private static final String KIT_TAG = "marketplace:kit";
 
 	/** Место не задано: кладём предмет в первое свободное место. */
 	private static final int AUTO = -1;
@@ -166,7 +175,26 @@ public final class KitCatalog {
 		icon.set(DataComponents.CUSTOM_NAME, Component.translatable(kit.nameKey())
 				.withStyle(Style.EMPTY.withItalic(false).withColor(colorOf(kit))));
 		icon.set(DataComponents.LORE, new ItemLore(loreOf(kit)));
+		mark(icon, kit);
 		return icon;
+	}
+
+	/** Помечает предмет набором: метку игрок не видит, а магазин по ней узнаёт набор. */
+	private static void mark(ItemStack stack, Kit kit) {
+		CompoundTag tag = new CompoundTag();
+		tag.putString(KIT_TAG, kit.id());
+		stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+	}
+
+	/** Id набора, которым помечен предмет. Пустая строка — это не предмет набора. */
+	public static String kitId(ItemStack stack) {
+		CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+
+		if (data == null) {
+			return "";
+		}
+
+		return data.copyTag().getStringOr(KIT_TAG, "");
 	}
 
 	/** Строки описания набора: цена, пометка про шлякеры и начало содержимого. */
@@ -238,6 +266,7 @@ public final class KitCatalog {
 	/** Что выдать игроку: шалкеры с содержимым или предметы (когда шлякеров нет). */
 	public static List<ItemStack> deliver(Kit kit) {
 		if (kit.shulkers() <= 0) {
+			// Набор без шлякеров: предметы выдаются прямо в инвентарь, состав тот же.
 			return List.copyOf(kit.items());
 		}
 
@@ -248,8 +277,17 @@ public final class KitCatalog {
 
 		for (List<ItemStack> inside : boxes) {
 			ItemStack shulker = shulkerOf(kit);
-			// fromItems сохраняет позиции: пустые ячейки остаются пустыми, раскладка не сдвигается.
-			shulker.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(inside));
+			// fromItems сохраняет позиции: пустые ячейки остаются пустыми, а предметы попадают
+			// ровно в те ячейки, что указаны в kits.json (поля shulker и slot).
+			ItemContainerContents contents = ItemContainerContents.fromItems(inside);
+
+			if (contents == ItemContainerContents.EMPTY) {
+				// Молча выдавать пустой шлякер нельзя: это ошибка в данных набора.
+				MarketplaceMod.LOGGER.error("Набор {}: шлякер собрался пустым — проверьте kits.json", kit.id());
+			} else {
+				shulker.set(DataComponents.CONTAINER, contents);
+			}
+
 			result.add(shulker);
 		}
 
@@ -321,10 +359,20 @@ public final class KitCatalog {
 		return false;
 	}
 
-	/** Найти набор по его иконке (магазин показывает и продаёт именно иконку). */
+	/**
+	 * Найти набор по предмету из магазина. Смотрим метку {@link #KIT_TAG}, а не подсказку:
+	 * цена в подсказке дышит вместе с микро-дрейфом, и сверка целых предметов не срабатывала
+	 * (покупка набора выдавала саму иконку — пустой шлякер).
+	 */
 	public static Optional<Kit> kitOf(ItemStack stack) {
+		String id = kitId(stack);
+
+		if (id.isEmpty()) {
+			return Optional.empty();
+		}
+
 		for (Kit kit : kits()) {
-			if (ItemStack.matches(iconOf(kit), stack)) {
+			if (kit.id().equals(id)) {
 				return Optional.of(kit);
 			}
 		}
