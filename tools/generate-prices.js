@@ -3,15 +3,16 @@
 // Что делает:
 //   1. берёт список всех предметов и все рецепты прямо из jar-файлов Minecraft;
 //   2. расставляет цены: сначала явные (BASE и PATTERNS ниже), потом считает остальные
-//      из рецептов по правилу «сумма ингредиентов + 5%», как просил заказчик
-//      (чтобы постройка ферм и крафт оставались выгодными, но не ломали экономику);
+//      из рецептов по правилу «сумма ингредиентов + наценка крафта» (CRAFT_MARKUP), как
+//      просил заказчик (чтобы постройка ферм и крафт оставались выгодными, но не ломали экономику);
 //   3. пишет готовый прайс в src/main/resources/data/marketplace/prices.json.
 //
 // Запуск:  node tools/generate-prices.js
 // Данные Minecraft должны быть распакованы в Z:/gradle-home/_mcdata (recipe, tags, items).
 //
-// ВАЖНО: цены в долларах за 1 предмет. Покупатель платит price * 1.25 (наценка рынка),
-// продажа даёт price (торговец — 75%). Поэтому купить и перепродать невыгодно.
+// ВАЖНО: цены в долларах за 1 предмет. Покупатель платит price * 2,2 (buy_multiplier),
+// продажа на рынке даёт price…price * 2,0 (наценка x1…x2), торговец — 75%. Поэтому купить
+// предмет и перепродать его же невыгодно: 2,2 > 2,0.
 
 const fs = require('fs');
 const path = require('path');
@@ -19,21 +20,25 @@ const path = require('path');
 const DATA = process.env.MC_DATA || 'Z:/gradle-home/_mcdata';
 const OUT = process.argv[2] || 'src/main/resources/data/marketplace/prices.json';
 
-/** Наценка на крафт: собранный предмет стоит на 5% дороже своих ингредиентов. */
-const CRAFT_MARKUP = 1.05;
+/** Наценка на крафт: собранный предмет стоит на 25% дороже своих ингредиентов. */
+const CRAFT_MARKUP = 1.25;
 
 /** Наценка на переплавку (печка, коптильня и так далее): +15%, как просил заказчик. */
 const SMELT_MARKUP = 1.15;
 
 /**
- * Цены, которые расчёт из рецептов НЕ понижает. Сюда попадает только то, что заказчик
- * задал вручную осознанно. Внимание: если предмет можно скрафтить дешевле его цены,
- * он попадёт в tools/craft-cheats.txt — это значит, что на нём можно зарабатывать.
+ * Цены, которые расчёт из рецептов НЕ понижает и НЕ повышает: значение берётся из BASE
+ * и остаётся таким, каким его задал заказчик. Внимание: если предмет можно скрафтить
+ * дешевле его цены, он попадёт в tools/craft-cheats.txt — это значит, что на нём можно
+ * зарабатывать.
  */
 const LOCKED = new Set([
 	// Шаблон незеритового апгрейда: заказчик просил 100 000, чтобы наценка была, но небольшая
-	// (дублирование шаблона выходит около 92 500, то есть прибыль ~7 500 за штуку).
+	// (дублирование шаблона выходит около 84 375 при наценке крафта 1,25, прибыль около 15 600).
 	'minecraft:netherite_upgrade_smithing_template',
+	// Шалкер: заказчик закрепил 100 000 000 — из рецепта (2 панциря по 50M) с наценкой крафта
+	// 1,25 вышло бы 125M, а это подняло бы и цену наборов, и цену цветных шлякеров.
+	'minecraft:shulker_box',
 ]);
 
 /** Сколько стаков предмета торговец готов купить за один игровой день. */
@@ -98,7 +103,9 @@ const BASE = {
 	'minecraft:heart_of_the_sea': 500000, 'minecraft:scute': 150, 'minecraft:phantom_membrane': 800,
 	'minecraft:rabbit_foot': 300, 'minecraft:magma_cream': 25, 'minecraft:blaze_rod': 22000,
 	'minecraft:ender_pearl': 400, 'minecraft:chorus_fruit': 500, 'minecraft:popped_chorus_fruit': 550,
-	'minecraft:shulker_shell': 50000000, 'minecraft:dragon_breath': 200000, 'minecraft:ghast_tear': 150000,
+	'minecraft:shulker_shell': 50000000,
+	// Шалкер закреплён на 100M (см. LOCKED) — иначе наценка крафта 1,25 подняла бы его до 125M.
+	'minecraft:shulker_box': 100000000, 'minecraft:dragon_breath': 200000, 'minecraft:ghast_tear': 150000,
 	'minecraft:wither_skeleton_skull': 600000, 'minecraft:trident': 250000, 'minecraft:breeze_rod': 400000,
 	'minecraft:heavy_core': 20000000, 'minecraft:ominous_bottle': 100000, 'minecraft:ominous_trial_key': 75000,
 	'minecraft:trial_key': 25000,
@@ -531,8 +538,13 @@ for (const item of items) {
 // Проверка на «печать денег»: если предмет можно продать дороже, чем стоит
 // купить его ингредиенты, игрок сможет бесконечно покупать сырьё, крафтить
 // и продавать готовое. Такие случаи надо править вручную.
+//
+// Порог CHEAT_MARGIN = 1,25: в отчёт попадает предмет, у которого крафт дешевле
+// собственной цены более чем на четверть (то есть запас больше, чем обычная
+// наценка крафта CRAFT_MARKUP). У всех обычных предметов цена и есть «стоимость
+// крафта × 1,25», поэтому в отчёт попадают только закреплённые (LOCKED) предметы.
 // ---------------------------------------------------------------------------
-const BUY_MARKUP = 1.25; // наценка рынка при покупке (см. механику торговли)
+const CHEAT_MARGIN = 1.25;
 const cheats = [];
 for (const [item, price] of prices) {
 	let cheapest = null;
@@ -542,7 +554,7 @@ for (const [item, price] of prices) {
 		const perItem = info.cost / info.count;
 		if (cheapest === null || perItem < cheapest) cheapest = perItem;
 	}
-	if (cheapest !== null && cheapest * BUY_MARKUP < price * 0.999) {
+	if (cheapest !== null && cheapest * CHEAT_MARGIN < price * 0.999) {
 		cheats.push({ item, price, craft: cheapest });
 	}
 }
