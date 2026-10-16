@@ -69,6 +69,8 @@
 	"marketplace.command.help.money.get": "/market money get [игрок] — посмотреть баланс",
 	"marketplace.command.help.money.set": "/market money set <игрок> <сумма> — установить баланс",
 	"marketplace.command.help.money.add": "/market money add <игрок> <сумма> — изменить баланс (отрицательная сумма вычитает)",
+	"marketplace.command.help.drift": "/market drift <предмет> [тик] — показать микро-дрейф цены (±5%)",
+	"marketplace.command.help.event": "/market event list — крупные ивенты (пока не реализованы)",
 
 	"marketplace.command.money.balance.self": "Твой баланс: %s",
 	"marketplace.command.money.balance.other": "Баланс %s: %s",
@@ -84,6 +86,29 @@
 	"marketplace.command.price.cannotBuy": "Купить нельзя — только продать",
 	"marketplace.command.price.sell": "Продажа: рынок %s (с наценкой до %s), торговец %s",
 	"marketplace.command.price.notLoaded": "Прайс-лист не загружен, цены неизвестны",
+
+	"marketplace.command.drift.header": "Микро-дрейф цены: %s",
+	"marketplace.command.drift.base": "Базовая цена: %s",
+	"marketplace.command.drift.multiplier": "Множитель дрейфа: x%s (%s) — пределы ±5%%",
+	"marketplace.command.drift.unit": "Цена сейчас: %s (дрейф ходит в пределах ±%s%%)",
+	"marketplace.command.drift.buy": "Купить в магазине: %s",
+	"marketplace.command.drift.trader": "Сдать торговцу: %s",
+	"marketplace.command.drift.time": "Игровое время: %s тиков, зерно мира: %s",
+	"marketplace.command.drift.noPrice": "Этого предмета нет в прайсе — цену посчитать нельзя",
+	"marketplace.command.drift.noSeed": "Мир ещё не загружен: зерно мира и игровое время неизвестны, попробуйте позже",
+
+	"marketplace.command.event.header": "Крупные ивенты:",
+	"marketplace.command.event.none": "Крупные ивенты ещё не добавлены — сейчас работает только фон (микро-дрейф цен).",
+	"marketplace.command.event.planned": "Запланировано: %s",
+	"marketplace.command.event.startHint": "Запуск: /market event start <id> (пока заглушка)",
+	"marketplace.command.event.start": "Ивент %s пока не реализован — он появится позже",
+	"marketplace.command.event.stop": "Активных ивентов нет — останавливать нечего",
+
+	"marketplace.event.sale": "распродажа",
+	"marketplace.event.crash": "обвал рынка",
+	"marketplace.event.hype": "ажиотаж",
+	"marketplace.event.shortage": "дефицит",
+	"marketplace.event.blackday": "чёрный день",
 
 	"marketplace.hud.balance": "Баланс: %s",
 	"marketplace.hud.inventory": "Инвентарь: %s"
