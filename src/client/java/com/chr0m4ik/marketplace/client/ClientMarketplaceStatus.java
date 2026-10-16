@@ -1,6 +1,9 @@
 package com.chr0m4ik.marketplace.client;
 
+import com.chr0m4ik.marketplace.MarketplaceMod;
 import com.chr0m4ik.marketplace.economy.TraderPrices;
+import com.chr0m4ik.marketplace.event.EventService;
+import com.chr0m4ik.marketplace.event.MarketEvent;
 import com.chr0m4ik.marketplace.network.MarketplaceStatusPayload;
 import com.chr0m4ik.marketplace.price.PriceDrift;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -10,6 +13,7 @@ import net.minecraft.world.item.Item;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Последнее состояние, полученное с сервера: баланс, стоимость инвентаря и закупки торговца.
@@ -35,7 +39,7 @@ public final class ClientMarketplaceStatus {
 	}
 
 	public static void update(long balance, long inventory, List<MarketplaceStatusPayload.SaleEntry> entries,
-			long seed, long time) {
+			long seed, long time, MarketplaceStatusPayload.EventData event) {
 		balanceCents = balance;
 		inventoryCents = inventory;
 		traderPrices = toTraderPrices(entries);
@@ -45,6 +49,9 @@ public final class ClientMarketplaceStatus {
 
 		// Дрейф считаем по серверным данным: тогда клиент и сервер дают одно и то же число.
 		PriceDrift.update(worldSeed, gameTime);
+
+		// Ивент тоже берём с сервера и считаем его множитель тем же кодом, что и сервер.
+		applyEvent(event);
 	}
 
 	/** Вызывается при выходе из мира, чтобы не показывать старые числа в меню. */
@@ -56,6 +63,30 @@ public final class ClientMarketplaceStatus {
 		worldSeed = 0L;
 		gameTime = 0L;
 		PriceDrift.clear();
+		EventService.clearCurrent();
+	}
+
+	/**
+	 * Кладёт описание ивента с сервера в {@link EventService} — оттуда его берут и подсказки,
+	 * и любая другая цена на клиенте. Незнакомое название (чужой мод или старый клиент) —
+	 * считаем, что ивента нет, и не ломаем цены.
+	 */
+	private static void applyEvent(MarketplaceStatusPayload.EventData data) {
+		if (!data.active()) {
+			EventService.clearCurrent();
+			return;
+		}
+
+		Optional<MarketEvent> event = MarketEvent.fromNetwork(data.name(), data.category(), data.items(),
+				data.multiplier());
+
+		if (event.isPresent()) {
+			EventService.applyFromServer(event.get());
+		} else {
+			MarketplaceMod.LOGGER.warn("С сервера пришёл непонятный ивент «{}» — считаю, что ивента нет",
+					data.name());
+			EventService.clearCurrent();
+		}
 	}
 
 	private static TraderPrices toTraderPrices(List<MarketplaceStatusPayload.SaleEntry> entries) {

@@ -51,10 +51,11 @@ public class MarketplaceClient implements ClientModInitializer {
 		MarketplaceTooltips.register();
 
 		// Состояние с сервера: баланс, стоимость инвентаря, закупки торговца,
-		// а также зерно мира и игровое время — по ним считается микро-дрейф цен.
+		// а также зерно мира и игровое время — по ним считается микро-дрейф цен —
+		// и описание активного крупного ивента: его множитель клиент считает сам.
 		ClientPlayNetworking.registerGlobalReceiver(MarketplaceStatusPayload.TYPE, (payload, context) ->
 				ClientMarketplaceStatus.update(payload.balanceCents(), payload.inventoryCents(),
-						payload.traderSales(), payload.worldSeed(), payload.gameTime()));
+						payload.traderSales(), payload.worldSeed(), payload.gameTime(), payload.event()));
 
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ClientMarketplaceStatus.clear());
 

@@ -133,13 +133,6 @@ public record MarketEvent(MarketEvents.Name name, String category, List<String> 
 	 * множитель или пустая цель (такой ивент ничего не делает, и хранить его нельзя).
 	 */
 	public static Optional<MarketEvent> fromTag(CompoundTag tag) {
-		Optional<MarketEvents.Name> name = MarketEvents.Name.byId(tag.getStringOr(NAME_KEY, ""));
-
-		if (name.isEmpty()) {
-			return Optional.empty();
-		}
-
-		String category = tag.getStringOr(CATEGORY_KEY, "");
 		List<String> items = new ArrayList<>();
 		ListTag stored = tag.getListOrEmpty(ITEMS_KEY);
 
@@ -151,15 +144,43 @@ public record MarketEvent(MarketEvents.Name name, String category, List<String> 
 			}
 		}
 
-		double multiplier = tag.getDoubleOr(MULTIPLIER_KEY, 1.0);
 		long duration = tag.getLongOr(DURATION_KEY, 0L);
-		boolean valid = category.isEmpty() ? !items.isEmpty() : parseCategory(category).isPresent();
 
-		if (!valid || multiplier <= 0.0 || multiplier == 1.0 || duration <= 0L) {
+		if (duration <= 0L) {
 			return Optional.empty();
 		}
 
-		return Optional.of(new MarketEvent(name.get(), category, items, multiplier, duration));
+		return build(tag.getStringOr(NAME_KEY, ""), tag.getStringOr(CATEGORY_KEY, ""), items,
+				tag.getDoubleOr(MULTIPLIER_KEY, 1.0), duration);
+	}
+
+	/**
+	 * Описание из пакета (клиент получил его с сервера). Длительность не передаётся: клиенту
+	 * она не нужна — по ней считает только сервер. Пусто — если название незнакомо.
+	 */
+	public static Optional<MarketEvent> fromNetwork(String nameId, String category, List<String> items,
+			double multiplier) {
+		return build(nameId, category, items, multiplier, 0L);
+	}
+
+	/** Общая сборка описания из частей: проверяет, что ивент вообще что-то значит. */
+	private static Optional<MarketEvent> build(String nameId, String categoryValue, List<String> items,
+			double multiplier, long duration) {
+		Optional<MarketEvents.Name> name = MarketEvents.Name.byId(nameId);
+
+		if (name.isEmpty() || multiplier <= 0.0 || multiplier == 1.0) {
+			return Optional.empty();
+		}
+
+		String category = categoryValue == null ? "" : categoryValue;
+
+		if (category.isEmpty()) {
+			return items.isEmpty() ? Optional.empty()
+					: Optional.of(new MarketEvent(name.get(), "", items, multiplier, duration));
+		}
+
+		return parseCategory(category)
+				.map(parsed -> new MarketEvent(name.get(), parsed.name(), List.of(), multiplier, duration));
 	}
 
 	/** Раздел по его имени ({@code BLOCKS} и так далее); пустая строка и мусор — пусто. */

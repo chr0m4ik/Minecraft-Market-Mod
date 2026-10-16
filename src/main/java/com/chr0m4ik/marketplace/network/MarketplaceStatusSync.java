@@ -4,6 +4,7 @@ import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
 import com.chr0m4ik.marketplace.economy.TraderPrices;
+import com.chr0m4ik.marketplace.event.EventService;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -45,6 +46,10 @@ public final class MarketplaceStatusSync {
 			// Зерно и время нужны клиенту, чтобы посчитать тот же микро-дрейф цен, что и сервер.
 			long seed = server.overworld().getSeed();
 			long gameTime = GameTime.now(server);
+			// Описание активного ивента: клиент считает по нему тот же множитель, что и сервер.
+			// Номер изменения не зависит от времени, поэтому ивент уходит только когда сменился.
+			MarketplaceStatusPayload.EventData event = eventData();
+			long eventRevision = EventService.revision();
 
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 				// Клиент без нашего мода пакет не поймёт — таким ничего не отправляем.
@@ -57,20 +62,31 @@ public final class MarketplaceStatusSync {
 				long[] last = LAST_SENT.get(player.getUUID());
 				boolean salesWereSent = last != null && last[2] != 0L;
 				boolean salesNeedSending = !entries.isEmpty() || salesWereSent;
+				boolean eventChanged = last == null || last[3] != eventRevision;
 
-				if (last != null && last[0] == balance && last[1] == inventory && !salesNeedSending) {
+				if (last != null && last[0] == balance && last[1] == inventory && !salesNeedSending
+						&& !eventChanged) {
 					continue;
 				}
 
-				LAST_SENT.put(player.getUUID(), new long[] {balance, inventory, entries.isEmpty() ? 0L : 1L});
+				LAST_SENT.put(player.getUUID(), new long[] {balance, inventory,
+						entries.isEmpty() ? 0L : 1L, eventRevision});
 				ServerPlayNetworking.send(player,
-						new MarketplaceStatusPayload(balance, inventory, entries, seed, gameTime));
+						new MarketplaceStatusPayload(balance, inventory, entries, seed, gameTime, event));
 			}
 		});
 
 		// Игрок вышел — забываем его состояние.
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
 				LAST_SENT.remove(handler.getPlayer().getUUID()));
+	}
+
+	/** Описание активного ивента для пакета (или «ивента нет»). */
+	private static MarketplaceStatusPayload.EventData eventData() {
+		return EventService.current()
+				.map(event -> new MarketplaceStatusPayload.EventData(event.name().id(), event.category(),
+						event.itemIds(), event.multiplier()))
+				.orElse(MarketplaceStatusPayload.EventData.NONE);
 	}
 
 	/**
