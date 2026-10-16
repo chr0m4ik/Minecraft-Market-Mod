@@ -193,6 +193,14 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	 */
 	private int[] shopCounts;
 
+	/**
+	 * ВРЕМЕННО (диагностика проблемы 1): какой раздел и какая страница сейчас разложены по слотам
+	 * окна списка товаров. Нужно, чтобы поймать расхождение содержимого окна с его данными
+	 * (раздел и страница лежат в данных окна) и пересобрать список, а не показывать пустой раздел
+	 * до переоткрытия окна. {@code null} — по слотам ещё ничего не разложено.
+	 */
+	private String loadedShopPage;
+
 	public MarketplaceMenu(WindowKind kind, int syncId, Inventory inventory) {
 		super(MarketplaceMenus.typeOf(kind), syncId);
 		this.kind = kind;
@@ -240,7 +248,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 	}
 
-	/** Заполняет ячейки окна списка товарами текущей страницы раздела. */
+	/** Заполняет ячейки окна списка товаров текущей страницы раздела. */
 	private void loadShopPage() {
 		if (this.serverPlayer == null || this.kind != WindowKind.BUY_LIST) {
 			return;
@@ -251,17 +259,30 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		ShopCatalog.refresh(this.serverPlayer.registryAccess());
 
 		MarketService.ShopState shop = MarketService.shop(this.serverPlayer.getUUID());
-		ShopCatalog.Category[] categories = ShopCatalog.Category.values();
-		ShopCatalog.Category category = categories[Math.max(0, Math.min(shop.category(), categories.length - 1))];
+		ShopCatalog.Category category = shopCategory(shop);
 		List<ItemStack> page = ShopCatalog.page(category, shop.page());
+		int pages = ShopCatalog.pages(category);
 
 		// ВРЕМЕННО (диагностика проблемы 1): что сервер положил в окно списка товаров.
-		Diag.log("loadShopPage: раздел {} (индекс {}), страница {}, товаров на странице {}, всего в разделе {}",
-				category, shop.category(), shop.page(), page.size(), ShopCatalog.items(category).size());
+		// Пустой раздел рядом с этой строкой даёт ERROR — молча пустого магазина быть не должно.
+		Diag.logShopSection("сервер", category, shop.page() + 1, pages, page, ShopCatalog.items(category).size());
+
+		this.loadedShopPage = shopPageKey(category, shop.page());
 
 		for (int i = 0; i < this.kind.tradeSlots(); i++) {
 			this.tradeContainer.setItem(i, i < page.size() ? page.get(i).copy() : ItemStack.EMPTY);
 		}
+	}
+
+	/** Раздел магазина по состоянию окна: индекс может прийти любым, поэтому зажимаем его в границы. */
+	private static ShopCatalog.Category shopCategory(MarketService.ShopState shop) {
+		ShopCatalog.Category[] categories = ShopCatalog.Category.values();
+		return categories[Math.max(0, Math.min(shop.category(), categories.length - 1))];
+	}
+
+	/** Ключ «раздел + страница»: по нему видно, что именно сейчас разложено по слотам окна. */
+	private static String shopPageKey(ShopCatalog.Category category, int page) {
+		return category.name() + "/" + page;
 	}
 	private void loadMarketCells() {
 		if (this.serverPlayer == null || !this.hasMarketCells()) {
@@ -1038,8 +1059,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Перелистывание страниц списка товаров (без переоткрытия окна). */
 	private void turnShopPage(ServerPlayer player, int delta) {
 		MarketService.ShopState shop = MarketService.shop(player.getUUID());
-		ShopCatalog.Category[] categories = ShopCatalog.Category.values();
-		ShopCatalog.Category category = categories[Math.max(0, Math.min(shop.category(), categories.length - 1))];
+		ShopCatalog.Category category = shopCategory(shop);
 		int pages = ShopCatalog.pages(category);
 		int page = Math.floorMod(shop.page() + delta, pages);
 		MarketService.setShop(player.getUUID(), shop.withPage(page));
@@ -1193,9 +1213,31 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	@Override
 	public void broadcastChanges() {
 		this.updateData();
+		this.ensureShopPage();
 		this.saveMarketCells();
 		this.syncMarketCells();
 		super.broadcastChanges();
+	}
+
+	/**
+	 * ВРЕМЕННО (диагностика проблемы 1): содержимое окна списка товаров должно соответствовать
+	 * данным окна (раздел и страница). Если они разошлись — например, раздел переключили в обход
+	 * {@link #turnShopPage} или список в слоты не влез, — пересобираем страницу прямо сейчас.
+	 * Так пустой или чужой список не может остаться на экране до переоткрытия окна.
+	 */
+	private void ensureShopPage() {
+		if (this.serverPlayer == null || this.kind != WindowKind.BUY_LIST) {
+			return;
+		}
+
+		MarketService.ShopState shop = MarketService.shop(this.serverPlayer.getUUID());
+		String expected = shopPageKey(shopCategory(shop), shop.page());
+
+		if (!expected.equals(this.loadedShopPage)) {
+			Diag.log("окно списка разошлось с данными страницы: разложено {}, нужно {} — пересобираю список",
+					this.loadedShopPage, expected);
+			this.loadShopPage();
+		}
 	}
 
 	/**
@@ -1342,6 +1384,14 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Номер текущей страницы магазина (с единицы). */
 	public int getShopPage() {
 		return this.data.get(PAGE_DATA);
+	}
+
+	/**
+	 * Номер выбранного раздела магазина. Сервер кладёт его в данные окна, поэтому клиент
+	 * по этому числу знает, какой раздел открыт (нужно подсказкам и диагностике).
+	 */
+	public int getShopCategory() {
+		return this.data.get(PAGE_DATA + 2);
 	}
 
 	/** Номер выбранного количества в окне покупки. */
