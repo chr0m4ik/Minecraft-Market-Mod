@@ -34,6 +34,9 @@ import java.util.List;
  * </ul>
  */
 public final class MarketplaceTooltips {
+	/** Последняя напечатанная шапка данных окна (временная диагностика, чтобы не спамить в лог). */
+	private static String lastMarketLog;
+
 	private MarketplaceTooltips() {
 		// Класс только со статическими методами.
 	}
@@ -212,12 +215,19 @@ public final class MarketplaceTooltips {
 
 	/** Подсказка кнопки-справки на рынке: сколько дадут за ордера и за неподтверждённые предметы. */
 	private static void addMarketSummary(List<Component> lines, MarketplaceMenu menu) {
-		// ВРЕМЕННАЯ диагностика: печатаем то, что видит клиент (сравниваем с логом сервера).
-		com.chr0m4ik.marketplace.MarketplaceMod.LOGGER.info(
-				"Рынок (клиент): ордера {} шт -> {} (текст {}), неподтверждённые {} шт -> {} (текст {}), наценка {}",
-				menu.getOrdersCount(), menu.getOrdersPayout(), MoneyFormat.format(menu.getOrdersPayout()),
-				menu.getStagedCount(), menu.getStagedPayout(), MoneyFormat.format(menu.getStagedPayout()),
-				menu.getMarkup());
+		// ВРЕМЕННАЯ диагностика: печатаем то, что видит клиент, вместе с сырыми ячейками окна.
+		// Только при изменении — иначе подсказка перерисовывается каждый кадр и лог засоряется.
+		String dump = menu.headerDump();
+
+		if (!dump.equals(lastMarketLog)) {
+			lastMarketLog = dump;
+			com.chr0m4ik.marketplace.MarketplaceMod.LOGGER.info(
+					"Рынок (клиент): ячейки [{}], ордера {} шт -> {} ({}), неподтверждённые {} шт -> {} ({}), наценка {}",
+					dump, menu.getOrdersCount(), menu.getOrdersPayout(), MoneyFormat.format(menu.getOrdersPayout()),
+					menu.getStagedCount(), menu.getStagedPayout(), MoneyFormat.format(menu.getStagedPayout()),
+					menu.getMarkup());
+		}
+
 		lines.add(Component.translatable("marketplace.tooltip.market.orders",
 				money(menu.getOrdersPayout()), count(menu.getOrdersCount())).withStyle(ChatFormatting.GOLD));
 		lines.add(Component.translatable("marketplace.tooltip.market.stagedMoney",

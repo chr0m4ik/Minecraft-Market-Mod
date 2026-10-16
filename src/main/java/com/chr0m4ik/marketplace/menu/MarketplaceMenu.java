@@ -15,6 +15,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Prediction;
@@ -55,17 +56,39 @@ import java.util.UUID;
  * </ul>
  */
 public class MarketplaceMenu extends AbstractContainerMenu {
-	/** Баланс передаём как одно long-число (копейки), а слоты данных — это int. Отсюда 2. */
-	private static final int DATA_SIZE = 10 + MarketService.SLOTS * 2;
+	/**
+	 * Сколько ячеек данных занимает одна сумма. Ячейка несёт только 16 бит: пакет данных окна
+	 * ({@code ClientboundContainerSetDataPacket}) пишет числа как {@code short}, поэтому всё, что
+	 * больше 32 767, приходит на клиент искажённым. Суммы считаем в копейках (до 2^63), значит
+	 * режем их на четыре куска по 16 бит.
+	 */
+	private static final int MONEY_CELLS = 4;
+
+	/** Где лежат суммы: баланс, деньги по ордерам и по неподтверждённым предметам. */
+	private static final int BALANCE_DATA = 0;
+	private static final int ORDERS_DATA = BALANCE_DATA + MONEY_CELLS;
+	private static final int STAGED_DATA = ORDERS_DATA + MONEY_CELLS;
+
+	/** Счётчики предметов, наценка и число открытых ячеек рынка. */
+	private static final int ORDERS_COUNT_DATA = STAGED_DATA + MONEY_CELLS;
+	private static final int STAGED_COUNT_DATA = ORDERS_COUNT_DATA + 1;
+	private static final int MARKUP_DATA = STAGED_COUNT_DATA + 1;
+	private static final int UNLOCKED_DATA = MARKUP_DATA + 1;
+
+	/** Сколько ячеек занимает шапка данных: суммы, счётчики, наценка и открытые ячейки. */
+	private static final int HEADER_SIZE = UNLOCKED_DATA + 1;
+
+	/** Сколько всего ячеек данных синхронизируется с клиентом. */
+	private static final int DATA_SIZE = HEADER_SIZE + MarketService.SLOTS * 2;
 
 	/** С какого места в данных начинаются минуты до конца продажи по каждой ячейке. */
-	private static final int CELL_DATA_START = 10;
+	private static final int CELL_DATA_START = HEADER_SIZE;
 
 	/** Где лежат номер страницы магазина, всего страниц и номер раздела. */
-	private static final int PAGE_DATA = 10;
+	private static final int PAGE_DATA = HEADER_SIZE;
 
 	/** С какого места начинаются наценки по ячейкам. */
-	private static final int CELL_MARKUP_START = 10 + MarketService.SLOTS;
+	private static final int CELL_MARKUP_START = HEADER_SIZE + MarketService.SLOTS;
 
 	/** Слоты кнопок главного меню (средний ряд: 10, 13, 16). */
 	public static final int MAIN_SLOT_TRADER = 10;
@@ -214,13 +237,13 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	private static ItemStack lockedPane() {
 		// В 26.3 цветные предметы лежат в наборе ColorCollection, поэтому берём цвет через pick.
 		ItemStack pane = new ItemStack(Items.STAINED_GLASS_PANE.pick(DyeColor.RED));
-		pane.set(DataComponents.CUSTOM_NAME, Component.translatable("marketplace.gui.slot.locked"));
+		pane.set(DataComponents.CUSTOM_NAME, plain(Component.translatable("marketplace.gui.slot.locked")));
 		return pane;
 	}
 
 	/** Открыта ли эта ячейка рынка (данные приходят с сервера, поэтому работает и на клиенте). */
 	public boolean isCellUnlocked(int cell) {
-		return cell < this.data.get(9);
+		return cell < this.data.get(UNLOCKED_DATA);
 	}
 
 	/** Есть ли в этом окне ячейки рынка. */
@@ -404,8 +427,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			for (int row = 1; row <= BUY_GRID_ROWS && index < categories.length; row++) {
 				for (int col = 1; col <= BUY_GRID_COLUMNS && index < categories.length; col++) {
 					ItemStack button = new ItemStack(categories[index].icon());
-					button.set(DataComponents.CUSTOM_NAME, Component.translatable("marketplace.gui.category",
-							Component.translatable(categories[index].titleKey())));
+					button.set(DataComponents.CUSTOM_NAME, plain(Component.translatable("marketplace.gui.category",
+							Component.translatable(categories[index].titleKey()))));
 					button.set(DataComponents.LORE, new ItemLore(List.of(
 							Component.translatable("marketplace.gui.category.count",
 									Component.literal(String.valueOf(ShopCatalog.items(categories[index]).size())))
@@ -443,8 +466,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 		MarketService.ShopState shop = MarketService.shop(this.serverPlayer.getUUID());
 		ItemStack quantity = new ItemStack(Items.REPEATER);
-		quantity.set(DataComponents.CUSTOM_NAME, Component.translatable("marketplace.gui.button.quantity",
-				Component.literal(shop.quantityText())));
+		quantity.set(DataComponents.CUSTOM_NAME, plain(Component.translatable("marketplace.gui.button.quantity",
+				Component.literal(shop.quantityText()))));
 		quantity.set(DataComponents.LORE, new ItemLore(List.of(
 				Component.translatable("marketplace.gui.button.quantity.hint").withStyle(ChatFormatting.GRAY))));
 		this.setButtonStack(BUY_ITEM_QUANTITY, quantity);
@@ -453,8 +476,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.setButtonStack(BUY_ITEM_PREVIEW, shop.selected().copy());
 
 		ItemStack drop = new ItemStack(Items.DISPENSER);
-		drop.set(DataComponents.CUSTOM_NAME, Component.translatable(shop.drop()
-				? "marketplace.gui.button.drop.ground" : "marketplace.gui.button.drop.inventory"));
+		drop.set(DataComponents.CUSTOM_NAME, plain(Component.translatable(shop.drop()
+				? "marketplace.gui.button.drop.ground" : "marketplace.gui.button.drop.inventory")));
 
 		if (shop.drop()) {
 			drop.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
@@ -475,7 +498,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	 */
 	private void updatePriceButton() {
 		ItemStack button = new ItemStack(Items.GOLD_INGOT);
-		button.set(DataComponents.CUSTOM_NAME, Component.translatable("marketplace.gui.button.price"));
+		button.set(DataComponents.CUSTOM_NAME, plain(Component.translatable("marketplace.gui.button.price")));
 		List<Component> lore = new ArrayList<>();
 		double current = this.markupValue();
 
@@ -491,9 +514,9 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Кнопка «снять ордер»: включён ли сейчас безопасный режим снятия. */
 	private void updateTargetButton() {
 		ItemStack button = new ItemStack(Items.TARGET);
-		button.set(DataComponents.CUSTOM_NAME, Component.translatable("marketplace.gui.button.target",
+		button.set(DataComponents.CUSTOM_NAME, plain(Component.translatable("marketplace.gui.button.target",
 				Component.translatable(this.targetMode
-						? "marketplace.gui.button.target.on" : "marketplace.gui.button.target.off")));
+						? "marketplace.gui.button.target.on" : "marketplace.gui.button.target.off"))));
 		button.set(DataComponents.LORE, new ItemLore(List.of(
 				Component.translatable("marketplace.gui.button.target.hint").withStyle(ChatFormatting.GRAY))));
 
@@ -511,20 +534,30 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	}
 
 	/**
+	 * Убирает курсив у названия предмета. Игра рисует любое изменённое название
+	 * ({@link DataComponents#CUSTOM_NAME}) курсивом, а у кнопок он выглядит неаккуратно.
+	 * Стиль снимаем у {@link MutableComponent}: сам {@code Component} неизменяемый и такого
+	 * метода не имеет.
+	 */
+	private static MutableComponent plain(MutableComponent text) {
+		return text.withStyle(Style.EMPTY.withItalic(false));
+	}
+
+	/**
 	 * @param containerSlot номер слота в верхней части окна (как его видит игрок),
 	 *                      а не индекс внутри контейнера кнопок.
 	 */
 	private void setButton(int containerSlot, Item item, String nameKey) {
 		ItemStack stack = new ItemStack(item);
 		// Своё название предмета — игрок увидит его в подсказке при наведении.
-		stack.set(DataComponents.CUSTOM_NAME, Component.translatable(nameKey));
+		stack.set(DataComponents.CUSTOM_NAME, plain(Component.translatable(nameKey)));
 		this.buttonContainer.setItem(containerSlot - this.kind.tradeSlots(), stack);
 	}
 
 	/** Кнопка, в названии которой есть значение (например, текущая наценка). */
 	private void setButtonWithArg(int containerSlot, Item item, String nameKey, Component arg) {
 		ItemStack stack = new ItemStack(item);
-		stack.set(DataComponents.CUSTOM_NAME, Component.translatable(nameKey, arg));
+		stack.set(DataComponents.CUSTOM_NAME, plain(Component.translatable(nameKey, arg)));
 		this.buttonContainer.setItem(containerSlot - this.kind.tradeSlots(), stack);
 	}
 
@@ -536,7 +569,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 	/** Наценка из данных окна (на сервере — из сейва, на клиенте — из синхронизированных данных). */
 	private double markupValue() {
-		return this.data.get(8) / 100.0;
+		return this.data.get(MARKUP_DATA) / 100.0;
 	}
 
 	/**
@@ -1010,13 +1043,13 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		UUID playerId = this.serverPlayer.getUUID();
 		MarketplaceState state = MarketplaceEconomy.state(server);
 
-		setMoney(0, MarketplaceEconomy.getBalance(server, playerId));
+		setMoney(BALANCE_DATA, MarketplaceEconomy.getBalance(server, playerId));
 		// Список книг зачарований строится по реестру мира — отдаём его каталогу магазина.
 		ShopCatalog.setRegistries(server.registryAccess());
 		// Наборы тоже собираются из реестров (зачарования и зелья внутри).
 		KitCatalog.setRegistries(server.registryAccess());
-		this.data.set(8, (int) Math.round(state.markup(playerId) * 100.0));
-		this.data.set(9, MarketService.unlockedSlots(state, playerId));
+		this.data.set(MARKUP_DATA, (int) Math.round(state.markup(playerId) * 100.0));
+		this.data.set(UNLOCKED_DATA, MarketService.unlockedSlots(state, playerId));
 
 		if (this.kind == WindowKind.BUY_ITEM) {
 			// Номер выбранного количества — клиент считает по нему цену в подсказке.
@@ -1055,12 +1088,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			stagedCount += stack.getCount();
 		}
 
-		setMoney(2, ordersMoney);
-		setMoney(4, stagedMoney);
-		this.data.set(6, ordersCount);
-		this.data.set(7, stagedCount);
+		setMoney(ORDERS_DATA, ordersMoney);
+		setMoney(STAGED_DATA, stagedMoney);
+		this.data.set(ORDERS_COUNT_DATA, ordersCount);
+		this.data.set(STAGED_COUNT_DATA, stagedCount);
 
-		// ВРЕМЕННАЯ диагностика цен рынка: печатаем числа, когда они изменились.
+		// ВРЕМЕННАЯ диагностика цен рынка: печатаем числа и сырые ячейки, когда они изменились.
 		String stamp = ordersCount + "/" + ordersMoney + "/" + stagedCount + "/" + stagedMoney
 				+ "/" + state.markup(playerId);
 
@@ -1069,6 +1102,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			MarketplaceMod.LOGGER.info(
 					"Рынок (диагностика): ордера {} шт на {}, неподтверждённые {} шт на {}, наценка x{}",
 					ordersCount, ordersMoney, stagedCount, stagedMoney, state.markup(playerId));
+			MarketplaceMod.LOGGER.info("Рынок (диагностика, сервер, ячейки): {}", headerDump());
 		}
 
 		// Сколько минут осталось каждому ордеру и с какой наценкой он выставлен.
@@ -1103,16 +1137,46 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		return this.data.get(CELL_MARKUP_START + cell) / 100.0;
 	}
 
-	/** Кладёт сумму в копейках в две ячейки данных (числа там только int). */
+	/**
+	 * Кладёт сумму в копейках в {@link #MONEY_CELLS} ячеек данных — по 16 бит в каждую.
+	 * Так приходится делать потому, что пакет данных окна передаёт числа как {@code short}:
+	 * значение больше 32 767 в одну ячейку не влезает и приходит на клиент искажённым.
+	 */
 	private void setMoney(int index, double amount) {
 		long cents = Math.round(amount * 100.0);
-		this.data.set(index, (int) (cents >>> 32));
-		this.data.set(index + 1, (int) cents);
+
+		for (int i = 0; i < MONEY_CELLS; i++) {
+			this.data.set(index + i, (int) ((cents >>> (16 * i)) & 0xFFFFL));
+		}
 	}
 
+	/** Собирает сумму обратно из ячеек (см. {@link #setMoney}). */
 	private double money(int index) {
-		long cents = ((long) this.data.get(index) << 32) | (this.data.get(index + 1) & 0xFFFFFFFFL);
+		long cents = 0L;
+
+		for (int i = 0; i < MONEY_CELLS; i++) {
+			cents |= (long) (this.data.get(index + i) & 0xFFFF) << (16 * i);
+		}
+
 		return cents / 100.0;
+	}
+
+	/**
+	 * ВРЕМЕННАЯ диагностика: сырые значения шапки данных окна. Их же печатает клиент — по двум
+	 * строкам сразу видно, сходятся ли числа на сервере и в окне игрока.
+	 */
+	public String headerDump() {
+		StringBuilder text = new StringBuilder();
+
+		for (int i = 0; i < HEADER_SIZE; i++) {
+			if (i > 0) {
+				text.append(", ");
+			}
+
+			text.append(i).append('=').append(this.data.get(i));
+		}
+
+		return text.toString();
 	}
 
 	/** Номер текущей страницы магазина (с единицы). */
@@ -1132,35 +1196,35 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 	/** Баланс, который видит клиент (в долларах). */
 	public double getBalance() {
-		return money(0);
+		return money(BALANCE_DATA);
 	}
 
 	/** Сколько дадут за все подтверждённые ордера. */
 	public double getOrdersPayout() {
-		return money(2);
+		return money(ORDERS_DATA);
 	}
 
 	/** Сколько дадут за предметы, которые положили, но ещё не подтвердили. */
 	public double getStagedPayout() {
-		return money(4);
+		return money(STAGED_DATA);
 	}
 
 	public int getOrdersCount() {
-		return this.data.get(6);
+		return this.data.get(ORDERS_COUNT_DATA);
 	}
 
 	public int getStagedCount() {
-		return this.data.get(7);
+		return this.data.get(STAGED_COUNT_DATA);
 	}
 
 	/** Текущая наценка (x1…x2). */
 	public double getMarkup() {
-		return this.data.get(8) / 100.0;
+		return this.data.get(MARKUP_DATA) / 100.0;
 	}
 
 	/** Сколько ячеек рынка открыто. */
 	public int getUnlockedSlots() {
-		return this.data.get(9);
+		return this.data.get(UNLOCKED_DATA);
 	}
 
 	/** Цена следующего слота рынка: считаем из числа открытых ячеек — так надёжнее. */
