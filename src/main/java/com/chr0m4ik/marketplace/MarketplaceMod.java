@@ -9,6 +9,7 @@ import com.chr0m4ik.marketplace.event.EventService;
 import com.chr0m4ik.marketplace.market.MarketTick;
 import com.chr0m4ik.marketplace.market.SaleTimes;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
+import com.chr0m4ik.marketplace.mining.DiagDrillCommand;
 import com.chr0m4ik.marketplace.mining.DrillHandler;
 import com.chr0m4ik.marketplace.mining.VeinMinerHandler;
 import com.chr0m4ik.marketplace.network.MarketplaceNetworking;
@@ -17,6 +18,7 @@ import com.chr0m4ik.marketplace.price.PriceDrift;
 import com.chr0m4ik.marketplace.price.TraderLimits;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -61,6 +63,10 @@ public class MarketplaceMod implements ModInitializer {
 		// «Бур»: инструмент с нашим зачарованием ломает куб вокруг блока — по слою за тик.
 		DrillHandler.register();
 
+		// ВРЕМЕННО (диагностика проблем 2 и 3): команды проверки бура — форма куба и подходящие
+		// блоки. Убрать вместе с классом DiagDrillCommand после проверки.
+		DiagDrillCommand.register();
+
 		// Крупные экономические ивенты: броски раз в игровой день и отсчёт по активному времени
 		// мира (без игроков ивенты замирают).
 		EventService.register();
@@ -88,6 +94,10 @@ public class MarketplaceMod implements ModInitializer {
 						Component.literal(MoneyFormat.format(lost))).withStyle(ChatFormatting.RED));
 			}
 		});
+
+		// ВРЕМЕННО (диагностика проблемы 1): при старте мира пишем, какие разделы магазина
+		// собрались и сколько в них предметов, и из какой сборки играет код. Убрать после починки.
+		ServerLifecycleEvents.SERVER_STARTED.register(server -> Diag.logCategories(server.registryAccess(), "старт мира"));
 
 		// Дальше здесь появятся: подписка на события, слоты продажи, киты.
 	}
