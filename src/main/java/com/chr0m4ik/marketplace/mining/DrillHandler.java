@@ -1,6 +1,5 @@
 package com.chr0m4ik.marketplace.mining;
 
-import com.chr0m4ik.marketplace.Diag;
 import com.chr0m4ik.marketplace.MarketplaceMod;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
@@ -194,9 +193,6 @@ public final class DrillHandler {
 	 */
 	private static void breakLayer(ServerPlayer player, ServerLevel level, ItemStack tool, List<BlockPos> layer) {
 		ACTIVE.set(true);
-		// ВРЕМЕННО (диагностика проблемы 2): сколько блоков слоя реально сломано.
-		int broken = 0;
-		int skipped = 0;
 
 		try {
 			for (BlockPos target : layer) {
@@ -207,23 +203,15 @@ public final class DrillHandler {
 				// Блок мог исчезнуть сам (например, другой игрок его сломал) — тогда пропускаем:
 				// destroyBlock по воздуху ничего не делает, но зря потратил бы проверку прочности.
 				if (level.getBlockState(target).isAir()) {
-					skipped++;
 					continue;
 				}
 
 				// Полный ванильный цикл ломания: уровень инструмента, защита, урон, дроп и опыт.
-				if (player.gameMode.destroyBlock(target)) {
-					broken++;
-				} else {
-					skipped++;
-				}
+				player.gameMode.destroyBlock(target);
 			}
 		} finally {
 			ACTIVE.set(false);
 		}
-
-		// ВРЕМЕННО (диагностика проблемы 2): по этим строкам видно, что слой ломается целиком.
-		Diag.log("бур: слой из {} блоков — сломано {}, пропущено {}", layer.size(), broken, skipped);
 	}
 
 	/**
@@ -268,8 +256,8 @@ public final class DrillHandler {
 	 * симметричны по всем трём осям, поэтому фигура — ровный куб со стороной {@code 2·radius+1}
 	 * (центр в него не входит: его ломает сама игра).
 	 *
-	 * <p>Слои считаются здесь, а не в {@link #plan}, чтобы форму можно было проверить отдельно
-	 * от мира (см. временную команду {@code /marketdiag drillshape}).
+	 * <p>Слои считаются здесь, а не в {@link #plan}, чтобы форму куба можно было проверить отдельно
+	 * от мира: размеры слоёв зависят только от радиуса.
 	 */
 	static List<List<BlockPos>> shellLayers(int radius) {
 		List<List<BlockPos>> layers = new ArrayList<>();

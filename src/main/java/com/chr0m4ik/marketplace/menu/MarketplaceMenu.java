@@ -1,6 +1,5 @@
 package com.chr0m4ik.marketplace.menu;
 
-import com.chr0m4ik.marketplace.Diag;
 import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
@@ -194,10 +193,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	private int[] shopCounts;
 
 	/**
-	 * ВРЕМЕННО (диагностика проблемы 1): какой раздел и какая страница сейчас разложены по слотам
-	 * окна списка товаров. Нужно, чтобы поймать расхождение содержимого окна с его данными
-	 * (раздел и страница лежат в данных окна) и пересобрать список, а не показывать пустой раздел
-	 * до переоткрытия окна. {@code null} — по слотам ещё ничего не разложено.
+	 * Какой раздел и какая страница сейчас разложены по слотам окна списка товаров. Нужно, чтобы
+	 * поймать расхождение содержимого окна с его данными (раздел и страница лежат в данных окна)
+	 * и пересобрать список, а не показывать пустой раздел до переоткрытия окна. {@code null} —
+	 * по слотам ещё ничего не разложено.
 	 */
 	private String loadedShopPage;
 
@@ -241,11 +240,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.fillButtons();
 		this.loadMarketCells();
 		this.loadShopPage();
-
-		// ВРЕМЕННО (диагностика проблемы 1): что оказалось в слотах окна списка сразу после сборки.
-		if (this.serverPlayer != null && this.kind == WindowKind.BUY_LIST) {
-			Diag.dumpMenu("сервер: окно списка товаров собрано", this);
-		}
 	}
 
 	/** Заполняет ячейки окна списка товаров текущей страницы раздела. */
@@ -261,11 +255,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		MarketService.ShopState shop = MarketService.shop(this.serverPlayer.getUUID());
 		ShopCatalog.Category category = shopCategory(shop);
 		List<ItemStack> page = ShopCatalog.page(category, shop.page());
-		int pages = ShopCatalog.pages(category);
-
-		// ВРЕМЕННО (диагностика проблемы 1): что сервер положил в окно списка товаров.
-		// Пустой раздел рядом с этой строкой даёт ERROR — молча пустого магазина быть не должно.
-		Diag.logShopSection("сервер", category, shop.page() + 1, pages, page, ShopCatalog.items(category).size());
 
 		this.loadedShopPage = shopPageKey(category, shop.page());
 
@@ -874,13 +863,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				if (row >= 1 && row <= BUY_GRID_ROWS && col >= 1 && col <= BUY_GRID_COLUMNS) {
 					int index = (row - 1) * BUY_GRID_COLUMNS + (col - 1);
 
-					// ВРЕМЕННО (диагностика проблемы 1): какой раздел выбран кликом по сетке.
-					Diag.log("клик по сетке разделов: слот {}, строка {}, столбец {}, индекс {} ({}), всего разделов {}",
-							slotId, row, col, index,
-							index < ShopCatalog.Category.values().length
-									? ShopCatalog.Category.values()[index].name() : "за пределами",
-							ShopCatalog.Category.values().length);
-
 					if (index < ShopCatalog.Category.values().length) {
 						MarketService.setShop(serverPlayer.getUUID(),
 								MarketService.shop(serverPlayer.getUUID()).withCategory(index));
@@ -1220,10 +1202,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	}
 
 	/**
-	 * ВРЕМЕННО (диагностика проблемы 1): содержимое окна списка товаров должно соответствовать
-	 * данным окна (раздел и страница). Если они разошлись — например, раздел переключили в обход
-	 * {@link #turnShopPage} или список в слоты не влез, — пересобираем страницу прямо сейчас.
-	 * Так пустой или чужой список не может остаться на экране до переоткрытия окна.
+	 * Содержимое окна списка товаров должно соответствовать данным окна (раздел и страница).
+	 * Если они разошлись — например, раздел переключили в обход {@link #turnShopPage} или список
+	 * в слоты не влез, — пересобираем страницу прямо сейчас. Так пустой или чужой список не может
+	 * остаться на экране до переоткрытия окна.
 	 */
 	private void ensureShopPage() {
 		if (this.serverPlayer == null || this.kind != WindowKind.BUY_LIST) {
@@ -1234,8 +1216,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		String expected = shopPageKey(shopCategory(shop), shop.page());
 
 		if (!expected.equals(this.loadedShopPage)) {
-			Diag.log("окно списка разошлось с данными страницы: разложено {}, нужно {} — пересобираю список",
-					this.loadedShopPage, expected);
 			this.loadShopPage();
 		}
 	}

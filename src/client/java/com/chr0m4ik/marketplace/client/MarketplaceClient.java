@@ -59,15 +59,6 @@ public class MarketplaceClient implements ClientModInitializer {
 
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ClientMarketplaceStatus.clear());
 
-		// ВРЕМЕННО (диагностика проблемы 1): проба «путь игрока» — включается только переменной
-		// окружения MARKETPLACE_PROBE=1. Убрать после починки.
-		DiagShopProbe.register();
-
-		// ВРЕМЕННО (диагностика проблемы 1): строка в логе клиента при открытии раздела магазина —
-		// «раздел такой-то: предметов в окне N, из них наших книг M». По ней заказчик сразу видит,
-		// пусто ли в разделе на самом деле и какая сборка играет. Убрать после подтверждения.
-		ShopSectionLog.register();
-
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			while (openMenuKey.consumeClick()) {
 				// Отправляем только если сервер умеет принимать наш пакет.
