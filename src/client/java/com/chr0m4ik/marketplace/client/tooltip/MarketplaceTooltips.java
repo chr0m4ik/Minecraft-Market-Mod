@@ -212,6 +212,12 @@ public final class MarketplaceTooltips {
 
 	/** Подсказка кнопки-справки на рынке: сколько дадут за ордера и за неподтверждённые предметы. */
 	private static void addMarketSummary(List<Component> lines, MarketplaceMenu menu) {
+		// ВРЕМЕННАЯ диагностика: печатаем то, что видит клиент (сравниваем с логом сервера).
+		com.chr0m4ik.marketplace.MarketplaceMod.LOGGER.info(
+				"Рынок (клиент): ордера {} шт -> {} (текст {}), неподтверждённые {} шт -> {} (текст {}), наценка {}",
+				menu.getOrdersCount(), menu.getOrdersPayout(), MoneyFormat.format(menu.getOrdersPayout()),
+				menu.getStagedCount(), menu.getStagedPayout(), MoneyFormat.format(menu.getStagedPayout()),
+				menu.getMarkup());
 		lines.add(Component.translatable("marketplace.tooltip.market.orders",
 				money(menu.getOrdersPayout()), count(menu.getOrdersCount())).withStyle(ChatFormatting.GOLD));
 		lines.add(Component.translatable("marketplace.tooltip.market.stagedMoney",
