@@ -1,6 +1,7 @@
 package com.chr0m4ik.marketplace;
 
 import com.chr0m4ik.marketplace.command.MarketplaceCommands;
+import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.market.MarketTick;
@@ -8,9 +9,11 @@ import com.chr0m4ik.marketplace.market.SaleTimes;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.network.MarketplaceNetworking;
 import com.chr0m4ik.marketplace.price.ItemPrices;
+import com.chr0m4ik.marketplace.price.PriceDrift;
 import com.chr0m4ik.marketplace.price.TraderLimits;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -45,6 +48,16 @@ public class MarketplaceMod implements ModInitializer {
 
 		// Рынок: ордера продаются со временем, даже если игрок вышел.
 		MarketTick.register();
+
+		// Микро-дрейф цен: раз в тик обновляем зерно и игровое время, от которых он считается.
+		// Так цена в любой момент считается без обращения к миру — это дёшево и безопасно.
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			if (server.overworld() == null) {
+				return;
+			}
+
+			PriceDrift.update(server.overworld().getSeed(), GameTime.now(server));
+		});
 
 		// Смерть игрока: теряется часть денег, а не весь кошелёк.
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {

@@ -42,6 +42,9 @@ public final class MarketplaceStatusSync {
 			MarketplaceState state = MarketplaceEconomy.state(server);
 			TraderPrices trader = state.traderSnapshot(GameTime.now(server));
 			List<MarketplaceStatusPayload.SaleEntry> entries = saleEntries(trader);
+			// Зерно и время нужны клиенту, чтобы посчитать тот же микро-дрейф цен, что и сервер.
+			long seed = server.overworld().getSeed();
+			long gameTime = GameTime.now(server);
 
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 				// Клиент без нашего мода пакет не поймёт — таким ничего не отправляем.
@@ -60,7 +63,8 @@ public final class MarketplaceStatusSync {
 				}
 
 				LAST_SENT.put(player.getUUID(), new long[] {balance, inventory, entries.isEmpty() ? 0L : 1L});
-				ServerPlayNetworking.send(player, new MarketplaceStatusPayload(balance, inventory, entries));
+				ServerPlayNetworking.send(player,
+						new MarketplaceStatusPayload(balance, inventory, entries, seed, gameTime));
 			}
 		});
 

@@ -15,11 +15,17 @@ import java.util.List;
  * чтобы показывать у него те же цены, что и сервер.
  *
  * <p>Деньги передаём в копейках (целыми числами), чтобы не терять точность.
+ *
+ * <p>Здесь же идут зерно мира и игровое время сервера: по ним клиент считает микро-дрейф цен
+ * ({@code PriceDrift}) по той же формуле, что и сервер. Иначе подсказки расходились бы с тем,
+ * что игрок платит на самом деле.
  */
 public record MarketplaceStatusPayload(
 		long balanceCents,
 		long inventoryCents,
-		List<SaleEntry> traderSales
+		List<SaleEntry> traderSales,
+		long worldSeed,
+		long gameTime
 ) implements CustomPacketPayload {
 	public static final CustomPacketPayload.Type<MarketplaceStatusPayload> TYPE =
 			new CustomPacketPayload.Type<>(MarketplaceMod.id("status"));
@@ -28,6 +34,8 @@ public record MarketplaceStatusPayload(
 			ByteBufCodecs.VAR_LONG, MarketplaceStatusPayload::balanceCents,
 			ByteBufCodecs.VAR_LONG, MarketplaceStatusPayload::inventoryCents,
 			SaleEntry.CODEC.apply(ByteBufCodecs.list()), MarketplaceStatusPayload::traderSales,
+			ByteBufCodecs.VAR_LONG, MarketplaceStatusPayload::worldSeed,
+			ByteBufCodecs.VAR_LONG, MarketplaceStatusPayload::gameTime,
 			MarketplaceStatusPayload::new
 	);
 

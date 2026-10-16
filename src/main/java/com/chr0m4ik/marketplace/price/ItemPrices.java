@@ -42,6 +42,11 @@ import java.util.Set;
  *     <li>сдать торговцу — {@link #TRADER_MULTIPLIER} от цены.</li>
  * </ul>
  * Так как покупка дороже самой выгодной продажи, «купить — продать» всегда в убыток.
+ *
+ * <p>К базовой цене стака добавляется микро-дрейф — фон ±5% ({@link PriceDrift}). Он встроен
+ * именно здесь, поэтому работает одинаково везде: покупка в магазине, продажа торговцу, рынок,
+ * подсказки предметов, HUD и стоимость наборов. Зачарования, содержимое контейнеров и зелья
+ * дрейфу не подвержены — он берётся только с самих предметов.
  */
 public final class ItemPrices {
 	/** Прайс внутри мода. Читаем его прямо из своего jar-файла, поэтому цены одинаковы на клиенте и на сервере. */
@@ -127,7 +132,10 @@ public final class ItemPrices {
 		return item;
 	}
 
-	/** Базовая цена предмета (за 1 штуку). */
+	/**
+	 * Базовая цена предмета за 1 штуку без микро-дрейфа. Дрейф встроен в
+	 * {@link #priceOf(ItemStack)} — там множитель уже учтён.
+	 */
 	public static double priceOf(Item item) {
 		ensureLoaded();
 		return prices.getOrDefault(item, UNKNOWN_PRICE);
@@ -144,7 +152,9 @@ public final class ItemPrices {
 		}
 
 		ensureLoaded();
-		double price = basePriceOf(stack) * stack.getCount();
+		// Базовая цена «дышит» (микро-дрейф), а зачарования и содержимое контейнеров
+		// считаются по своим правилам и дрейфу не подвержены.
+		double price = basePriceOf(stack) * PriceDrift.multiplier(stack.getItem()) * stack.getCount();
 
 		// Зачарования на самом предмете.
 		ItemEnchantments enchantments = stack.get(DataComponents.ENCHANTMENTS);

@@ -2,6 +2,7 @@ package com.chr0m4ik.marketplace.client;
 
 import com.chr0m4ik.marketplace.economy.TraderPrices;
 import com.chr0m4ik.marketplace.network.MarketplaceStatusPayload;
+import com.chr0m4ik.marketplace.price.PriceDrift;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
@@ -13,6 +14,9 @@ import java.util.Map;
 /**
  * Последнее состояние, полученное с сервера: баланс, стоимость инвентаря и закупки торговца.
  * Нужно плашке на HUD и подсказкам предметов в окне торговца (цены считаются теми же формулами).
+ *
+ * <p>Здесь же храним зерно мира и игровое время с сервера: по ним считается микро-дрейф цен,
+ * поэтому подсказки на клиенте совпадают с тем, что заплатит сервер.
  */
 public final class ClientMarketplaceStatus {
 	/** Пока данных с сервера нет, плашку не показываем. */
@@ -22,15 +26,25 @@ public final class ClientMarketplaceStatus {
 	private static long inventoryCents;
 	private static TraderPrices traderPrices = TraderPrices.empty();
 
+	/** Зерно мира и игровое время сервера — для микро-дрейфа цен. */
+	private static long worldSeed;
+	private static long gameTime;
+
 	private ClientMarketplaceStatus() {
 		// Класс только со статическими методами.
 	}
 
-	public static void update(long balance, long inventory, List<MarketplaceStatusPayload.SaleEntry> entries) {
+	public static void update(long balance, long inventory, List<MarketplaceStatusPayload.SaleEntry> entries,
+			long seed, long time) {
 		balanceCents = balance;
 		inventoryCents = inventory;
 		traderPrices = toTraderPrices(entries);
+		worldSeed = seed;
+		gameTime = time;
 		hasData = true;
+
+		// Дрейф считаем по серверным данным: тогда клиент и сервер дают одно и то же число.
+		PriceDrift.update(worldSeed, gameTime);
 	}
 
 	/** Вызывается при выходе из мира, чтобы не показывать старые числа в меню. */
@@ -39,6 +53,9 @@ public final class ClientMarketplaceStatus {
 		balanceCents = 0L;
 		inventoryCents = 0L;
 		traderPrices = TraderPrices.empty();
+		worldSeed = 0L;
+		gameTime = 0L;
+		PriceDrift.clear();
 	}
 
 	private static TraderPrices toTraderPrices(List<MarketplaceStatusPayload.SaleEntry> entries) {
