@@ -1,5 +1,6 @@
 package com.chr0m4ik.marketplace.market;
 
+import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
@@ -36,8 +37,13 @@ public final class MarketService {
 	/** Сколько ячеек открыто сразу, без покупки. */
 	public static final int FREE_SLOTS = 5;
 
-	/** Наценки, между которыми переключается игрок. */
-	public static final double[] MARKUPS = {1.0, 1.25, 1.5, 1.75, 2.0};
+	/**
+	 * Наценки, между которыми переключается игрок (x1…x2). Лежат в
+	 * {@code data/marketplace/economy.json}, поэтому заказчик может их менять без пересборки.
+	 */
+	public static double[] markups() {
+		return EconomyConfig.marketMarkups();
+	}
 
 	/** Цена первого покупаемого слота. */
 	private static final double SLOT_BASE_PRICE = 200.0;
@@ -146,13 +152,15 @@ public final class MarketService {
 
 	/** Следующая наценка по кругу: x1 → x1,25 → x1,5 → x1,75 → x2 → x1. */
 	public static double nextMarkup(double current) {
-		for (int i = 0; i < MARKUPS.length; i++) {
-			if (MARKUPS[i] > current + 0.001) {
-				return MARKUPS[i];
+		double[] markups = markups();
+
+		for (double markup : markups) {
+			if (markup > current + 0.001) {
+				return markup;
 			}
 		}
 
-		return MARKUPS[0];
+		return markups.length == 0 ? 1.0 : markups[0];
 	}
 
 	// --- Магазин: выбор игрока и покупка ---
@@ -246,7 +254,7 @@ public final class MarketService {
 		int amount = kit.isPresent() ? 1 : count;
 		double cost = MoneyFormat.round((kit.isPresent()
 				? KitCatalog.priceOf(kit.get())
-				: ItemPrices.priceOf(state.selected()) * ItemPrices.BUY_MULTIPLIER) * amount);
+				: ItemPrices.priceOf(state.selected()) * EconomyConfig.buyMultiplier()) * amount);
 
 		if (!player.isCreative() && !MarketplaceEconomy.trySpend(server, player.getUUID(), cost)) {
 			return false;

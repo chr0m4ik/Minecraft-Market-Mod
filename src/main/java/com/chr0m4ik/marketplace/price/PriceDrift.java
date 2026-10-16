@@ -30,17 +30,21 @@ import net.minecraft.world.item.Item;
  * <p>Считается лениво — только когда у предмета спрашивают цену. Никаких пересчётов
  * «для всех предметов каждый тик».
  *
- * <p><b>Настройка.</b> Всё, что заказчик может захотеть поправить, собрано в константах
- * {@link #AMPLITUDE} и {@link Wave}: добавь или убери строку в {@link #WAVES} — и характер
- * дрейфа изменится. Сумма весов волн нормализуется, поэтому итог всегда в пределах амплитуды,
- * сколько бы волн ни было.
+ * <p><b>Настройка.</b> Амплитуда дрейфа лежит в {@code data/marketplace/economy.json}
+ * ({@code drift_amplitude}) — заказчик может менять её без пересборки. Характер дрейфа задаётся
+ * волнами {@link Wave}: добавь или убери строку в {@link #WAVES} — и он изменится. Сумма весов
+ * волн нормализуется, поэтому итог всегда в пределах амплитуды, сколько бы волн ни было.
  */
 public final class PriceDrift {
 	/**
-	 * Амплитуда дрейфа: доля от базовой цены. 0.03 — это «база минус 3% … база плюс 3%».
-	 * Именно на неё умножается итог, поэтому больше амплитуды значение быть не может.
+	 * Амплитуда дрейфа: доля от базовой цены, например 0.03 — это «база минус 3% … база плюс 3%».
+	 * Значение берётся из {@code data/marketplace/economy.json} (поле {@code drift_amplitude}) —
+	 * см. {@link com.chr0m4ik.marketplace.economy.EconomyConfig}. Именно на неё умножается итог,
+	 * поэтому больше амплитуды значение быть не может.
 	 */
-	public static final double AMPLITUDE = 0.03;
+	public static double amplitude() {
+		return com.chr0m4ik.marketplace.economy.EconomyConfig.driftAmplitude();
+	}
 
 	/**
 	 * Одна волна дрейфа.
@@ -109,8 +113,8 @@ public final class PriceDrift {
 	}
 
 	/**
-	 * Множитель микро-дрейфа для предмета: от {@code 1 - }{@link #AMPLITUDE} до
-	 * {@code 1 + }{@link #AMPLITUDE}. Пока данных о мире нет — ровно 1.0.
+	 * Множитель микро-дрейфа для предмета: от {@code 1 - }{@link #amplitude()} до
+	 * {@code 1 + }{@link #amplitude()}. Пока данных о мире нет — ровно 1.0.
 	 */
 	public static double multiplier(Item item) {
 		if (!ready) {
@@ -130,7 +134,7 @@ public final class PriceDrift {
 	}
 
 	/**
-	 * Отклонение цены от базы (доля): всегда в пределах ±{@link #AMPLITUDE}.
+	 * Отклонение цены от базы (доля): всегда в пределах ±{@link #amplitude()}.
 	 * Чистая функция — именно её сравнивают сервер и клиент.
 	 *
 	 * <p>Считаем только целыми 32-битными числами ({@code int} и переполнение как у {@code int}):
@@ -150,7 +154,7 @@ public final class PriceDrift {
 			sum += wave.weight() * Math.sin(2.0 * Math.PI * phase / wave.period());
 		}
 
-		return AMPLITUDE * sum / TOTAL_WEIGHT;
+		return amplitude() * sum / TOTAL_WEIGHT;
 	}
 
 	/**

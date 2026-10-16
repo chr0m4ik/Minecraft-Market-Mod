@@ -1,6 +1,7 @@
 package com.chr0m4ik.marketplace;
 
 import com.chr0m4ik.marketplace.command.MarketplaceCommands;
+import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
@@ -40,8 +41,10 @@ public class MarketplaceMod implements ModInitializer {
 		MarketplaceMenus.initialize();
 		MarketplaceNetworking.registerServer();
 
-		// Читаем прайс, лимиты и время продажи сразу при загрузке: если файлы повреждены,
-		// это видно в логе, а не при первой сделке.
+		// Читаем прайс, настройки экономики, лимиты и время продажи сразу при загрузке: если файлы
+		// повреждены, это видно в логе, а не при первой сделке. Заодно проверяем, что настройки
+		// не позволяют печатать деньги (купить предмет и продать его же дороже).
+		EconomyConfig.ensureLoaded();
 		ItemPrices.ensureLoaded();
 		TraderLimits.ensureLoaded();
 		SaleTimes.ensureLoaded();

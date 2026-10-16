@@ -1,5 +1,6 @@
 package com.chr0m4ik.marketplace.menu;
 
+import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
@@ -501,7 +502,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		List<Component> lore = new ArrayList<>();
 		double current = this.markupValue();
 
-		for (double markup : MarketService.MARKUPS) {
+		for (double markup : MarketService.markups()) {
 			MutableComponent line = Component.translatable("marketplace.gui.button.price.line", text(markup));
 			lore.add(Math.abs(markup - current) < 0.001 ? line.withStyle(ChatFormatting.GREEN) : line);
 		}
@@ -886,7 +887,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 		MarketService.ShopState shop = MarketService.shop(player.getUUID());
 		double cost = MoneyFormat.round(ItemPrices.priceOf(shop.selected()) * shop.count()
-				* ItemPrices.BUY_MULTIPLIER);
+				* EconomyConfig.buyMultiplier());
 
 		if (MarketService.buy(server, player, shop)) {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.buy.bought",

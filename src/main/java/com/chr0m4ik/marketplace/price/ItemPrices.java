@@ -35,13 +35,16 @@ import java.util.Set;
  * <p>Цены лежат в файле {@code data/marketplace/prices.json} внутри мода. Файл создаётся
  * генератором {@code tools/generate-prices.js} (см. AGENTS.md) и правится руками.
  *
- * <p>Правила торговли, из-за которых перепродажа не приносит денег:
+ * <p>Правила торговли, из-за которых перепродажа не приносит денег (числа лежат в
+ * {@code data/marketplace/economy.json}, читает их
+ * {@link com.chr0m4ik.marketplace.economy.EconomyConfig}):
  * <ul>
- *     <li>купить у рынка — {@link #BUY_MULTIPLIER} от цены (дорого);</li>
- *     <li>продать на рынке — от {@code price} до {@code price * MAX_MARKET_MARKUP} в зависимости от наценки;</li>
- *     <li>сдать торговцу — {@link #TRADER_MULTIPLIER} от цены.</li>
+ *     <li>купить у рынка — {@code buy_multiplier} от цены (дорого);</li>
+ *     <li>продать на рынке — от {@code price} до {@code price × max(наценки)} в зависимости от наценки;</li>
+ *     <li>сдать торговцу — {@code trader_multiplier} от цены.</li>
  * </ul>
- * Так как покупка дороже самой выгодной продажи, «купить — продать» всегда в убыток.
+ * Покупка дороже самой выгодной продажи даже с учётом микро-дрейфа, поэтому «купить — продать»
+ * всегда в убыток. Это же условие проверяется при старте мода.
  *
  * <p>К базовой цене стака добавляется микро-дрейф — фон ±3% ({@link PriceDrift}). Он встроен
  * именно здесь, поэтому работает одинаково везде: покупка в магазине, продажа торговцу, рынок,
@@ -60,15 +63,6 @@ public final class ItemPrices {
 
 	/** Цена предмета, которого нет в прайсе: продать можно за копейку, купить нельзя. */
 	public static final double UNKNOWN_PRICE = 1.0;
-
-	/** Во сколько раз покупка дороже базовой цены. Должно быть больше {@link #MAX_MARKET_MARKUP} с учётом дрейфа. */
-	public static final double BUY_MULTIPLIER = 2.2;
-
-	/** Сколько от базовой цены даёт торговец (мгновенная продажа). */
-	public static final double TRADER_MULTIPLIER = 0.75;
-
-	/** Самая большая наценка на рынке (модификатор x2). */
-	public static final double MAX_MARKET_MARKUP = 2.0;
 
 	/** Насколько глубоко разворачиваем содержимое контейнеров (защита от зацикливания). */
 	private static final int MAX_CONTENT_DEPTH = 8;

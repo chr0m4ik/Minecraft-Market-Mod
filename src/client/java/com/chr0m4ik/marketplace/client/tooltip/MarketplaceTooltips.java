@@ -2,6 +2,7 @@ package com.chr0m4ik.marketplace.client.tooltip;
 
 import com.chr0m4ik.marketplace.client.ClientMarketplaceStatus;
 import com.chr0m4ik.marketplace.client.screen.MarketplaceScreen;
+import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.economy.TraderService;
 import com.chr0m4ik.marketplace.economy.TraderPrices;
@@ -202,10 +203,10 @@ public final class MarketplaceTooltips {
 		int count = MarketService.QUANTITIES[index];
 
 		lines.add(Component.translatable("marketplace.tooltip.buy.unit",
-				money(MoneyFormat.round(ItemPrices.priceOf(stack) * maxStack * ItemPrices.BUY_MULTIPLIER)))
+				money(MoneyFormat.round(ItemPrices.priceOf(stack) * maxStack * EconomyConfig.buyMultiplier())))
 				.withStyle(ChatFormatting.GOLD));
 		lines.add(Component.translatable("marketplace.tooltip.buy.total",
-				money(MoneyFormat.round(ItemPrices.priceOf(stack) * count * ItemPrices.BUY_MULTIPLIER)))
+				money(MoneyFormat.round(ItemPrices.priceOf(stack) * count * EconomyConfig.buyMultiplier())))
 				.withStyle(ChatFormatting.GREEN));
 		return true;
 	}

@@ -1,6 +1,7 @@
 package com.chr0m4ik.marketplace.market;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
+import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -112,27 +113,32 @@ public final class SaleTimes {
 	}
 
 	/**
-	 * Во сколько раз наценка замедляет продажу (задано заказчиком):
-	 * x1 — обычно, x1.25 — в 2 раза, x1.5 — в 5 раз, x1.75 — в 8 раз, x2 — в 10 раз.
+	 * Во сколько раз наценка замедляет продажу (задано заказчиком): x1 — обычно, x1.25 — в 2 раза,
+	 * x1.5 — в 5 раз, x1.75 — в 8 раз, x2 — в 10 раз. Пары «наценка → замедление» лежат в
+	 * {@code data/marketplace/economy.json} ({@code market_markups} и {@code markup_slowdowns}),
+	 * поэтому заказчик может их менять без пересборки. Для наценки между ступенями берётся
+	 * нижняя ступень, для наценки выше самой большой — замедление последней ступени.
 	 */
 	public static double markupSlowdown(double markup) {
-		if (markup >= 2.0) {
-			return 10.0;
+		double[] markups = EconomyConfig.marketMarkups();
+		double[] slowdowns = EconomyConfig.markupSlowdowns();
+		int pairs = Math.min(markups.length, slowdowns.length);
+
+		if (pairs == 0) {
+			return 1.0;
 		}
 
-		if (markup >= 1.75) {
-			return 8.0;
+		double result = slowdowns[0];
+
+		for (int i = 0; i < pairs; i++) {
+			if (markup + 1e-9 < markups[i]) {
+				break;
+			}
+
+			result = slowdowns[i];
 		}
 
-		if (markup >= 1.5) {
-			return 5.0;
-		}
-
-		if (markup >= 1.25) {
-			return 2.0;
-		}
-
-		return 1.0;
+		return result;
 	}
 
 	/**

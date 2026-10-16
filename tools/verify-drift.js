@@ -14,9 +14,13 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const RESOURCES = join(here, '..', 'src', 'main', 'resources', 'data', 'marketplace');
 
-// --- Настройки: должны совпадать с константами в PriceDrift.java ---
-const AMPLITUDE = 0.03;
+// --- Настройки: берём из data/marketplace/economy.json, как Java (EconomyConfig) ---
+const economy = JSON.parse(readFileSync(join(RESOURCES, 'economy.json'), 'utf8'));
+const AMPLITUDE = economy.drift_amplitude ?? 0.03;
+const BUY_MULTIPLIER = economy.buy_multiplier ?? 2.2;
+const TRADER_MULTIPLIER = economy.trader_multiplier ?? 0.75;
 const WAVES = [
 	{ weight: 0.50, period: 24_000, phaseSalt: 0x9E37 },
 	{ weight: 0.30, period: 6_000, phaseSalt: 0x85EB },
@@ -60,50 +64,54 @@ function multiplier(id, gameTime, seed) {
 }
 
 // Контрольные значения, снятые с настоящего сервера (временный отчёт PriceDriftReport
-// на мире с зерном -8485521596771069071). Если формула здесь разойдётся с PriceDrift.java,
-// проверка сразу это покажет.
+// на мире с зерном -8485521596771069071) при амплитуде 0,05. Если формула здесь разойдётся
+// с PriceDrift.java, проверка сразу это покажет.
 //
-// Поправка на амплитуду: сервер печатал множители при амплитуде 0,05. После перехода на 0,03
-// волнистая часть формулы не изменилась, а сама амплитуда — общий множитель, поэтому старые
-// значения пересчитаны точно: новое = 1 + (старое − 1) × 0,03 / 0,05 = 1 + (старое − 1) × 0,6.
+// Поправка на амплитуду: волнистая часть формулы не зависит от амплитуды, а сама амплитуда —
+// общий множитель, поэтому при другой амплитуде значения пересчитываются точно:
+// ожидаемое = 1 + (записанное − 1) × амплитуда / 0,05.
+const RECORDED_AMPLITUDE = 0.05;
 const REAL_SEED = -8485521596771069071n;
 const REAL_VALUES = [
-	{ id: 'minecraft:diamond', time: 0, expected: 1.018065 },
-	{ id: 'minecraft:apple', time: 0, expected: 1.016302 },
-	{ id: 'minecraft:netherite_ingot', time: 0, expected: 1.000332 },
-	{ id: 'minecraft:coal', time: 0, expected: 0.982428 },
-	{ id: 'minecraft:shulker_box', time: 0, expected: 0.984429 },
-	{ id: 'minecraft:diamond', time: 72_000, expected: 1.018065 },
-	{ id: 'minecraft:apple', time: 72_000, expected: 1.016302 },
-	{ id: 'minecraft:netherite_ingot', time: 72_000, expected: 1.000332 },
-	{ id: 'minecraft:coal', time: 72_000, expected: 0.982428 },
-	{ id: 'minecraft:shulker_box', time: 72_000, expected: 0.984429 },
-	{ id: 'minecraft:diamond', time: 583_777, expected: 0.984346 },
-	{ id: 'minecraft:apple', time: 583_777, expected: 0.970378 },
-	{ id: 'minecraft:netherite_ingot', time: 583_777, expected: 1.013153 },
-	{ id: 'minecraft:coal', time: 583_777, expected: 0.996620 },
-	{ id: 'minecraft:shulker_box', time: 583_777, expected: 0.993867 },
+	{ id: 'minecraft:diamond', time: 0, expected: 1.030108 },
+	{ id: 'minecraft:apple', time: 0, expected: 1.027170 },
+	{ id: 'minecraft:netherite_ingot', time: 0, expected: 1.000553 },
+	{ id: 'minecraft:coal', time: 0, expected: 0.970713 },
+	{ id: 'minecraft:shulker_box', time: 0, expected: 0.974049 },
+	{ id: 'minecraft:diamond', time: 72_000, expected: 1.030108 },
+	{ id: 'minecraft:apple', time: 72_000, expected: 1.027170 },
+	{ id: 'minecraft:netherite_ingot', time: 72_000, expected: 1.000553 },
+	{ id: 'minecraft:coal', time: 72_000, expected: 0.970713 },
+	{ id: 'minecraft:shulker_box', time: 72_000, expected: 0.974049 },
+	{ id: 'minecraft:diamond', time: 583_777, expected: 0.973910 },
+	{ id: 'minecraft:apple', time: 583_777, expected: 0.950630 },
+	{ id: 'minecraft:netherite_ingot', time: 583_777, expected: 1.021922 },
+	{ id: 'minecraft:coal', time: 583_777, expected: 0.994366 },
+	{ id: 'minecraft:shulker_box', time: 583_777, expected: 0.989778 },
 ];
+
+/** Пересчёт записанного значения на текущую амплитуду. */
+const scale = (recorded) => 1 + (recorded - 1) * AMPLITUDE / RECORDED_AMPLITUDE;
 
 const seed = REAL_SEED;
 const items = [
 	{ id: 'minecraft:diamond', price: 5000 },
 	{ id: 'minecraft:apple', price: 1000 },
-	{ id: 'minecraft:netherite_ingot', price: 88600 },
+	{ id: 'minecraft:netherite_ingot', price: 105513 },
 	{ id: 'minecraft:coal', price: 50 },
 	{ id: 'minecraft:shulker_box', price: 100000000 },
 ];
 const times = [0, 72_000, 583_777];
 
 console.log('=== Множители дрейфа (5 предметов × 3 момента времени) ===');
-console.log(`зерно мира: ${seed}`);
-console.log('предмет                     тик      множитель    отклонение      покупка x2.2     торговец x0.75');
+console.log(`зерно мира: ${seed}, амплитуда ±${(AMPLITUDE * 100).toFixed(1)}%`);
+console.log(`предмет                     тик      множитель    отклонение      покупка x${BUY_MULTIPLIER}     торговец x${TRADER_MULTIPLIER}`);
 
 for (const time of times) {
 	for (const item of items) {
 		const m = multiplier(item.id, time, seed);
-		const buy = item.price * m * 2.2;
-		const trader = item.price * m * 0.75;
+		const buy = item.price * m * BUY_MULTIPLIER;
+		const trader = item.price * m * TRADER_MULTIPLIER;
 
 		console.log(`${item.id.padEnd(27)} ${String(time).padStart(6)}  x${m.toFixed(6)}  `
 			+ `${((m - 1) * 100).toFixed(3).padStart(8)}%  ${buy.toFixed(2).padStart(16)}  ${trader.toFixed(2).padStart(16)}`);
@@ -111,13 +119,15 @@ for (const time of times) {
 }
 
 console.log('\n=== Проверка контрольных значений с сервера ===');
+console.log(`записаны при амплитуде ±${(RECORDED_AMPLITUDE * 100).toFixed(1)}%, пересчитаны на текущую`);
 let exact = true;
 
 for (const check of REAL_VALUES) {
 	const value = multiplier(check.id, check.time, REAL_SEED);
-	const ok = Math.abs(value - check.expected) < 5e-7; // на сервере числа печатались с 6 знаками
+	const expected = scale(check.expected);
+	const ok = Math.abs(value - expected) < 5e-7; // на сервере числа печатались с 6 знаками
 	exact = exact && ok;
-	console.log(`${check.id} @ ${check.time}: здесь x${value.toFixed(6)}, на сервере x${check.expected.toFixed(6)} — ${ok ? 'совпало' : 'РАСХОЖДЕНИЕ'}`);
+	console.log(`${check.id} @ ${check.time}: здесь x${value.toFixed(6)}, ожидается x${expected.toFixed(6)} — ${ok ? 'совпало' : 'РАСХОЖДЕНИЕ'}`);
 }
 
 console.log('\n=== Полный перебор: все предметы прайса × полный цикл волн ===');

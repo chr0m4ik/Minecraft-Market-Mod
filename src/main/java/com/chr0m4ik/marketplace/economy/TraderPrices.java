@@ -106,7 +106,7 @@ public final class TraderPrices {
 			return 0.0;
 		}
 
-		double normal = price(stack) * ItemPrices.TRADER_MULTIPLIER;
+		double normal = price(stack) * EconomyConfig.traderMultiplier();
 		double perItem = ItemPrices.priceOf(stack.getItem()) * DISCOUNT_PER_STACK * soldStacks(stack.getItem());
 		double discount = Math.min(perItem * stack.getCount(), normal * MAX_DISCOUNT);
 		return Math.max(0.0, normal - discount);

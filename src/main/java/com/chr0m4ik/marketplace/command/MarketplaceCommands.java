@@ -1,5 +1,6 @@
 package com.chr0m4ik.marketplace.command;
 
+import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
@@ -288,15 +289,15 @@ public final class MarketplaceCommands {
 
 		if (ItemPrices.isBuyable(item)) {
 			source.sendSuccess(() -> Component.translatable("marketplace.command.price.buy",
-					money(total * ItemPrices.BUY_MULTIPLIER)), false);
+					money(total * EconomyConfig.buyMultiplier())), false);
 		} else {
 			source.sendSuccess(() -> Component.translatable("marketplace.command.price.cannotBuy")
 					.withStyle(ChatFormatting.GRAY), false);
 		}
 
 		source.sendSuccess(() -> Component.translatable("marketplace.command.price.sell",
-				money(total), money(total * ItemPrices.MAX_MARKET_MARKUP),
-				money(total * ItemPrices.TRADER_MULTIPLIER)), false);
+				money(total), money(total * EconomyConfig.maxMarketMarkup()),
+				money(total * EconomyConfig.traderMultiplier())), false);
 
 		if (!ItemPrices.isLoaded()) {
 			source.sendSuccess(() -> Component.translatable("marketplace.command.price.notLoaded")
@@ -342,12 +343,12 @@ public final class MarketplaceCommands {
 						multiplier >= 1.0 ? ChatFormatting.GREEN : ChatFormatting.RED),
 				percent(multiplier - 1.0)).withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.drift.unit",
-				money(unit), Component.literal(String.format("%.1f", PriceDrift.AMPLITUDE * 100.0)))
+				money(unit), Component.literal(String.format("%.1f", PriceDrift.amplitude() * 100.0)))
 				.withStyle(ChatFormatting.WHITE), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.drift.buy",
-				money(unit * ItemPrices.BUY_MULTIPLIER)), false);
+				money(unit * EconomyConfig.buyMultiplier())), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.drift.trader",
-				money(unit * ItemPrices.TRADER_MULTIPLIER)), false);
+				money(unit * EconomyConfig.traderMultiplier())), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.drift.time",
 				Component.literal(String.valueOf(moment)), Component.literal(String.valueOf(seed)))
 				.withStyle(ChatFormatting.DARK_GRAY), false);
