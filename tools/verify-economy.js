@@ -474,7 +474,9 @@ console.log(`минимум обычный: ${percent(Math.min(...profits))} (${
 // 3. Наборы: цена набора против распродажи содержимого.
 // ---------------------------------------------------------------------------
 const KIT_DISCOUNT_OLD = 0.95;
-const KIT_MARKUP_NEW = 1.02;
+// Решение заказчика: цена набора = цена шлякера + цена содержимого × 1,2 (множитель покупки
+// магазина к наборам не применяется). Совпадает с market/KitCatalog.java (CONTENT_MARKUP).
+const KIT_CONTENT_MARKUP = 1.2;
 const SHULKER_COLORS = {
 	pvp_pro: 'light_blue', pvp_extra: 'blue', pvp_crystal: 'purple', miner_dream: 'gray',
 	lumberjack_dream: 'green', builder: 'yellow', glutton: 'orange', pro_set: 'cyan',
@@ -505,7 +507,8 @@ for (const kit of kits) {
 	const coloredShulker = basePrice(coloredId);
 	const shulkerSum = kit.shulkers * coloredShulker;
 	const oldPrice = (contents + kit.shulkers * basePrice('minecraft:shulker_box')) * KIT_DISCOUNT_OLD;
-	const newPrice = (contents + shulkerSum) * KIT_MARKUP_NEW;
+	// Новая формула: наценка 1,2 только на содержимое, шлякеры — по своей цене.
+	const newPrice = contents * KIT_CONTENT_MARKUP + shulkerSum;
 	const resaleX1 = contents + shulkerSum;
 
 	kitRows.push({ kit, contents, coloredId, coloredShulker, oldPrice, newPrice, resaleX1, resaleX2: resaleX1 * MAX_MARKUP });
@@ -516,7 +519,7 @@ for (const row of kitRows) {
 		+ (row.kit.shulkers > 0 ? `, ${row.coloredId} = ${money(row.coloredShulker)}` : ''));
 	console.log(`    содержимое:          ${money(row.contents)}`);
 	console.log(`    цена была (×0,95):   ${money(row.oldPrice)}`);
-	console.log(`    цена стала (×1,02):  ${money(row.newPrice)}`);
+	console.log(`    цена стала (×1,2):   ${money(row.newPrice)}`);
 	console.log(`    распродажа x1:       ${money(row.resaleX1)}  → итог ${percent(row.resaleX1 / row.newPrice - 1)}`);
 	console.log(`    распродажа x2:       ${money(row.resaleX2)}  → итог ${percent(row.resaleX2 / row.newPrice - 1)}`
 		+ ` (ордеров на рынке: ${row.kit.shulkers + (row.kit.items ?? []).length})`);
@@ -530,14 +533,15 @@ for (const row of kitRows.filter((value) => ['pvp_pro', 'pvp_extra', 'legendary_
 }
 
 // ---------------------------------------------------------------------------
-// Вариант, который закрывает дыру на x2: набор продаётся как покупка, то есть
-// его цена идёт через buy_multiplier (и та же наценка 2% сверху). Показан для сравнения —
-// в моде НЕ включён, это предложение.
+// Наценка x2 на содержимое набора даёт прибыль (выплата ×2 против цены ×1,2). Заказчик оставил
+// это осознанно: время продажи ордера складывается со временем всего содержимого, а наценка ×2
+// замедляет продажу в 10 раз (см. market/SaleTimes.java) — прибыль «заморожена» во времени.
+// Ниже — сколько это в часах, и вариант, который закрывал бы дыру полностью (в моде НЕ включён).
 // ---------------------------------------------------------------------------
-console.log('\n--- вариант «цена набора = содержимое × buy_multiplier × 1,02» (в моде не включён) ---');
+console.log('\n--- вариант «цена набора = содержимое × buy_multiplier × 1,2» (в моде не включён) ---');
 
 for (const row of kitRows.filter((value) => ['pvp_pro', 'pvp_extra', 'legendary_set'].includes(value.kit.id))) {
-	const price = row.resaleX1 * BUY * KIT_MARKUP_NEW;
+	const price = row.resaleX1 * BUY * KIT_CONTENT_MARKUP;
 	console.log(`  ${row.kit.id}: цена ${money(price)} — распродажа x1 ${percent(row.resaleX1 / price - 1)},`
 		+ ` x2 ${percent(row.resaleX2 / price - 1)}`);
 }

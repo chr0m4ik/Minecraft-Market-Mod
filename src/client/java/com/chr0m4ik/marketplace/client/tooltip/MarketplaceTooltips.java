@@ -6,6 +6,7 @@ import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.economy.TraderService;
 import com.chr0m4ik.marketplace.economy.TraderPrices;
+import com.chr0m4ik.marketplace.market.KitCatalog;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenu;
 import com.chr0m4ik.marketplace.menu.WindowKind;
@@ -14,6 +15,7 @@ import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -88,7 +90,39 @@ public final class MarketplaceTooltips {
 			}
 		}
 
+		// Иконка набора — шлякер, но цена у неё не шлякерная: см. KitCatalog.priceOf.
+		if (addKitPrice(lines, stack)) {
+			return;
+		}
+
 		addBasePriceLines(lines, stack);
+	}
+
+	/**
+	 * Цена набора для иконки из магазина: покупается набор, а не шлякер, и множитель покупки
+	 * магазина к наборам не применяется.
+	 *
+	 * @return {@code false}, если это не предмет набора
+	 */
+	private static boolean addKitPrice(List<Component> lines, ItemStack stack) {
+		if (KitCatalog.kitId(stack).isEmpty()) {
+			return false;
+		}
+
+		// Зачарования и зелья набора берутся из реестров мира: без них цена была бы меньше.
+		ClientLevel level = Minecraft.getInstance().level;
+
+		if (level == null) {
+			return false;
+		}
+
+		KitCatalog.setRegistriesIfMissing(level.registryAccess());
+
+		return KitCatalog.kitOf(stack).map(kit -> {
+			lines.add(Component.translatable("marketplace.tooltip.buy.kit",
+					money(MoneyFormat.round(KitCatalog.priceOf(kit)))).withStyle(ChatFormatting.GOLD));
+			return true;
+		}).orElse(false);
 	}
 
 	/** Подсказка для ячейки рынка: обычная цена, наценка и как забрать предмет. */
@@ -200,6 +234,11 @@ public final class MarketplaceTooltips {
 			MarketplaceMenu menu, ItemStack stack) {
 		if (screen.getHoveredSlotIndex() != MarketplaceMenu.BUY_ITEM_PREVIEW || stack.isEmpty()) {
 			return false;
+		}
+
+		// У набора своя цена: количество и множитель покупки к нему не применяются.
+		if (addKitPrice(lines, stack)) {
+			return true;
 		}
 
 		int maxStack = Math.max(1, stack.getItem().getDefaultMaxStackSize());

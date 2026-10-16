@@ -135,8 +135,9 @@
 	"marketplace.gui.buy.bought": "Bought: %s pcs — %s for %s",
 	"marketplace.gui.buy.noMoney": "Not enough money: the purchase costs %s",
 	"marketplace.tooltip.buy.unit": "Price per stack: %s",
-	"marketplace.tooltip.buy.total": "For all: %s"
-,	"marketplace.gui.category.arrows": "Arrows",
+	"marketplace.tooltip.buy.total": "For all: %s",
+	"marketplace.tooltip.buy.kit": "Kit price: %s (shulker + contents ×1.2)",
+	"marketplace.gui.category.arrows": "Arrows",
 	"marketplace.gui.category.books": "Enchanted books",
 	"marketplace.gui.category.spawnEggs": "Spawn eggs and spawners"
 ,	"marketplace.gui.category.other": "Other"

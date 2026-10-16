@@ -135,8 +135,9 @@
 	"marketplace.gui.buy.bought": "Куплено: %s шт. — %s за %s",
 	"marketplace.gui.buy.noMoney": "Не хватает денег: покупка стоит %s",
 	"marketplace.tooltip.buy.unit": "Цена за стак: %s",
-	"marketplace.tooltip.buy.total": "За всё: %s"
-,	"marketplace.gui.category.arrows": "Стрелы",
+	"marketplace.tooltip.buy.total": "За всё: %s",
+	"marketplace.tooltip.buy.kit": "Цена набора: %s (шлякер + содержимое ×1,2)",
+	"marketplace.gui.category.arrows": "Стрелы",
 	"marketplace.gui.category.books": "Книги зачарований",
 	"marketplace.gui.category.spawnEggs": "Яйца призыва и спавнеры"
 ,	"marketplace.gui.category.other": "Прочее"
