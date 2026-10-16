@@ -22,3 +22,6 @@ tools/craft-cheats.txt
 *.iml
 .idea/
 bin/
+
+# Артефакты исследований (декомпиляция, исходники модов)
+.research/
