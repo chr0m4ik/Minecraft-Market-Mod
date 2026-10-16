@@ -81,8 +81,18 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Сколько всего ячеек данных синхронизируется с клиентом. */
 	private static final int DATA_SIZE = HEADER_SIZE + MarketService.SLOTS * 2;
 
-	/** С какого места в данных начинаются минуты до конца продажи по каждой ячейке. */
+	/**
+	 * С какого места в данных начинается состояние ячеек рынка: {@link #CELL_ORDER} — в ячейке
+	 * подтверждённый ордер, {@link #CELL_FREE} — нет. По этому признаку клиент запрещает брать
+	 * выставленный предмет мышкой (подробности — {@link #isCellOrder}).
+	 */
 	private static final int CELL_DATA_START = HEADER_SIZE;
+
+	/** В ячейке лежит подтверждённый ордер. */
+	private static final int CELL_ORDER = 1;
+
+	/** Подтверждённого ордера в ячейке нет. */
+	private static final int CELL_FREE = 0;
 
 	/** Где лежат номер страницы магазина, всего страниц и номер раздела. */
 	private static final int PAGE_DATA = HEADER_SIZE;
@@ -229,7 +239,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				this.orderCells.add(i);
 			}
 
-			this.tradeContainer.setItem(i, order != null ? order.stack() : (staged == null ? ItemStack.EMPTY : staged));
+			// Копия: слот контейнера не должен держать тот же объект, что лежит в сейве,
+			// иначе случайное изменение стака в окне испортило бы сам ордер.
+			this.tradeContainer.setItem(i, order != null ? order.stack().copy()
+					: (staged == null ? ItemStack.EMPTY : staged.copy()));
 		}
 	}
 
@@ -252,11 +265,25 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	}
 
 	/**
-	 * Лежит ли в ячейке подтверждённый ордер. Такую ячейку нельзя утащить мышкой —
-	 * сначала нужно включить кнопку-мишень и нажать shift.
+	 * Лежит ли в ячейке подтверждённый ордер. Такую ячейку нельзя ни утащить мышкой, ни
+	 * перетащить, ни выбросить: предмет снимается только в режиме-мишени по Shift + ПКМ
+	 * (см. {@link #clicked}).
+	 *
+	 * <p>На сервере истина — в сейве мира (там лежат ордера). Клиент сейва не видит, поэтому
+	 * получает признак ячейки данными окна, которые обновляются каждый тик в {@link #updateData}.
 	 */
 	public boolean isCellOrder(int cell) {
-		return cell >= 0 && cell < MarketService.SLOTS && this.getCellMinutes(cell) >= 0;
+		if (cell < 0 || cell >= MarketService.SLOTS) {
+			return false;
+		}
+
+		if (this.serverPlayer != null) {
+			MinecraftServer server = this.serverPlayer.level().getServer();
+			return server != null
+					&& MarketplaceEconomy.state(server).order(this.serverPlayer.getUUID(), cell) != null;
+		}
+
+		return this.data.get(CELL_DATA_START + cell) == CELL_ORDER;
 	}
 
 	/** Сохраняет то, что игрок разложил по ячейкам, в сейв (кроме подтверждённых ордеров). */
@@ -287,9 +314,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 	/**
 	 * Забрать предмет из ячейки рынка. Неподтверждённый предмет забирается свободно,
-	 * а подтверждённый ордер — только когда включён безопасный режим (кнопка-мишень).
+	 * а подтверждённый ордер — только когда включён безопасный режим (кнопка-мишень)
+	 * и только по Shift + ПКМ.
+	 *
+	 * @param rightButton нажата ли правая кнопка мыши (Shift + ПКМ)
 	 */
-	private void takeMarketCell(Player player, int cell) {
+	private void takeMarketCell(Player player, int cell, boolean rightButton) {
 		if (this.serverPlayer == null || cell < 0 || cell >= this.kind.tradeSlots()
 				|| !this.isCellUnlocked(cell)) {
 			return;
@@ -301,14 +331,15 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		ItemStack stack;
 
 		if (order != null) {
-			if (!this.targetMode) {
+			if (!this.targetMode || !rightButton) {
 				player.sendSystemMessage(Component.translatable("marketplace.gui.market.needTarget")
 						.withStyle(ChatFormatting.RED));
 				return;
 			}
 
 			state.removeOrder(playerId, cell);
-			stack = order.stack();
+			// Копия: сейв ордера очищен, но сам стак всё ещё нужен игроку.
+			stack = order.stack().copy();
 			player.sendSystemMessage(Component.translatable("marketplace.gui.market.cancelled",
 					stack.getHoverName()).withStyle(ChatFormatting.YELLOW));
 		} else {
@@ -348,7 +379,16 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				expected = lockedPane();
 				this.orderCells.remove(i);
 			} else if (state.order(playerId, i) != null) {
-				expected = state.order(playerId, i).stack();
+				expected = state.order(playerId, i).stack().copy();
+				// Страховка от потери предметов: если в ячейке с ордером оказалось что-то
+				// другое (например, окно разошлось с сейвом), вернём это игроку, а не затрём.
+				ItemStack current = this.tradeContainer.getItem(i);
+
+				if (!current.isEmpty() && !ItemStack.matches(current, expected)) {
+					this.tradeContainer.setItem(i, ItemStack.EMPTY);
+					this.serverPlayer.getInventory().placeItemBackInInventory(current, Prediction.SERVER_ONLY);
+				}
+
 				this.orderCells.add(i);
 			} else if (this.orderCells.remove(i)) {
 				// Ордер продался, пока окно открыто: ячейку сразу освобождаем,
@@ -593,11 +633,26 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
-		// Shift-клик по ячейке рынка: забрать предмет или снять ордер.
-		if (input == ContainerInput.QUICK_MOVE && this.hasMarketCells()
-				&& slotId >= 0 && slotId < this.kind.tradeSlots()) {
-			this.takeMarketCell(player, slotId);
-			return;
+		// Ячейки рынка: у них своё управление, поэтому разбираем их до обычных слотов.
+		if (this.hasMarketCells() && slotId >= 0 && slotId < this.kind.tradeSlots()) {
+			boolean order = this.isCellOrder(slotId);
+
+			if (input == ContainerInput.QUICK_MOVE) {
+				// Shift + ПКМ по ячейке с ордером — снять ордер (только в режиме-мишени).
+				// Shift + ЛКМ забирает лишь неподтверждённые предметы: их ещё нет в сейве.
+				if (!order || button == 1) {
+					this.takeMarketCell(player, slotId, button == 1);
+				}
+
+				return;
+			}
+
+			if (order) {
+				// Выставленный предмет нельзя ни поднять курсором, ни перетащить, ни выбросить:
+				// ордер лежит в сейве мира, и «взятый» предмет вернулся бы в ячейку при
+				// следующей перерисовке — то есть просто продублировался бы.
+				return;
+			}
 		}
 
 		super.clicked(slotId, button, input, player);
@@ -778,11 +833,16 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		long now = GameTime.now(server);
 		double markup = state.markup(playerId);
 		int created = 0;
+		List<ItemStack> leftovers = new ArrayList<>();
 
 		for (Map.Entry<Integer, ItemStack> entry : Map.copyOf(staged).entrySet()) {
 			if (MarketService.placeOrder(state, playerId, entry.getKey(), entry.getValue(), markup, now,
 					server.overworld().getRandom()) != null) {
 				created++;
+			} else {
+				// Ячейка оказалась занята или закрыта — предмет возвращаем в инвентарь,
+				// а не теряем вместе с очисткой неподтверждённого списка.
+				leftovers.add(entry.getValue().copy());
 			}
 		}
 
@@ -790,6 +850,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		// Наценку сбрасываем: по умолчанию всегда x1.
 		state.setMarkup(playerId, 1.0);
 		MarketplaceMenus.open(player, WindowKind.SELL);
+
+		for (ItemStack stack : leftovers) {
+			player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+			player.sendSystemMessage(Component.translatable("marketplace.gui.market.leftover",
+					stack.getHoverName()).withStyle(ChatFormatting.RED));
+		}
 
 		if (created > 0) {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.market.listed",
@@ -977,8 +1043,9 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 			if (!transition) {
 				for (int i = 0; i < this.kind.tradeSlots(); i++) {
-					// Закрытые ячейки показывают панели — их возвращать нельзя.
-					if (i >= this.getUnlockedSlots() || this.orderCells.contains(i)) {
+					// Закрытые ячейки показывают панели, а ордера живут в сейве мира —
+					// их возвращать нельзя, иначе предмет выдали бы второй раз.
+					if (i >= this.getUnlockedSlots() || this.isCellOrder(i)) {
 						continue;
 					}
 
@@ -1093,25 +1160,16 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.data.set(ORDERS_COUNT_DATA, ordersCount);
 		this.data.set(STAGED_COUNT_DATA, stagedCount);
 
-		// Сколько минут осталось каждому ордеру и с какой наценкой он выставлен.
+		// Состояние ячеек и наценка по каждой из них. Признак «в ячейке ордер» нужен клиенту:
+		// по нему слот запрещает брать выставленный предмет мышкой (см. isCellOrder).
 		for (int i = 0; i < MarketService.SLOTS; i++) {
 			MarketOrder order = state.order(playerId, i);
 			ItemStack staged = state.staging(playerId).get(i);
-			// Время продажи игроку не показываем: пусть это остаётся загадкой.
-			this.data.set(CELL_DATA_START + i, -1);
+			this.data.set(CELL_DATA_START + i, order != null ? CELL_ORDER : CELL_FREE);
 			this.data.set(CELL_MARKUP_START + i,
 					order != null ? (int) Math.round(order.markup() * 100.0)
 							: (staged == null ? 0 : (int) Math.round(state.markup(playerId) * 100.0)));
 		}
-	}
-
-	/** Сколько минут осталось продаваться ордеру в этой ячейке ({@code -1} — ордера нет). */
-	public int getCellMinutes(int cell) {
-		if (cell < 0 || cell >= MarketService.SLOTS) {
-			return -1;
-		}
-
-		return this.data.get(CELL_DATA_START + cell);
 	}
 
 	/** С какой наценкой выставлен предмет в этой ячейке (0 — ячейка пуста). */

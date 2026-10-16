@@ -91,7 +91,7 @@ public final class MarketplaceTooltips {
 		addBasePriceLines(lines, stack);
 	}
 
-	/** Подсказка для ячейки рынка: обычная цена, наценка и время до продажи. */
+	/** Подсказка для ячейки рынка: обычная цена, наценка и как забрать предмет. */
 	private static void addMarketCellLines(List<Component> lines, MarketplaceScreen screen,
 			MarketplaceMenu menu, ItemStack stack) {
 		int cell = screen.getHoveredSlotIndex();
@@ -101,10 +101,10 @@ public final class MarketplaceTooltips {
 			return;
 		}
 
-		int minutes = menu.getCellMinutes(cell);
-
-		if (minutes >= 0) {
-			lines.add(Component.translatable("marketplace.tooltip.market.time", time(minutes))
+		if (menu.isCellOrder(cell)) {
+			// Подтверждённый ордер: он лежит в сейве мира и продаётся сам, забрать —
+			// только в режиме-мишени и только Shift + ПКМ.
+			lines.add(Component.translatable("marketplace.tooltip.market.order")
 					.withStyle(ChatFormatting.AQUA));
 		} else if (!stack.isEmpty()) {
 			lines.add(Component.translatable("marketplace.tooltip.market.staged").withStyle(ChatFormatting.GRAY));
@@ -120,7 +120,11 @@ public final class MarketplaceTooltips {
 					money(ItemPrices.priceOf(stack) * markup)).withStyle(ChatFormatting.GOLD));
 		}
 
-		lines.add(Component.translatable("marketplace.tooltip.market.take").withStyle(ChatFormatting.DARK_GRAY));
+		if (menu.isCellOrder(cell)) {
+			lines.add(Component.translatable("marketplace.tooltip.market.cancel").withStyle(ChatFormatting.DARK_GRAY));
+		} else if (!stack.isEmpty()) {
+			lines.add(Component.translatable("marketplace.tooltip.market.take").withStyle(ChatFormatting.DARK_GRAY));
+		}
 	}
 
 	/** Обычная цена: так платят рынок и покупка. */
@@ -232,15 +236,6 @@ public final class MarketplaceTooltips {
 
 	private static Component markup(double value) {
 		return Component.literal(value == Math.floor(value) ? String.valueOf((int) value) : String.valueOf(value));
-	}
-
-	/** Время до конца продажи: минуты или часы с минутами. */
-	private static Component time(int minutes) {
-		if (minutes < 60) {
-			return Component.translatable("marketplace.time.minutes", count(minutes));
-		}
-
-		return Component.translatable("marketplace.time.hours", count(minutes / 60), count(minutes % 60));
 	}
 
 	private static Component stacks(double amount) {
