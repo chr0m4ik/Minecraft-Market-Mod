@@ -172,8 +172,11 @@ public final class VeinMinerHandler {
 		}
 	}
 
-	/** Руда ли это (см. {@link #ORES}). */
-	private static boolean isOre(Block block) {
+	/**
+	 * Руда ли это (см. {@link #ORES}). Список общий: им пользуются «Жилковый майнер» и «Плавильня»
+	 * (второй — чтобы плавить дроп только руд, а не песка и еды).
+	 */
+	static boolean isOre(Block block) {
 		return ORES.contains(block);
 	}
 

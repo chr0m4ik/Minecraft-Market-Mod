@@ -45,6 +45,9 @@ public final class SpecialCatalog {
 	/** «Магнит»: путь зачарования в нашем пространстве имён. */
 	private static final String MAGNET = "magnet";
 
+	/** «Плавильня»: путь зачарования в нашем пространстве имён. */
+	private static final String SMELTER = "smelter";
+
 	/** Одна книга: зачарование, уровень и цена за штуку. */
 	private record Entry(String path, int level, double price) {
 	}
@@ -53,7 +56,8 @@ public final class SpecialCatalog {
 	 * Все «особые предметы» и их цены. Цены — из ТЗ заказчика:
 	 * «Жилковый майнер» I/II/III — 200 000 000 / 750 000 000 / 1 600 000 000,
 	 * «Бур» I/II/III — 100 000 000 / 600 000 000 / 1 300 000 000,
-	 * «Магнит» I/II — 100 000 000 / 500 000 000.
+	 * «Магнит» I/II — 100 000 000 / 500 000 000,
+	 * «Плавильня» I — 300 000 000.
 	 */
 	private static final List<Entry> ENTRIES = List.of(
 			new Entry(VEIN_MINER, 1, 200_000_000.0),
@@ -63,7 +67,8 @@ public final class SpecialCatalog {
 			new Entry(VEIN_DRILL, 2, 600_000_000.0),
 			new Entry(VEIN_DRILL, 3, 1_300_000_000.0),
 			new Entry(MAGNET, 1, 100_000_000.0),
-			new Entry(MAGNET, 2, 500_000_000.0));
+			new Entry(MAGNET, 2, 500_000_000.0),
+			new Entry(SMELTER, 1, 300_000_000.0));
 
 	private SpecialCatalog() {
 		// Класс только со статическими методами.

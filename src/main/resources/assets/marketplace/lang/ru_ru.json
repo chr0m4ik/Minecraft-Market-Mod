@@ -219,6 +219,12 @@
 	"marketplace.special.magnet.level.1": "До 256 предметов за нажатие",
 	"marketplace.special.magnet.level.2": "До 1024 предметов за нажатие",
 	"marketplace.special.magnet.hint": "Кирка, лопата, топор. Совместимо со всеми зачарованиями, включая «Майнер» и «Бур».",
+
+	"enchantment.marketplace.smelter": "Плавильня",
+	"enchantment.marketplace.smelter.desc": "Дроп добытой руды сразу превращается в результат переплавки. Опыта не даёт.",
+	"marketplace.special.smelter.name.1": "Книга «Плавильня» I",
+	"marketplace.special.smelter.level.1": "Переплавка руды",
+	"marketplace.special.smelter.hint": "Кирка, лопата, топор. Только руды. Несовместимо с «Шёлковым касанием».",
 	"marketplace.gui.category.special": "Особые предметы",
 	"marketplace.tooltip.buy.special": "Особый предмет: %s (цена фиксированная)"
 }

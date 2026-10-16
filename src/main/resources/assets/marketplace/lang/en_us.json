@@ -220,6 +220,12 @@
 	"marketplace.special.magnet.level.1": "Up to 256 items per swing",
 	"marketplace.special.magnet.level.2": "Up to 1024 items per swing",
 	"marketplace.special.magnet.hint": "Pickaxe, shovel, axe. Compatible with every enchantment, including Vein Miner and Drill.",
+
+	"enchantment.marketplace.smelter": "Smelter",
+	"enchantment.marketplace.smelter.desc": "Drops from mined ore are smelted immediately. Grants no experience.",
+	"marketplace.special.smelter.name.1": "Smelter I book",
+	"marketplace.special.smelter.level.1": "Smelts mined ore",
+	"marketplace.special.smelter.hint": "Pickaxe, shovel, axe. Ores only. Incompatible with Silk Touch.",
 	"marketplace.gui.category.special": "Special items",
 	"marketplace.tooltip.buy.special": "Special item: %s (fixed price)"
 }

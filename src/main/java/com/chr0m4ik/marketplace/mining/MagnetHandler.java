@@ -3,12 +3,10 @@ package com.chr0m4ik.marketplace.mining;
 import com.chr0m4ik.marketplace.MarketplaceMod;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Prediction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.level.Level;
 
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -25,16 +23,16 @@ import java.util.WeakHashMap;
  * <p>Ваниль выбрасывает дроп из {@code Block.playerDestroy} → {@code Block.dropResources} →
  * {@code Block.popResource(Level, BlockPos, ItemStack)} — именно там создаётся {@code ItemEntity}.
  * Миксин {@code BlockMixin} встаёт в начало {@code popResource} и отдаёт предмет
- * {@link #absorb(Level, ItemStack)} <b>до</b> создания сущности: что магнит забрал, то в мире не
+ * {@link #absorb(ItemStack)} <b>до</b> создания сущности: что магнит забрал, то в мире не
  * появится вовсе (не «подберётся через тик», а не появится), остаток остаётся в стеке и падает
  * обычным путём.
  *
  * <h2>Откуда берётся игрок</h2>
- * <p>У {@code popResource} игрока нет — только позиция и предмет. Поэтому миксин
- * {@code ServerPlayerGameModeMixin} запоминает игрока на входе в {@code ServerPlayerGameMode.destroyBlock}
+ * <p>У {@code popResource} игрока нет — только позиция и предмет. Поэтому игрок и инструмент
+ * берутся из {@link BreakContext}: он заполняется на входе в {@code ServerPlayerGameMode.destroyBlock}
  * (полный ванильный цикл ломания блока, через него же ломают «Жилковый майнер» и «Бур»)
- * и очищает на выходе. Это даёт ещё одно важное свойство: магнит видит <b>всю</b> цепочку ломания —
- * и блок, который сломал игрок, и все блоки, которые за него сломали наши зачарования.
+ * и очищается на выходе. Это даёт ещё одно важное свойство: магнит видит <b>всю</b> цепочку
+ * ломания — и блок, который сломал игрок, и все блоки, которые за него сломали наши зачарования.
  *
  * <h2>Лимит за нажатие</h2>
  * <p>Запас магнита — это счётчик предметов, сброшенный на новом нажатии игрока. Нажатием считается
@@ -54,18 +52,6 @@ public final class MagnetHandler {
 
 	/** Сколько предметов за одно нажатие уходит в инвентарь: уровень 1 — 256, уровень 2 — 1024. */
 	private static final int[] LIMIT_BY_LEVEL = { 0, 256, 1024 };
-
-	/**
-	 * Кто сейчас ломает блок и чем. Заполняется на входе в {@code destroyBlock} и очищается на
-	 * выходе, поэтому дроп вне ломания блока игроком (взрывы, сущности, воронки) не трогаем.
-	 */
-	private static ServerPlayer breaker;
-
-	/** Инструмент, которым игрок начал это нажатие (по нему считаем уровень магнита). */
-	private static ItemStack breakerTool = ItemStack.EMPTY;
-
-	/** Вложенность {@code destroyBlock}: 0 — снаружи, 1 и больше — ломаем мы сами. */
-	private static int breakDepth;
 
 	/** Остаток магнита у игрока: сколько предметов ещё можно убрать в инвентарь. */
 	private static final class Session {
@@ -89,33 +75,18 @@ public final class MagnetHandler {
 	}
 
 	// ---------------------------------------------------------------------------------------------
-	// Ломание блока: кто и чем
+	// Ломание блока: запас на нажатие
 
-	/** Игрок начал (или продолжил вложенно) ломать блок. Вызывается из миксина {@code destroyBlock}. */
-	public static void beginBreak(ServerPlayer player) {
-		if (breakDepth == 0) {
-			breaker = player;
-			breakerTool = player.getMainHandItem();
-
-			// Новое нажатие игрока: запас магнита восстанавливается. Слои «Бура» ломаются своими
-			// вызовами destroyBlock, но под его флагом — для них запас продолжается, иначе куб
-			// получал бы новые 256/1024 предметов на каждый слой.
-			if (!DrillHandler.isActive()) {
-				startAction(player);
-			}
-		}
-
-		breakDepth++;
-	}
-
-	/** Игрок закончил ломать блок (в том числе неудачно). Вызывается из миксина {@code destroyBlock}. */
-	public static void endBreak() {
-		breakDepth--;
-
-		if (breakDepth <= 0) {
-			breakDepth = 0;
-			breaker = null;
-			breakerTool = ItemStack.EMPTY;
+	/**
+	 * Игрок начал новое нажатие (самое внешнее ломание блока). Вызывается из миксина
+	 * {@code ServerPlayerGameModeMixin} через {@link BreakContext}.
+	 */
+	public static void onSwingStart(ServerPlayer player) {
+		// Слои «Бура» ломаются своими вызовами destroyBlock каждый тик, но под его флагом — это всё
+		// ещё одно нажатие, поэтому запас на них не сбрасывается, иначе куб получал бы новые
+		// 256/1024 предметов на каждый слой.
+		if (!DrillHandler.isActive()) {
+			startAction(player);
 		}
 	}
 
@@ -154,14 +125,14 @@ public final class MagnetHandler {
 	 * предмета. Стек не копируется, а урезается: сколько магнит забрал, столько из него и ушло,
 	 * и остаток ваниль тут же выбросит обычным путём — предмет не теряется и не дублируется.
 	 */
-	public static void absorb(Level level, ItemStack itemStack) {
-		ServerPlayer player = breaker;
+	public static void absorb(ItemStack itemStack) {
+		ServerPlayer player = BreakContext.player();
 
-		if (player == null || itemStack.isEmpty() || !(level instanceof ServerLevel)) {
+		if (player == null || itemStack.isEmpty()) {
 			return;
 		}
 
-		int limit = limit(player, breakerTool);
+		int limit = limit(player, BreakContext.tool());
 
 		if (limit <= 0) {
 			return;   // на инструменте нет магнита — дроп обычный

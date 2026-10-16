@@ -12,6 +12,7 @@ import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.mining.DiagDrillCommand;
 import com.chr0m4ik.marketplace.mining.DrillHandler;
 import com.chr0m4ik.marketplace.mining.MagnetHandler;
+import com.chr0m4ik.marketplace.mining.SmelterHandler;
 import com.chr0m4ik.marketplace.mining.VeinMinerHandler;
 import com.chr0m4ik.marketplace.network.MarketplaceNetworking;
 import com.chr0m4ik.marketplace.price.ItemPrices;
@@ -64,8 +65,11 @@ public class MarketplaceMod implements ModInitializer {
 		// «Бур»: инструмент с нашим зачарованием ломает куб вокруг блока — по слою за тик.
 		DrillHandler.register();
 
-		// «Магнит»: дроп сломанных блоков уходит в инвентарь (до 32/96 предметов за нажатие).
+		// «Магнит»: дроп сломанных блоков уходит в инвентарь (до 256/1024 предметов за нажатие).
 		MagnetHandler.register();
+
+		// «Плавильня»: дроп добытой руды сразу превращается в результат переплавки (опыт — ванильный).
+		SmelterHandler.register();
 
 		// ВРЕМЕННО (диагностика проблем 2 и 3): команды проверки бура — форма куба и подходящие
 		// блоки. Убрать вместе с классом DiagDrillCommand после проверки.
