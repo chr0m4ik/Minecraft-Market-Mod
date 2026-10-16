@@ -6,6 +6,8 @@ import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.OminousBottleAmplifier;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
@@ -142,7 +144,7 @@ public final class ItemPrices {
 		}
 
 		ensureLoaded();
-		double price = prices.getOrDefault(stack.getItem(), UNKNOWN_PRICE) * stack.getCount();
+		double price = basePriceOf(stack) * stack.getCount();
 
 		// Зачарования на самом предмете.
 		ItemEnchantments enchantments = stack.get(DataComponents.ENCHANTMENTS);
@@ -162,6 +164,23 @@ public final class ItemPrices {
 		price += contentsPrice(stack, depth);
 
 		return price;
+	}
+
+	/**
+	 * Цена одной штуки. У зелий она считается по ингредиентам варки, у зелья дурного знамения —
+	 * по уровню силы, у всех остальных предметов берётся из прайса.
+	 */
+	private static double basePriceOf(ItemStack stack) {
+		if (stack.has(DataComponents.POTION_CONTENTS)) {
+			return PotionPrices.priceOf(stack);
+		}
+
+		if (stack.is(Items.OMINOUS_BOTTLE)) {
+			OminousBottleAmplifier amplifier = stack.get(DataComponents.OMINOUS_BOTTLE_AMPLIFIER);
+			return PotionPrices.ominousPrice(amplifier == null ? 0 : amplifier.value());
+		}
+
+		return prices.getOrDefault(stack.getItem(), UNKNOWN_PRICE);
 	}
 
 	/** Стоимость того, что лежит внутри предмета (шалкер, мешок). */
