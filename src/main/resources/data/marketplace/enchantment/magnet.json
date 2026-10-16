@@ -1,0 +1,12 @@
+{
+	"description": { "translate": "enchantment.marketplace.magnet" },
+	"supported_items": "#marketplace:vein_tools",
+	"primary_items": "#marketplace:vein_tools",
+	"weight": 1,
+	"max_level": 2,
+	"min_cost": { "base": 25, "per_level_above_first": 15 },
+	"max_cost": { "base": 75, "per_level_above_first": 15 },
+	"anvil_cost": 8,
+	"slots": ["mainhand"],
+	"effects": {}
+}
