@@ -7,6 +7,7 @@ import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.economy.TraderService;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.chr0m4ik.marketplace.market.MarketService;
+import com.chr0m4ik.marketplace.MarketplaceMod;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
 import com.chr0m4ik.marketplace.market.KitCatalog;
 import com.chr0m4ik.marketplace.price.ItemPrices;
@@ -1059,6 +1060,17 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.data.set(6, ordersCount);
 		this.data.set(7, stagedCount);
 
+		// ВРЕМЕННАЯ диагностика цен рынка: печатаем числа, когда они изменились.
+		String stamp = ordersCount + "/" + ordersMoney + "/" + stagedCount + "/" + stagedMoney
+				+ "/" + state.markup(playerId);
+
+		if (!stamp.equals(lastMarketLog)) {
+			lastMarketLog = stamp;
+			MarketplaceMod.LOGGER.info(
+					"Рынок (диагностика): ордера {} шт на {}, неподтверждённые {} шт на {}, наценка x{}",
+					ordersCount, ordersMoney, stagedCount, stagedMoney, state.markup(playerId));
+		}
+
 		// Сколько минут осталось каждому ордеру и с какой наценкой он выставлен.
 		long now = GameTime.now(server);
 
@@ -1173,4 +1185,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	private static Component money(double amount) {
 		return Component.literal(MoneyFormat.format(amount)).withStyle(ChatFormatting.GREEN);
 	}
+
+	/** Последнее напечатанное состояние рынка (временная диагностика). */
+	private static String lastMarketLog;
 }
