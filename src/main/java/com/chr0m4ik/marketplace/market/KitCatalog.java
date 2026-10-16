@@ -11,7 +11,10 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -83,41 +86,68 @@ public final class KitCatalog {
 		return kits;
 	}
 
+	/** Свой цвет названия для каждого набора — так они различаются в списке. */
+	private static ChatFormatting colorOf(Kit kit) {
+		return switch (kit.id()) {
+			case "pvp_pro" -> ChatFormatting.AQUA;
+			case "pvp_extra" -> ChatFormatting.BLUE;
+			case "pvp_crystal" -> ChatFormatting.LIGHT_PURPLE;
+			case "miner_dream" -> ChatFormatting.GRAY;
+			case "lumberjack_dream" -> ChatFormatting.GREEN;
+			case "builder" -> ChatFormatting.YELLOW;
+			case "glutton" -> ChatFormatting.GOLD;
+			case "pro_set" -> ChatFormatting.DARK_AQUA;
+			case "legendary_set" -> ChatFormatting.RED;
+			default -> ChatFormatting.WHITE;
+		};
+	}
+
+	/** Шалкер набора. */
+	private static ItemStack shulkerOf(Kit kit) {
+		return new ItemStack(Items.SHULKER_BOX);
+	}
+
+	/** Убирает курсив: игра делает изменённые названия курсивом. */
+	private static MutableComponent plain(MutableComponent text) {
+		return text.withStyle(Style.EMPTY.withItalic(false));
+	}
+
 	/** Иконка набора для магазина: покупается шалкер, поэтому в списке тоже шалкер. */
 	public static ItemStack iconOf(Kit kit) {
-		ItemStack icon = new ItemStack(Items.SHULKER_BOX);
-		icon.set(DataComponents.CUSTOM_NAME, Component.translatable(kit.nameKey()));
+		ItemStack icon = shulkerOf(kit);
+		icon.set(DataComponents.CUSTOM_NAME, Component.translatable(kit.nameKey())
+				.withStyle(Style.EMPTY.withItalic(false).withColor(colorOf(kit))));
 		icon.set(DataComponents.LORE, new ItemLore(loreOf(kit)));
 		return icon;
 	}
 
-	/** Строки описания набора: сначала сводка, затем содержимое. */
+	/** Строки описания набора: цена, пометка про шлякеры и начало содержимого. */
 	private static List<Component> loreOf(Kit kit) {
 		List<Component> lines = new ArrayList<>();
-		lines.add(Component.translatable("marketplace.kit.price",
+		lines.add(plain(Component.translatable("marketplace.kit.price",
 				com.chr0m4ik.marketplace.economy.MoneyFormat.format(priceOf(kit)))
-				.withStyle(net.minecraft.ChatFormatting.GOLD));
+				.withStyle(ChatFormatting.GOLD)));
 
 		if (kit.shulkers() > 1) {
-			lines.add(Component.translatable("marketplace.kit.shulkers",
+			lines.add(plain(Component.translatable("marketplace.kit.shulkers",
 					Component.literal(String.valueOf(kit.shulkers())))
-					.withStyle(net.minecraft.ChatFormatting.RED));
+					.withStyle(ChatFormatting.RED)));
 		}
 
-		lines.add(Component.translatable("marketplace.kit.contents").withStyle(net.minecraft.ChatFormatting.GRAY));
+		// Показываем только начало списка: полностью — по Shift.
+		int shown = Math.min(kit.items().size(), 3);
 
-		// Показываем первые строки, остальное — по Shift (см. подсказки клиента).
-		for (int i = 0; i < Math.min(kit.items().size(), 5); i++) {
+		for (int i = 0; i < shown; i++) {
 			ItemStack item = kit.items().get(i);
-			lines.add(Component.literal(" • ").append(item.getHoverName())
+			lines.add(plain(Component.literal(" • ").append(item.getHoverName())
 					.append(Component.literal(" ×" + item.getCount()))
-					.withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
+					.withStyle(ChatFormatting.DARK_GRAY)));
 		}
 
-		if (kit.items().size() > 5) {
-			lines.add(Component.translatable("marketplace.kit.more",
-					Component.literal(String.valueOf(kit.items().size() - 5)))
-					.withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
+		if (kit.items().size() > shown) {
+			lines.add(plain(Component.translatable("marketplace.kit.more",
+					Component.literal(String.valueOf(kit.items().size() - shown)))
+					.withStyle(ChatFormatting.DARK_GRAY)));
 		}
 
 		return lines;
@@ -169,7 +199,7 @@ public final class KitCatalog {
 				index++;
 			}
 
-			ItemStack shulker = new ItemStack(Items.SHULKER_BOX);
+			ItemStack shulker = shulkerOf(kit);
 			shulker.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(inside));
 			result.add(shulker);
 		}
