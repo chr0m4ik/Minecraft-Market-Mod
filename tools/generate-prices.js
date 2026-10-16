@@ -107,6 +107,8 @@ const BASE = {
 	// Узор флага Моджанга — как остальные узоры (они дешёвые, из бумаги), а ключи испытаний дорогие.
 	'minecraft:mojang_banner_pattern': 5,
 	'minecraft:trial_key': 1000000, 'minecraft:ominous_trial_key': 1000000,
+	// Пузырёк опыта — нужен для починки предметов, поэтому цена высокая.
+	'minecraft:experience_bottle': 100000,
 	'minecraft:totem_of_undying': 100000000, 'minecraft:nether_star': 2000000000,
 	'minecraft:dragon_egg': 5000000000, 'minecraft:spawner': 10000000000,
 	'minecraft:trial_spawner': 2000000000, 'minecraft:vault': 2000000000, 'minecraft:end_portal_frame': 10000000,

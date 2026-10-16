@@ -525,7 +525,7 @@
 		"minecraft:enderman_spawn_egg": 8000000000,
 		"minecraft:endermite_spawn_egg": 3000000000,
 		"minecraft:evoker_spawn_egg": 25000000000,
-		"minecraft:experience_bottle": 5000,
+		"minecraft:experience_bottle": 100000,
 		"minecraft:explorer_pottery_sherd": 500,
 		"minecraft:exposed_chiseled_copper": 24.9,
 		"minecraft:exposed_copper": 95,

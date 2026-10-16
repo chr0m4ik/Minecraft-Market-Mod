@@ -185,6 +185,11 @@ public final class ShopCatalog {
 	/** Зелья: обычные, брызгающие и туманные (флаг — только брызгающие и туманные). */
 	private static void addPotions(List<ItemStack> stacks, boolean splashOnly) {
 		for (Holder<Potion> potion : BuiltInRegistries.POTION.listElements().toList()) {
+			// Зелье удачи в выживании не сварить (рецепта нет) — в магазине ему не место.
+			if (potion.unwrapKey().map(key -> key.identifier().getPath()).orElse("").equals("luck")) {
+				continue;
+			}
+
 			stacks.add(potionStack(Items.POTION, potion));
 
 			if (splashOnly) {
