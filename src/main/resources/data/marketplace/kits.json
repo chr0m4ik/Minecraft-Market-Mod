@@ -17,7 +17,7 @@
 				{ "item": "minecraft:splash_potion", "count": 3, "shulker": 1, "slot": 9, "potion": "minecraft:strong_healing" },
 				{ "item": "minecraft:totem_of_undying", "count": 3, "shulker": 1, "slot": 12 },
 				{ "item": "minecraft:splash_potion", "count": 3, "shulker": 1, "slot": 15, "potion": "minecraft:strong_swiftness" },
-				{ "item": "minecraft:apple", "count": 16, "shulker": 1, "slot": 20 },
+				{ "item": "minecraft:golden_apple", "count": 16, "shulker": 1, "slot": 20 },
 				{ "item": "minecraft:water_bucket", "count": 1, "shulker": 1, "slot": 21 },
 				{ "item": "minecraft:ender_pearl", "count": 16, "shulker": 1, "slot": 22 },
 				{ "item": "minecraft:cobweb", "count": 32, "shulker": 1, "slot": 23 },
@@ -45,7 +45,9 @@
 				{ "item": "minecraft:experience_bottle", "count": 64, "shulker": 1, "slot": 21 },
 				{ "item": "minecraft:golden_apple", "count": 64, "shulker": 1, "slot": 22 },
 				{ "item": "minecraft:ender_pearl", "count": 16, "shulker": 1, "slot": 23 },
-				{ "item": "minecraft:splash_potion", "count": 2, "shulker": 1, "slot": 24, "potion": "minecraft:strong_healing" }
+				{ "item": "minecraft:splash_potion", "count": 1, "shulker": 1, "slot": 24, "potion": "minecraft:strong_swiftness" },
+				{ "item": "minecraft:splash_potion", "count": 1, "shulker": 1, "slot": 25, "potion": "minecraft:strong_healing" },
+				{ "item": "minecraft:splash_potion", "count": 1, "shulker": 1, "slot": 26, "potion": "minecraft:strong_healing" }
 			],
 			"inventory": [
 				{ "item": "minecraft:arrow", "count": 128 },
