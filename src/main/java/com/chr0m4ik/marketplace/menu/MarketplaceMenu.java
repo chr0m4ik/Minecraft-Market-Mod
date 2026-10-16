@@ -934,6 +934,23 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		if (this.kind == WindowKind.SELL) {
+			// Игрок положил предметы, но не оформил продажу — возвращаем их в инвентарь,
+			// иначе рынок превращается в бесплатное хранилище. Ордера не трогаем.
+			for (int i = 0; i < this.kind.tradeSlots(); i++) {
+				if (this.orderCells.contains(i)) {
+					continue;
+				}
+
+				ItemStack stack = this.tradeContainer.getItem(i);
+
+				if (stack.isEmpty()) {
+					continue;
+				}
+
+				this.tradeContainer.setItem(i, ItemStack.EMPTY);
+				player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+			}
+
 			this.saveMarketCells();
 			return;
 		}
@@ -1040,8 +1057,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		for (int i = 0; i < MarketService.SLOTS; i++) {
 			MarketOrder order = state.order(playerId, i);
 			ItemStack staged = state.staging(playerId).get(i);
-			this.data.set(CELL_DATA_START + i,
-					order == null ? -1 : (int) Math.min(Integer.MAX_VALUE, order.ticksLeft(now) / 1200L));
+			// Время продажи игроку не показываем: пусть это остаётся загадкой.
+			this.data.set(CELL_DATA_START + i, -1);
 			this.data.set(CELL_MARKUP_START + i,
 					order != null ? (int) Math.round(order.markup() * 100.0)
 							: (staged == null ? 0 : (int) Math.round(state.markup(playerId) * 100.0)));
