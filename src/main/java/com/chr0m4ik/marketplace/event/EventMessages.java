@@ -84,6 +84,14 @@ public final class EventMessages {
 		return String.join(", ", event.itemIds());
 	}
 
+	/**
+	 * Что затронуто ивентом — компонентом: название раздела или список названий предметов.
+	 * Нужно команде {@code /market event list} и подсказкам, чтобы не повторять разбор цели.
+	 */
+	public static Component targetNames(MarketEvent event) {
+		return categoryTitle(event).orElseGet(() -> itemsText(event));
+	}
+
 	private static Component targetLine(MarketEvent event) {
 		Optional<Component> category = categoryTitle(event);
 

@@ -2,7 +2,12 @@ package com.chr0m4ik.marketplace.command;
 
 import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
+import com.chr0m4ik.marketplace.economy.MarketplaceState;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
+import com.chr0m4ik.marketplace.event.EventMessages;
+import com.chr0m4ik.marketplace.event.EventService;
+import com.chr0m4ik.marketplace.event.MarketEvent;
+import com.chr0m4ik.marketplace.event.MarketEvents;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.menu.WindowKind;
 import com.chr0m4ik.marketplace.price.ItemPrices;
@@ -31,6 +36,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Команды мода.
@@ -42,7 +48,9 @@ import java.util.List;
  *     <li>{@code /market money set <игрок> <сумма>} — установить баланс;</li>
  *     <li>{@code /market money add <игрок> <сумма>} — изменить баланс (отрицательная сумма вычитает);</li>
  *     <li>{@code /market drift <предмет> [тик]} — показать микро-дрейф цены предмета;</li>
- *     <li>{@code /market event ...} — заготовки под крупные ивенты (сами ивенты ещё не сделаны).</li>
+ *     <li>{@code /market event list} — что за крупный ивент идёт сейчас и какие названия бывают;</li>
+ *     <li>{@code /market event start <id|random>} — запустить ивент вручную (для проверки);</li>
+ *     <li>{@code /market event stop} — остановить активный ивент.</li>
  * </ul>
  *
  * <p>Всё, что связано с деньгами, требует прав оператора: в одиночной игре это значит, что
@@ -61,6 +69,8 @@ public final class MarketplaceCommands {
 	private static final String ARG_COUNT = "count";
 	private static final String ARG_EVENT = "id";
 	private static final String ARG_TICK = "tick";
+	/** Особое «название» для команды: запустить ивент со случайным названием. */
+	private static final String EVENT_RANDOM = "random";
 
 	/** Предмета нет в прайсе — считать нечего. */
 	private static final SimpleCommandExceptionType NO_PRICE =
@@ -69,17 +79,6 @@ public final class MarketplaceCommands {
 	/** Для указанного тика нет данных: сервер ещё не сообщил зерно мира. */
 	private static final SimpleCommandExceptionType NO_SEED =
 			new SimpleCommandExceptionType(Component.translatable("marketplace.command.drift.noSeed"));
-
-	/**
-	 * Крупные ивенты, которые появятся позже. Пока это только список названий:
-	 * команда {@code /market event list} показывает их игроку.
-	 */
-	private static final List<String> PLANNED_EVENTS = List.of(
-			"marketplace.event.sale",
-			"marketplace.event.crash",
-			"marketplace.event.hype",
-			"marketplace.event.shortage",
-			"marketplace.event.blackday");
 
 	public static void register() {
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -131,9 +130,9 @@ public final class MarketplaceCommands {
 							.executes(MarketplaceCommands::listEvents))
 					.then(Commands.literal("start")
 							.then(Commands.argument(ARG_EVENT, StringArgumentType.word())
-									.executes(MarketplaceCommands::startEventStub)))
+									.executes(MarketplaceCommands::startEvent)))
 					.then(Commands.literal("stop")
-							.executes(MarketplaceCommands::stopEventStub));
+							.executes(MarketplaceCommands::stopEvent));
 
 			dispatcher.register(Commands.literal("market")
 					.executes(MarketplaceCommands::openMainMenu)
@@ -356,18 +355,52 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market event list} — какие крупные ивенты запланированы. */
+	/**
+	 * {@code /market event list} — что идёт сейчас и какие названия бывают.
+	 *
+	 * <p>Показывает и «активное время мира» — тики, которые копятся, только когда в игре есть
+	 * игроки. По нему видно, что без игроков ивент замирает: число не растёт.
+	 */
 	private static int listEvents(CommandContext<CommandSourceStack> context) {
 		CommandSourceStack source = context.getSource();
+		MarketplaceState state = MarketplaceEconomy.state(source.getServer());
+		MarketEvent active = state.activeEvent();
+		MarketEvent pending = state.pendingEvent();
 
 		source.sendSuccess(() -> Component.translatable("marketplace.command.event.header")
 				.withStyle(ChatFormatting.GOLD), false);
-		source.sendSuccess(() -> Component.translatable("marketplace.command.event.none")
+
+		if (active == null) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.event.none",
+					Component.literal(one(EconomyConfig.eventDailyChance() * 100.0)))
+					.withStyle(ChatFormatting.GRAY), false);
+		} else {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.event.active",
+					active.name().title()).withStyle(ChatFormatting.GOLD), false);
+			source.sendSuccess(() -> Component.translatable("marketplace.command.event.target",
+					EventMessages.targetNames(active)).withStyle(ChatFormatting.LIGHT_PURPLE), false);
+			source.sendSuccess(() -> Component.translatable("marketplace.command.event.percent",
+					eventPercent(active)).withStyle(ChatFormatting.GRAY), false);
+			source.sendSuccess(() -> Component.translatable("marketplace.command.event.left",
+					MarketEvents.duration(state.eventRemaining())).withStyle(ChatFormatting.GRAY), false);
+		}
+
+		if (pending != null) {
+			// Запланированный ивент: видно, что день «выпал» и когда ивент начнётся.
+			long left = Math.max(0L, state.eventPendingAt() - state.activeTicks());
+			source.sendSuccess(() -> Component.translatable("marketplace.command.event.pending",
+					pending.name().title(), MarketEvents.duration(left))
+					.withStyle(ChatFormatting.AQUA), false);
+		}
+
+		source.sendSuccess(() -> Component.translatable("marketplace.command.event.activeTime",
+				MarketEvents.duration(state.activeTicks())).withStyle(ChatFormatting.DARK_GRAY), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.event.names")
 				.withStyle(ChatFormatting.GRAY), false);
 
-		for (String key : PLANNED_EVENTS) {
-			source.sendSuccess(() -> Component.translatable("marketplace.command.event.planned",
-					Component.translatable(key)).withStyle(ChatFormatting.GRAY), false);
+		for (MarketEvents.Name name : MarketEvents.Name.values()) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.event.name",
+					name.title(), name.direction().title()).withStyle(ChatFormatting.GRAY), false);
 		}
 
 		source.sendSuccess(() -> Component.translatable("marketplace.command.event.startHint")
@@ -376,22 +409,72 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market event start <id>} — пока заглушка: ивенты ещё не реализованы. */
-	private static int startEventStub(CommandContext<CommandSourceStack> context) {
+	/**
+	 * {@code /market event start <id|random>} — запустить ивент вручную. Второй ивент поверх
+	 * идущего не создаётся: команда скажет, что сначала нужно остановить текущий.
+	 */
+	private static int startEvent(CommandContext<CommandSourceStack> context) {
+		CommandSourceStack source = context.getSource();
 		String id = StringArgumentType.getString(context, ARG_EVENT);
+		Optional<MarketEvents.Name> name = EVENT_RANDOM.equalsIgnoreCase(id)
+				? Optional.of(MarketEvents.Name.random(source.getServer().overworld().getRandom()))
+				: MarketEvents.Name.byId(id);
 
-		context.getSource().sendSuccess(() -> Component.translatable("marketplace.command.event.start",
-				Component.literal(id).withStyle(ChatFormatting.YELLOW)).withStyle(ChatFormatting.GRAY), false);
+		if (name.isEmpty()) {
+			source.sendFailure(Component.translatable("marketplace.command.event.unknown",
+					Component.literal(id), Component.literal(MarketEvents.Name.ids())));
+			return 0;
+		}
 
-		return 0;
+		Optional<MarketEvent> started = EventService.startNow(source.getServer(), name.get());
+
+		if (started.isEmpty()) {
+			MarketEvent active = EventService.current().orElse(null);
+
+			if (active == null) {
+				source.sendFailure(Component.translatable("marketplace.command.event.failed"));
+			} else {
+				source.sendFailure(Component.translatable("marketplace.command.event.already",
+						active.name().title()));
+			}
+
+			return 0;
+		}
+
+		MarketEvent event = started.get();
+		source.sendSuccess(() -> Component.translatable("marketplace.command.event.started",
+				event.name().title(), EventMessages.targetNames(event), eventPercent(event),
+				MarketEvents.duration(event.durationTicks())).withStyle(ChatFormatting.GOLD), false);
+
+		return 1;
 	}
 
-	/** {@code /market event stop} — пока заглушка: останавливать нечего. */
-	private static int stopEventStub(CommandContext<CommandSourceStack> context) {
-		context.getSource().sendSuccess(() -> Component.translatable("marketplace.command.event.stop")
-				.withStyle(ChatFormatting.GRAY), false);
+	/** {@code /market event stop} — остановить активный ивент. Остановка объявляется всем в чат. */
+	private static int stopEvent(CommandContext<CommandSourceStack> context) {
+		CommandSourceStack source = context.getSource();
+		Optional<MarketEvent> stopped = EventService.stop(source.getServer());
 
-		return 0;
+		if (stopped.isEmpty()) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.event.stop")
+					.withStyle(ChatFormatting.GRAY), false);
+			return 0;
+		}
+
+		source.sendSuccess(() -> Component.translatable("marketplace.command.event.stopped",
+				stopped.get().name().title()).withStyle(ChatFormatting.YELLOW), false);
+
+		return 1;
+	}
+
+	/** Отклонение цены ивентом: зелёным рост, красным падение. */
+	private static Component eventPercent(MarketEvent event) {
+		return Component.literal(event.percentText())
+				.withStyle(event.rises() ? ChatFormatting.GREEN : ChatFormatting.RED);
+	}
+
+	/** Число с одним знаком после точки, точка как разделитель — для процентов в командах. */
+	private static String one(double value) {
+		return String.format(java.util.Locale.ROOT, "%.1f", value);
 	}
 
 	/** Отклонение дрейфа в процентах со знаком. */
