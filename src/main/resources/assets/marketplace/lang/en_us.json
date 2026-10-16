@@ -186,5 +186,11 @@
 	"marketplace.kit.legendary_set": "Legendary Set",
 	"marketplace.kit.price": "Kit price: %s",
 	"marketplace.kit.shulkers": "Shulkers: %s (does not fit in one)",
-	"marketplace.kit.more": "…and %s more items"
+	"marketplace.kit.more": "…and %s more items",
+
+	"enchantment.marketplace.vein_miner": "Vein Miner",
+	"enchantment.marketplace.vein_miner.desc": "Breaks the whole ore vein around the mined block — only blocks of the same type and only ores.",
+	"marketplace.special.vein_miner.level.1": "Vein Miner I — area 5×5×5",
+	"marketplace.special.vein_miner.level.2": "Vein Miner II — area 9×9×9",
+	"marketplace.special.vein_miner.level.3": "Vein Miner III — area 13×13×13"
 }
