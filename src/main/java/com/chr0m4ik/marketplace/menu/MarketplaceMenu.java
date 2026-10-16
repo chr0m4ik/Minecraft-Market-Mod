@@ -1,5 +1,6 @@
 package com.chr0m4ik.marketplace.menu;
 
+import com.chr0m4ik.marketplace.MarketplaceMod;
 import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
@@ -67,14 +68,21 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	private static final int ORDERS_DATA = BALANCE_DATA + MONEY_CELLS;
 	private static final int STAGED_DATA = ORDERS_DATA + MONEY_CELLS;
 
-	/** Счётчики предметов, наценка и число открытых ячеек рынка. */
+	/** Счётчики предметов, наценка, число открытых ячеек рынка и режим-мишень. */
 	private static final int ORDERS_COUNT_DATA = STAGED_DATA + MONEY_CELLS;
 	private static final int STAGED_COUNT_DATA = ORDERS_COUNT_DATA + 1;
 	private static final int MARKUP_DATA = STAGED_COUNT_DATA + 1;
 	private static final int UNLOCKED_DATA = MARKUP_DATA + 1;
 
-	/** Сколько ячеек занимает шапка данных: суммы, счётчики, наценка и открытые ячейки. */
-	private static final int HEADER_SIZE = UNLOCKED_DATA + 1;
+	/**
+	 * Включён ли безопасный режим снятия ордеров (кнопка-мишень). Сам флаг живёт на сервере
+	 * (в этом меню), а клиент узнаёт его из данных окна — без этого клиент не знает состояние
+	 * режима и не может честно показать его игроку (см. {@link #isTargetMode}).
+	 */
+	private static final int TARGET_DATA = UNLOCKED_DATA + 1;
+
+	/** Сколько ячеек занимает шапка данных: суммы, счётчики, наценка, открытые ячейки и мишень. */
+	private static final int HEADER_SIZE = TARGET_DATA + 1;
 
 	/** Сколько всего ячеек данных синхронизируется с клиентом. */
 	private static final int DATA_SIZE = HEADER_SIZE + MarketService.SLOTS * 2;
@@ -153,7 +161,11 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	private final ContainerData data;
 	/** Ссылка на игрока есть только на сервере; на клиенте здесь null. */
 	private final ServerPlayer serverPlayer;
-	/** Включён ли безопасный режим снятия ордеров (кнопка-мишень). */
+	/**
+	 * Включён ли безопасный режим снятия ордеров (кнопка-мишень). Поле серверное: кнопку
+	 * обрабатывает серверная часть окна (см. {@link #onButtonClick}), а клиенту состояние
+	 * уходит данными окна ({@link #TARGET_DATA}).
+	 */
 	private boolean targetMode;
 	/** Ячейки, которые сейчас показывают подтверждённый ордер (по ним ловим момент продажи). */
 	private final Set<Integer> orderCells = new HashSet<>();
@@ -257,6 +269,15 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		return cell < this.data.get(UNLOCKED_DATA);
 	}
 
+	/**
+	 * Включён ли режим-мишень. На сервере истина — поле меню, на клиенте — данные окна
+	 * (сервер пишет флаг в {@link #updateData}). Нужно клиенту, чтобы подсказка честно
+	 * говорила, включён режим или нет.
+	 */
+	public boolean isTargetMode() {
+		return this.serverPlayer != null ? this.targetMode : this.data.get(TARGET_DATA) == 1;
+	}
+
 	/** Есть ли в этом окне ячейки рынка. */
 	private boolean hasMarketCells() {
 		return this.kind == WindowKind.SELL;
@@ -264,8 +285,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 	/**
 	 * Лежит ли в ячейке подтверждённый ордер. Такую ячейку нельзя ни утащить мышкой, ни
-	 * перетащить, ни выбросить: предмет снимается только в режиме-мишени по Shift + ПКМ
-	 * (см. {@link #clicked}).
+	 * перетащить, ни выбросить: предмет снимается только в режиме-мишени shift-кликом
+	 * (и Shift + ПКМ, и Shift + ЛКМ — см. {@link #clicked}).
 	 *
 	 * <p>На сервере истина — в сейве мира (там лежат ордера). Клиент сейва не видит, поэтому
 	 * получает признак ячейки данными окна, которые обновляются каждый тик в {@link #updateData}.
@@ -311,13 +332,11 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	}
 
 	/**
-	 * Забрать предмет из ячейки рынка. Неподтверждённый предмет забирается свободно,
-	 * а подтверждённый ордер — только когда включён безопасный режим (кнопка-мишень)
-	 * и только по Shift + ПКМ.
-	 *
-	 * @param rightButton нажата ли правая кнопка мыши (Shift + ПКМ)
+	 * Забрать предмет из ячейки рынка. Неподтверждённый предмет забирается свободно, а
+	 * подтверждённый ордер — только когда включён безопасный режим (кнопка-мишень) и только
+	 * shift-кликом (любая кнопка мыши: и Shift + ПКМ, и Shift + ЛКМ).
 	 */
-	private void takeMarketCell(Player player, int cell, boolean rightButton) {
+	private void takeMarketCell(Player player, int cell) {
 		if (this.serverPlayer == null || cell < 0 || cell >= this.kind.tradeSlots()
 				|| !this.isCellUnlocked(cell)) {
 			return;
@@ -329,7 +348,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		ItemStack stack;
 
 		if (order != null) {
-			if (!this.targetMode || !rightButton) {
+			if (!this.targetMode) {
+				// Ордер без режима-мишени не снимаем: это защита от случайного клика.
 				player.sendSystemMessage(Component.translatable("marketplace.gui.market.needTarget")
 						.withStyle(ChatFormatting.RED));
 				return;
@@ -616,6 +636,9 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	 */
 	@Override
 	public void clicked(int slotId, int button, ContainerInput input, Player player) {
+		// ВРЕМЕННО: диагностика снятия ордера (см. logMarketClick) — убрать после проверки.
+		this.logMarketClick(slotId, button, input, player);
+
 		if (this.isButtonSlot(slotId)) {
 			if (input == ContainerInput.PICKUP && button == 0) {
 				this.onButtonClick(slotId, player);
@@ -634,14 +657,16 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		// Ячейки рынка: у них своё управление, поэтому разбираем их до обычных слотов.
 		if (this.hasMarketCells() && slotId >= 0 && slotId < this.kind.tradeSlots()) {
 			boolean order = this.isCellOrder(slotId);
+			// Shift-клик игра присылает как QUICK_MOVE. Дополнительно смотрим на сам shift
+			// в состоянии игрока: сервер знает о нём, пока окно открыто, поэтому снятие сработает,
+			// даже если клик придёт обычным PICKUP. Так работают обе комбинации: Shift + ПКМ и Shift + ЛКМ.
+			boolean shiftClick = input == ContainerInput.QUICK_MOVE
+					|| (input == ContainerInput.PICKUP && player.isShiftKeyDown());
 
-			if (input == ContainerInput.QUICK_MOVE) {
-				// Shift + ПКМ по ячейке с ордером — снять ордер (только в режиме-мишени).
-				// Shift + ЛКМ забирает лишь неподтверждённые предметы: их ещё нет в сейве.
-				if (!order || button == 1) {
-					this.takeMarketCell(player, slotId, button == 1);
-				}
-
+			if (shiftClick) {
+				// Неподтверждённый предмет забирается, а ордер снимается только в режиме-мишени —
+				// проверка режима внутри takeMarketCell.
+				this.takeMarketCell(player, slotId);
 				return;
 			}
 
@@ -654,6 +679,27 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		super.clicked(slotId, button, input, player);
+	}
+
+	/**
+	 * ВРЕМЕННО: диагностика снятия ордера. Пишет в лог сервера ровно одну строку на клик
+	 * в окне рынка: слот, кнопка, тип клика, shift, режим-мишень, есть ли в ячейке ордер.
+	 * Спама нет — строк столько же, сколько кликов. Убрать, когда заказчик подтвердит, что
+	 * ордер снимается (тогда же снять и вызов в начале {@link #clicked}).
+	 */
+	private void logMarketClick(int slotId, int button, ContainerInput input, Player player) {
+		// Только сервер: на клиенте serverPlayer пустой и лог дублировался бы.
+		if (this.serverPlayer == null || (this.kind != WindowKind.SELL && this.kind != WindowKind.CONFIRM)) {
+			return;
+		}
+
+		boolean cell = slotId >= 0 && slotId < this.kind.tradeSlots();
+		ItemStack stack = cell ? this.tradeContainer.getItem(slotId) : ItemStack.EMPTY;
+		MarketplaceMod.LOGGER.info(
+				"Клик рынка: слот={}, кнопка={}, input={}, shift={}, target={}, ордер={}, окно={}, открыта={}, предмет={}",
+				slotId, button, input, player.isShiftKeyDown(), this.targetMode,
+				cell && this.isCellOrder(slotId), this.kind, cell && this.isCellUnlocked(slotId),
+				stack.isEmpty() ? "пусто" : stack.getCount() + "x " + stack.getHoverName().getString());
 	}
 
 	/** Является ли слот верхней части окна кнопкой. */
@@ -706,8 +752,14 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				MarketplaceMenus.open(serverPlayer, WindowKind.CONFIRM);
 			} else if (slotId == MARKET_SLOT_TARGET) {
 				// Безопасный режим: пока он включён, shift-клик снимает ордер.
+				// Кнопку обрабатывает сервер, поэтому флаг переключается именно здесь,
+				// а клиент узнаёт новое состояние данными окна (updateData → TARGET_DATA).
 				this.targetMode = !this.targetMode;
 				this.updateTargetButton();
+				// ВРЕМЕННО: видно, что сервер действительно переключил режим.
+				MarketplaceMod.LOGGER.info("Клик рынка: режим-мишень переключён сервером — {}",
+						this.targetMode ? "включён" : "выключен");
+				this.updateData();
 				this.broadcastChanges();
 			}
 
@@ -1114,6 +1166,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		KitCatalog.setRegistries(server.registryAccess());
 		this.data.set(MARKUP_DATA, (int) Math.round(state.markup(playerId) * 100.0));
 		this.data.set(UNLOCKED_DATA, MarketService.unlockedSlots(state, playerId));
+		// Режим-мишень — часть состояния окна: клиент должен знать его так же, как наценку.
+		this.data.set(TARGET_DATA, this.targetMode ? 1 : 0);
 
 		if (this.kind == WindowKind.BUY_ITEM) {
 			// Номер выбранного количества — клиент считает по нему цену в подсказке.

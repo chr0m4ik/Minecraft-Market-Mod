@@ -137,7 +137,7 @@ public final class MarketplaceTooltips {
 
 		if (menu.isCellOrder(cell)) {
 			// Подтверждённый ордер: он лежит в сейве мира и продаётся сам, забрать —
-			// только в режиме-мишени и только Shift + ПКМ.
+			// только в режиме-мишени и только shift-кликом (Shift + ПКМ или Shift + ЛКМ).
 			lines.add(Component.translatable("marketplace.tooltip.market.order")
 					.withStyle(ChatFormatting.AQUA));
 		} else if (!stack.isEmpty()) {
@@ -155,7 +155,12 @@ public final class MarketplaceTooltips {
 		}
 
 		if (menu.isCellOrder(cell)) {
-			lines.add(Component.translatable("marketplace.tooltip.market.cancel").withStyle(ChatFormatting.DARK_GRAY));
+			// Подтверждённый ордер: он лежит в сейве мира и продаётся сам. Забрать его можно
+			// только в режиме-мишени и только shift-кликом. Состояние режима приходит с сервера
+			// данными окна, поэтому подсказка говорит правду, а не догадывается.
+			lines.add(Component.translatable(menu.isTargetMode()
+					? "marketplace.tooltip.market.cancel.on" : "marketplace.tooltip.market.cancel.off")
+					.withStyle(menu.isTargetMode() ? ChatFormatting.GOLD : ChatFormatting.DARK_GRAY));
 		} else if (!stack.isEmpty()) {
 			lines.add(Component.translatable("marketplace.tooltip.market.take").withStyle(ChatFormatting.DARK_GRAY));
 		}
