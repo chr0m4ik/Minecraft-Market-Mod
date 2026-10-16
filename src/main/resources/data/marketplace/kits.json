@@ -1,0 +1,211 @@
+{
+	"comment": "Наборы магазина. Цена считается автоматически: содержимое (+ шлякеры, если они есть) минус 5%. Кирка соответствует уровню набора: алмазный набор — алмазная, незеритовый — незеритовая.",
+	"kits": [
+		{
+			"id": "pvp_pro",
+			"shulkers": 1,
+			"items": [
+				{ "item": "minecraft:diamond_helmet", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:diamond_chestplate", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:diamond_leggings", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:diamond_boots", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:feather_falling": 4, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:diamond_sword", "count": 1, "enchantments": { "minecraft:sharpness": 5, "minecraft:knockback": 2, "minecraft:fire_aspect": 2, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:diamond_pickaxe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:fortune": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:shield", "count": 1, "enchantments": { "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:splash_potion", "count": 3, "potion": "minecraft:strong_swiftness" },
+				{ "item": "minecraft:splash_potion", "count": 4, "potion": "minecraft:strong_healing" },
+				{ "item": "minecraft:totem_of_undying", "count": 3 },
+				{ "item": "minecraft:golden_apple", "count": 32 },
+				{ "item": "minecraft:cobweb", "count": 32 },
+				{ "item": "minecraft:water_bucket", "count": 1 },
+				{ "item": "minecraft:ender_pearl", "count": 16 }
+			]
+		},
+		{
+			"id": "pvp_extra",
+			"shulkers": 1,
+			"items": [
+				{ "item": "minecraft:netherite_helmet", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:respiration": 3, "minecraft:aqua_affinity": 1, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_chestplate", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:thorns": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_leggings", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:swift_sneak": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_boots", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:feather_falling": 4, "minecraft:depth_strider": 3, "minecraft:soul_speed": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_sword", "count": 1, "enchantments": { "minecraft:sharpness": 5, "minecraft:knockback": 2, "minecraft:fire_aspect": 2, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_pickaxe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:fortune": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:mace", "count": 1, "enchantments": { "minecraft:density": 5, "minecraft:wind_burst": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_spear", "count": 1, "enchantments": { "minecraft:sharpness": 5, "minecraft:lunge": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:splash_potion", "count": 3, "potion": "minecraft:strong_swiftness" },
+				{ "item": "minecraft:splash_potion", "count": 6, "potion": "minecraft:strong_healing" },
+				{ "item": "minecraft:totem_of_undying", "count": 3 },
+				{ "item": "minecraft:golden_apple", "count": 64 },
+				{ "item": "minecraft:cobweb", "count": 64 },
+				{ "item": "minecraft:water_bucket", "count": 1 },
+				{ "item": "minecraft:ender_pearl", "count": 16 },
+				{ "item": "minecraft:wind_charge", "count": 64 },
+				{ "item": "minecraft:experience_bottle", "count": 64 }
+			]
+		},
+		{
+			"id": "pvp_crystal",
+			"shulkers": 2,
+			"items": [
+				{ "item": "minecraft:netherite_helmet", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_chestplate", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_leggings", "count": 1, "enchantments": { "minecraft:blast_protection": 4, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_boots", "count": 1, "enchantments": { "minecraft:blast_protection": 4, "minecraft:feather_falling": 4, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_sword", "count": 1, "enchantments": { "minecraft:sharpness": 5, "minecraft:sweeping_edge": 3, "minecraft:fire_aspect": 2, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_pickaxe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:fortune": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:end_crystal", "count": 128 },
+				{ "item": "minecraft:obsidian", "count": 128 },
+				{ "item": "minecraft:respawn_anchor", "count": 128 },
+				{ "item": "minecraft:glowstone", "count": 128 },
+				{ "item": "minecraft:totem_of_undying", "count": 12 },
+				{ "item": "minecraft:golden_apple", "count": 64 },
+				{ "item": "minecraft:experience_bottle", "count": 64 },
+				{ "item": "minecraft:water_bucket", "count": 1 },
+				{ "item": "minecraft:ender_pearl", "count": 32 }
+			]
+		},
+		{
+			"id": "miner_dream",
+			"shulkers": 0,
+			"items": [
+				{ "item": "minecraft:netherite_pickaxe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:fortune": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_shovel", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_hoe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:shield", "count": 1, "enchantments": { "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:torch", "count": 64 },
+				{ "item": "minecraft:ladder", "count": 128 },
+				{ "item": "minecraft:oak_planks", "count": 192 },
+				{ "item": "minecraft:cobblestone", "count": 64 },
+				{ "item": "minecraft:tnt", "count": 16 },
+				{ "item": "minecraft:cooked_beef", "count": 64 },
+				{ "item": "minecraft:potion", "count": 3, "potion": "minecraft:long_night_vision" },
+				{ "item": "minecraft:potion", "count": 2, "potion": "minecraft:long_fire_resistance" },
+				{ "item": "minecraft:water_bucket", "count": 1 }
+			]
+		},
+		{
+			"id": "lumberjack_dream",
+			"shulkers": 0,
+			"items": [
+				{ "item": "minecraft:netherite_axe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_hoe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:shield", "count": 1, "enchantments": { "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:shears", "count": 1 },
+				{ "item": "minecraft:oak_sapling", "count": 64 },
+				{ "item": "minecraft:bone_meal", "count": 256 },
+				{ "item": "minecraft:oak_planks", "count": 192 },
+				{ "item": "minecraft:ladder", "count": 64 },
+				{ "item": "minecraft:torch", "count": 64 },
+				{ "item": "minecraft:cooked_beef", "count": 64 },
+				{ "item": "minecraft:water_bucket", "count": 1 }
+			]
+		},
+		{
+			"id": "builder",
+			"shulkers": 0,
+			"items": [
+				{ "item": "minecraft:diamond_pickaxe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:diamond_axe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:diamond_shovel", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:oak_planks", "count": 256 },
+				{ "item": "minecraft:stone", "count": 256 },
+				{ "item": "minecraft:bricks", "count": 128 },
+				{ "item": "minecraft:glass", "count": 128 },
+				{ "item": "minecraft:oak_fence", "count": 64 },
+				{ "item": "minecraft:oak_door", "count": 16 },
+				{ "item": "minecraft:oak_stairs", "count": 64 },
+				{ "item": "minecraft:oak_slab", "count": 64 },
+				{ "item": "minecraft:scaffolding", "count": 128 },
+				{ "item": "minecraft:torch", "count": 64 },
+				{ "item": "minecraft:ladder", "count": 64 },
+				{ "item": "minecraft:water_bucket", "count": 1 },
+				{ "item": "minecraft:milk_bucket", "count": 1 },
+				{ "item": "minecraft:bread", "count": 64 }
+			]
+		},
+		{
+			"id": "glutton",
+			"shulkers": 0,
+			"items": [
+				{ "item": "minecraft:cooked_beef", "count": 64 },
+				{ "item": "minecraft:cooked_porkchop", "count": 64 },
+				{ "item": "minecraft:cooked_mutton", "count": 64 },
+				{ "item": "minecraft:cooked_chicken", "count": 64 },
+				{ "item": "minecraft:cooked_cod", "count": 64 },
+				{ "item": "minecraft:cooked_salmon", "count": 64 },
+				{ "item": "minecraft:bread", "count": 64 },
+				{ "item": "minecraft:baked_potato", "count": 64 },
+				{ "item": "minecraft:golden_carrot", "count": 128 },
+				{ "item": "minecraft:golden_apple", "count": 32 },
+				{ "item": "minecraft:apple", "count": 64 },
+				{ "item": "minecraft:melon_slice", "count": 64 },
+				{ "item": "minecraft:sweet_berries", "count": 64 },
+				{ "item": "minecraft:glow_berries", "count": 64 },
+				{ "item": "minecraft:cookie", "count": 64 },
+				{ "item": "minecraft:pumpkin_pie", "count": 64 },
+				{ "item": "minecraft:dried_kelp", "count": 64 },
+				{ "item": "minecraft:carrot", "count": 64 },
+				{ "item": "minecraft:water_bucket", "count": 1 }
+			]
+		},
+		{
+			"id": "pro_set",
+			"shulkers": 0,
+			"items": [
+				{ "item": "minecraft:diamond_helmet", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:unbreaking": 3 } },
+				{ "item": "minecraft:diamond_chestplate", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:unbreaking": 3 } },
+				{ "item": "minecraft:diamond_leggings", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:unbreaking": 3 } },
+				{ "item": "minecraft:diamond_boots", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:feather_falling": 4, "minecraft:unbreaking": 3 } },
+				{ "item": "minecraft:diamond_sword", "count": 1, "enchantments": { "minecraft:sharpness": 5, "minecraft:looting": 3, "minecraft:unbreaking": 3 } },
+				{ "item": "minecraft:diamond_pickaxe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:fortune": 3, "minecraft:unbreaking": 3 } },
+				{ "item": "minecraft:diamond_axe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3 } },
+				{ "item": "minecraft:diamond_shovel", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3 } },
+				{ "item": "minecraft:diamond_hoe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3 } },
+				{ "item": "minecraft:bow", "count": 1, "enchantments": { "minecraft:power": 5, "minecraft:unbreaking": 3, "minecraft:infinity": 1 } },
+				{ "item": "minecraft:arrow", "count": 64 },
+				{ "item": "minecraft:shield", "count": 1, "enchantments": { "minecraft:unbreaking": 3 } },
+				{ "item": "minecraft:totem_of_undying", "count": 3 },
+				{ "item": "minecraft:golden_carrot", "count": 64 },
+				{ "item": "minecraft:ender_pearl", "count": 16 },
+				{ "item": "minecraft:oak_planks", "count": 128 },
+				{ "item": "minecraft:water_bucket", "count": 1 },
+				{ "item": "minecraft:lava_bucket", "count": 1 },
+				{ "item": "minecraft:torch", "count": 64 },
+				{ "item": "minecraft:ladder", "count": 64 },
+				{ "item": "minecraft:cooked_beef", "count": 64 }
+			]
+		},
+		{
+			"id": "legendary_set",
+			"shulkers": 1,
+			"items": [
+				{ "item": "minecraft:netherite_helmet", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:respiration": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_chestplate", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_leggings", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_boots", "count": 1, "enchantments": { "minecraft:protection": 4, "minecraft:feather_falling": 4, "minecraft:depth_strider": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_sword", "count": 1, "enchantments": { "minecraft:sharpness": 5, "minecraft:looting": 3, "minecraft:sweeping_edge": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_pickaxe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:fortune": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_axe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_shovel", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_hoe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:netherite_spear", "count": 1, "enchantments": { "minecraft:sharpness": 5, "minecraft:lunge": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:bow", "count": 1, "enchantments": { "minecraft:power": 5, "minecraft:unbreaking": 3, "minecraft:infinity": 1 } },
+				{ "item": "minecraft:shield", "count": 1, "enchantments": { "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
+				{ "item": "minecraft:arrow", "count": 64 },
+				{ "item": "minecraft:totem_of_undying", "count": 3 },
+				{ "item": "minecraft:golden_apple", "count": 32 },
+				{ "item": "minecraft:golden_carrot", "count": 64 },
+				{ "item": "minecraft:ender_pearl", "count": 16 },
+				{ "item": "minecraft:wind_charge", "count": 32 },
+				{ "item": "minecraft:obsidian", "count": 64 },
+				{ "item": "minecraft:oak_planks", "count": 128 },
+				{ "item": "minecraft:water_bucket", "count": 1 },
+				{ "item": "minecraft:lava_bucket", "count": 1 },
+				{ "item": "minecraft:torch", "count": 64 },
+				{ "item": "minecraft:ladder", "count": 64 },
+				{ "item": "minecraft:cooked_beef", "count": 64 }
+			]
+		}
+	]
+}
