@@ -217,8 +217,8 @@
 	"enchantment.marketplace.magnet.desc": "Mined items go straight into your inventory instead of dropping on the ground. Uses no durability.",
 	"marketplace.special.magnet.name.1": "Magnet I book",
 	"marketplace.special.magnet.name.2": "Magnet II book",
-	"marketplace.special.magnet.level.1": "Up to 32 items per swing",
-	"marketplace.special.magnet.level.2": "Up to 96 items per swing",
+	"marketplace.special.magnet.level.1": "Up to 256 items per swing",
+	"marketplace.special.magnet.level.2": "Up to 1024 items per swing",
 	"marketplace.special.magnet.hint": "Pickaxe, shovel, axe. Compatible with every enchantment, including Vein Miner and Drill.",
 	"marketplace.gui.category.special": "Special items",
 	"marketplace.tooltip.buy.special": "Special item: %s (fixed price)"

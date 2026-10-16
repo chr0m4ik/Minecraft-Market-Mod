@@ -216,8 +216,8 @@
 	"enchantment.marketplace.magnet.desc": "Добытые предметы попадают прямо в инвентарь, а не падают на землю. Прочность не тратит.",
 	"marketplace.special.magnet.name.1": "Книга «Магнит» I",
 	"marketplace.special.magnet.name.2": "Книга «Магнит» II",
-	"marketplace.special.magnet.level.1": "До 32 предметов за нажатие",
-	"marketplace.special.magnet.level.2": "До 96 предметов за нажатие",
+	"marketplace.special.magnet.level.1": "До 256 предметов за нажатие",
+	"marketplace.special.magnet.level.2": "До 1024 предметов за нажатие",
 	"marketplace.special.magnet.hint": "Кирка, лопата, топор. Совместимо со всеми зачарованиями, включая «Майнер» и «Бур».",
 	"marketplace.gui.category.special": "Особые предметы",
 	"marketplace.tooltip.buy.special": "Особый предмет: %s (цена фиксированная)"
