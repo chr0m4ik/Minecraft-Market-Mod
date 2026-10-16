@@ -7,7 +7,6 @@ import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.economy.TraderService;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.chr0m4ik.marketplace.market.MarketService;
-import com.chr0m4ik.marketplace.MarketplaceMod;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
 import com.chr0m4ik.marketplace.market.KitCatalog;
 import com.chr0m4ik.marketplace.price.ItemPrices;
@@ -1093,21 +1092,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.data.set(ORDERS_COUNT_DATA, ordersCount);
 		this.data.set(STAGED_COUNT_DATA, stagedCount);
 
-		// ВРЕМЕННАЯ диагностика цен рынка: печатаем числа и сырые ячейки, когда они изменились.
-		String stamp = ordersCount + "/" + ordersMoney + "/" + stagedCount + "/" + stagedMoney
-				+ "/" + state.markup(playerId);
-
-		if (!stamp.equals(lastMarketLog)) {
-			lastMarketLog = stamp;
-			MarketplaceMod.LOGGER.info(
-					"Рынок (диагностика): ордера {} шт на {}, неподтверждённые {} шт на {}, наценка x{}",
-					ordersCount, ordersMoney, stagedCount, stagedMoney, state.markup(playerId));
-			MarketplaceMod.LOGGER.info("Рынок (диагностика, сервер, ячейки): {}", headerDump());
-		}
-
 		// Сколько минут осталось каждому ордеру и с какой наценкой он выставлен.
-		long now = GameTime.now(server);
-
 		for (int i = 0; i < MarketService.SLOTS; i++) {
 			MarketOrder order = state.order(playerId, i);
 			ItemStack staged = state.staging(playerId).get(i);
@@ -1159,24 +1144,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		return cents / 100.0;
-	}
-
-	/**
-	 * ВРЕМЕННАЯ диагностика: сырые значения шапки данных окна. Их же печатает клиент — по двум
-	 * строкам сразу видно, сходятся ли числа на сервере и в окне игрока.
-	 */
-	public String headerDump() {
-		StringBuilder text = new StringBuilder();
-
-		for (int i = 0; i < HEADER_SIZE; i++) {
-			if (i > 0) {
-				text.append(", ");
-			}
-
-			text.append(i).append('=').append(this.data.get(i));
-		}
-
-		return text.toString();
 	}
 
 	/** Номер текущей страницы магазина (с единицы). */
@@ -1249,7 +1216,4 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	private static Component money(double amount) {
 		return Component.literal(MoneyFormat.format(amount)).withStyle(ChatFormatting.GREEN);
 	}
-
-	/** Последнее напечатанное состояние рынка (временная диагностика). */
-	private static String lastMarketLog;
 }
