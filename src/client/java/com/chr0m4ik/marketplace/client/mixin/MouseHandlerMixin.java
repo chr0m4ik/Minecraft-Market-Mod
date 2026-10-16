@@ -1,6 +1,7 @@
 package com.chr0m4ik.marketplace.client.mixin;
 
 import com.chr0m4ik.marketplace.client.MarketplaceCursor;
+import com.chr0m4ik.marketplace.client.screen.MarketplaceScreen;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
@@ -38,12 +39,33 @@ public abstract class MouseHandlerMixin {
 	}
 
 	/**
+	 * При открытии окна игра «отпускает» мышь и тоже ставит курсор в центр — это и есть причина
+	 * прыжка. Возвращаем курсор на место, если открывается именно наше окно.
+	 */
+	@Inject(method = "releaseMouse", at = @At("RETURN"))
+	private void marketplace$keepOnRelease(CallbackInfo info) {
+		if (!marketplace$isOurScreen() || !MarketplaceCursor.hasPosition()) {
+			return;
+		}
+
+		this.xpos = MarketplaceCursor.x();
+		this.ypos = MarketplaceCursor.y();
+		InputConstants.releaseMouse(Minecraft.getInstance().getWindow(), this.xpos, this.ypos);
+	}
+
+	/** Открыт ли сейчас наш экран (или он вот-вот откроется). */
+	private static boolean marketplace$isOurScreen() {
+		return MarketplaceCursor.shouldKeep()
+				|| Minecraft.getInstance().gui.screen() instanceof MarketplaceScreen;
+	}
+
+	/**
 	 * После захвата мыши возвращаем курсор туда, где он был.
 	 * Срабатывает только при открытом окне магазина.
 	 */
 	@Inject(method = "grabMouse", at = @At("RETURN"))
 	private void marketplace$restoreCursor(CallbackInfo info) {
-		if (!MarketplaceCursor.shouldKeep() || !MarketplaceCursor.hasPosition()) {
+		if (!marketplace$isOurScreen() || !MarketplaceCursor.hasPosition()) {
 			return;
 		}
 
