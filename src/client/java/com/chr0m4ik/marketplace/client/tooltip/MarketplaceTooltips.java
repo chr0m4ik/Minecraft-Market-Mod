@@ -135,11 +135,18 @@ public final class MarketplaceTooltips {
 
 	/**
 	 * Цена «особого предмета» (книги своего зачарования): она задана явно и множитель покупки
-	 * к ней не применяется — см. {@link SpecialCatalog}.
+	 * к ней не применяется — см. {@link SpecialCatalog}. У «Турбо печки» своя ветка: её цена
+	 * зависит от уровня и приходит обычной базовой ценой.
 	 *
 	 * @return {@code false}, если это не особый предмет
 	 */
 	private static boolean addSpecialPrice(List<Component> lines, ItemStack stack) {
+		// У «Турбо печки» цена зависит от уровня и уже показана как обычная базовая: вторая такая
+		// же строка только путала бы (ItemPrices берёт цену из той же таблицы SpecialCatalog).
+		if (SpecialCatalog.isLevelledBlock(stack)) {
+			return false;
+		}
+
 		OptionalDouble special = SpecialCatalog.priceOf(stack);
 
 		if (special.isEmpty()) {

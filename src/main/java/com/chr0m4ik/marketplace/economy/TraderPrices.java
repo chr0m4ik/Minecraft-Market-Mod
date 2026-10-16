@@ -89,6 +89,9 @@ public final class TraderPrices {
 	/**
 	 * Цена стака у торговца. Надбавка берётся только с самих предметов: зачарования
 	 * и содержимое контейнеров дорожают вместе с торговцем, но своей надбавки не получают.
+	 *
+	 * <p>Цена «самих предметов» считается по стаку ({@link ItemPrices#unitPriceOf}), а не по id:
+	 * у «Турбо печки» один id на четыре уровня, и надбавка должна считаться от цены своего уровня.
 	 */
 	public double price(ItemStack stack) {
 		if (stack.isEmpty()) {
@@ -96,7 +99,7 @@ public final class TraderPrices {
 		}
 
 		double base = ItemPrices.priceOf(stack);
-		double itemsOnly = ItemPrices.priceOf(stack.getItem()) * stack.getCount();
+		double itemsOnly = ItemPrices.unitPriceOf(stack) * stack.getCount();
 		return base + itemsOnly * bonus(stack.getItem());
 	}
 
@@ -107,7 +110,7 @@ public final class TraderPrices {
 		}
 
 		double normal = price(stack) * EconomyConfig.traderMultiplier();
-		double perItem = ItemPrices.priceOf(stack.getItem()) * DISCOUNT_PER_STACK * soldStacks(stack.getItem());
+		double perItem = ItemPrices.unitPriceOf(stack) * DISCOUNT_PER_STACK * soldStacks(stack.getItem());
 		double discount = Math.min(perItem * stack.getCount(), normal * MAX_DISCOUNT);
 		return Math.max(0.0, normal - discount);
 	}

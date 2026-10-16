@@ -2,6 +2,8 @@ package com.chr0m4ik.marketplace.price;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
 import com.chr0m4ik.marketplace.event.EventService;
+import com.chr0m4ik.marketplace.market.SpecialCatalog;
+import com.chr0m4ik.marketplace.turbo.TurboUpgrade;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
@@ -60,6 +62,11 @@ import java.util.Set;
  * внутри шлякера, бочки или мешка дрейфует своим собственным множителем — цена контейнера
  * целиком отдельно не дрейфует. Цена зелья собирается по ингредиентам ({@link PotionPrices})
  * и дрейфует как сам предмет-бутылочка.
+ *
+ * <p><b>Цена зависит не только от id.</b> У зелий, зачарованных книг и «Турбо печки» базовая
+ * цена складывается из компонентов предмета, поэтому основной вход — {@link #priceOf(ItemStack)}.
+ * У турбо печки четырёх уровней один id, но разные цены (100M / 250M / 600M / 1.4B): их берём
+ * из таблицы «особых предметов» — так магазинная цена и цена продажи не могут разойтись.
  */
 public final class ItemPrices {
 	/** Прайс внутри мода. Читаем его прямо из своего jar-файла, поэтому цены одинаковы на клиенте и на сервере. */
@@ -137,8 +144,9 @@ public final class ItemPrices {
 	}
 
 	/**
-	 * Базовая цена предмета за 1 штуку без микро-дрейфа. Дрейф встроен в
-	 * {@link #priceOf(ItemStack)} — там множитель уже учтён.
+	 * Базовая цена одной штуки предмета без микро-дрейфа и ивента. Годится только для предметов,
+	 * цена которых не зависит от компонентов; у стака (турбо печка, зелье) берите
+	 * {@link #basePriceOf(ItemStack)}.
 	 */
 	public static double priceOf(Item item) {
 		ensureLoaded();
@@ -184,9 +192,10 @@ public final class ItemPrices {
 
 	/**
 	 * Цена одной штуки. У зелий она считается по ингредиентам варки, у зелья дурного знамения —
-	 * по уровню силы, у всех остальных предметов берётся из прайса.
+	 * по уровню силы, у «Турбо печки» — по уровню из компонента предмета, у всех остальных
+	 * предметов берётся из прайса.
 	 */
-	private static double basePriceOf(ItemStack stack) {
+	public static double basePriceOf(ItemStack stack) {
 		if (stack.has(DataComponents.POTION_CONTENTS)) {
 			return PotionPrices.priceOf(stack);
 		}
@@ -196,7 +205,24 @@ public final class ItemPrices {
 			return PotionPrices.ominousPrice(amplifier == null ? 0 : amplifier.value());
 		}
 
+		// «Турбо печка»: её базовая цена — это её же магазинная цена (решение заказчика), а она
+		// зависит от уровня в компоненте предмета. В прайсе один id не выразит четыре уровня,
+		// поэтому цены живут в таблице «особых предметов» (см. SpecialCatalog.turboPriceOf).
+		if (TurboUpgrade.isTurbo(stack)) {
+			return SpecialCatalog.turboPriceOf(TurboUpgrade.levelOf(stack)).orElse(UNKNOWN_PRICE);
+		}
+
 		return prices.getOrDefault(stack.getItem(), UNKNOWN_PRICE);
+	}
+
+	/**
+	 * Базовая цена одной штуки такого же предмета с теми же компонентами, но без дрейфа и ивента.
+	 * Нужна там, где цена стака разбирается на «сам предмет» и «прибавки» (например, надбавка
+	 * торговца за предметы считается по ней, а не по цене id: {@link #priceOf(Item)} у турбо
+	 * печки вернул бы цену предмета вообще, без уровня).
+	 */
+	public static double unitPriceOf(ItemStack stack) {
+		return stack.isEmpty() ? 0.0 : basePriceOf(stack);
 	}
 
 	/** Стоимость того, что лежит внутри предмета (шалкер, мешок). */

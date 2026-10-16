@@ -189,6 +189,32 @@ public final class SpecialCatalog {
 		return entryOf(stack).map(entry -> OptionalDouble.of(entry.price())).orElseGet(OptionalDouble::empty);
 	}
 
+	/**
+	 * Магазинная цена «Турбо печки» нужного уровня — по ней считается и базовая цена продажи
+	 * (см. {@code price/ItemPrices.basePriceOf(ItemStack)}): заказчик решил, что продать печку
+	 * можно ровно за столько, сколько она стоит в магазине. Пусто — уровень вне {@code 1..4}.
+	 *
+	 * <p>Таблица цен одна на весь мод: и магазин, и продажа берут числа отсюда, поэтому
+	 * разойтись они не могут.
+	 */
+	public static OptionalDouble turboPriceOf(int level) {
+		return ENTRIES.stream()
+				.filter(entry -> entry.item() == TurboFurnace.ITEM && entry.level() == level)
+				.map(entry -> OptionalDouble.of(entry.price()))
+				.findFirst()
+				.orElseGet(OptionalDouble::empty);
+	}
+
+	/**
+	 * Особый предмет, у которого цена зависит от уровня в компоненте предмета (сейчас это только
+	 * «Турбо печка»). Такой предмет показывает свою цену как обычную базовую
+	 * ({@code ItemPrices.priceOf} берёт её из {@link #turboPriceOf}), поэтому отдельную строку
+	 * «цена магазина» в подсказке дублировать не нужно.
+	 */
+	public static boolean isLevelledBlock(ItemStack stack) {
+		return TurboUpgrade.levelOf(stack) > 0;
+	}
+
 	/** Запись по предмету из магазина: книга ровно с одним нашим зачарованием нужного уровня
 	 *  или свой предмет-блок с уровнем в компоненте предмета. */
 	private static Optional<Entry> entryOf(ItemStack stack) {
