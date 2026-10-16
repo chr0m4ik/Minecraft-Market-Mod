@@ -359,7 +359,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				// Ордер без режима-мишени не снимаем: это защита от случайного клика.
 				player.sendSystemMessage(Component.translatable("marketplace.gui.market.needTarget")
 						.withStyle(ChatFormatting.RED));
-				MarketSounds.refused(this.serverPlayer);
 				return;
 			}
 
@@ -379,8 +378,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
-		// Предмет (или снятый ордер) ушёл в инвентарь — короткий звук подбора.
-		MarketSounds.cellTaken(this.serverPlayer);
 		this.saveMarketCells();
 		this.updateData();
 		this.broadcastChanges();
@@ -681,8 +678,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				// Выставленный предмет нельзя ни поднять курсором, ни перетащить, ни выбросить:
 				// ордер лежит в сейве мира, и «взятый» предмет вернулся бы в ячейку при
 				// следующей перерисовке — то есть просто продублировался бы.
-				// Отказ озвучиваем: иначе клик по ордеру выглядит как «ничего не произошло».
-				this.refuse(player);
+				// Молча: клик по ордеру ничего не делает, а порядок действий описан в подсказке.
 				return;
 			}
 		}
@@ -702,13 +698,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
-		// Нажатие кнопки игрок слышит всегда (звук частицы опыта), но у кнопок с важным
-		// действием — покупка, продажа, страницы — есть свой звук, и тогда общий щелчок
-		// не играем: два звука разом сливаются в кашу.
-		if (!this.hasOwnSound(slotId)) {
-			MarketSounds.buttonClick(serverPlayer);
-		}
-
+		// Общий щелчок нажатия здесь не играем: он остался только у кнопок смены режима
+		// (количество, выдача, наценка, мишень) — остальные кнопки меню молчат.
 		if (this.kind == WindowKind.MAIN) {
 			if (slotId == MAIN_SLOT_TRADER) {
 				MarketplaceMenus.open(serverPlayer, WindowKind.TRADER);
@@ -749,6 +740,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				// Безопасный режим: пока он включён, shift-клик снимает ордер.
 				// Кнопку обрабатывает сервер, поэтому флаг переключается именно здесь,
 				// а клиент узнаёт новое состояние данными окна (updateData → TARGET_DATA).
+				MarketSounds.buttonClick(serverPlayer);
 				this.targetMode = !this.targetMode;
 				this.updateTargetButton();
 				this.updateData();
@@ -801,11 +793,13 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				MarketService.setShop(serverPlayer.getUUID(), shop.withQuantity(1).withDrop(false));
 				MarketplaceMenus.open(serverPlayer, WindowKind.BUY_LIST);
 			} else if (slotId == BUY_ITEM_QUANTITY) {
+				MarketSounds.buttonClick(serverPlayer);
 				MarketService.setShop(serverPlayer.getUUID(),
 						shop.withQuantity(MarketService.nextQuantity(shop)));
 				this.updateShopButtons();
 				this.broadcastChanges();
 			} else if (slotId == BUY_ITEM_DROP) {
+				MarketSounds.buttonClick(serverPlayer);
 				MarketService.setShop(serverPlayer.getUUID(), shop.withDrop(!shop.drop()));
 				this.updateShopButtons();
 				this.broadcastChanges();
@@ -844,30 +838,11 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	}
 
 	/**
-	 * Есть ли у кнопки свой звук. Такие кнопки играют его сами (в обработчике действия),
-	 * а общий щелчок нажатия им не достаётся.
+	 * Переключение наценки по кругу: x1 → x1,25 → x1,5 → x1,75 → x2 → x1.
 	 */
-	private boolean hasOwnSound(int slotId) {
-		return switch (this.kind) {
-			case TRADER -> slotId == TRADER_SLOT_TRADE;
-			case SELL -> slotId == MARKET_SLOT_BUY;
-			case CONFIRM -> slotId == CONFIRM_SLOT_CONFIRM;
-			case BUY_SLOT -> slotId == SLOT_WINDOW_CONFIRM;
-			case BUY_LIST -> slotId == BUY_LIST_PREV || slotId == BUY_LIST_NEXT;
-			case BUY_ITEM -> slotId == BUY_ITEM_CONFIRM;
-			default -> false;
-		};
-	}
-
-	/** Звук отказа — только на сервере и только этому игроку (на клиенте игрока-сервера нет). */
-	private void refuse(Player player) {
-		if (player instanceof ServerPlayer serverPlayer) {
-			MarketSounds.refused(serverPlayer);
-		}
-	}
-
-	/** Переключение наценки по кругу: x1 → x1,25 → x1,5 → x1,75 → x2 → x1. */
 	private void cycleMarkup(ServerPlayer player) {
+		// Смена настройки — единственный случай, когда играем короткий щелчок.
+		MarketSounds.buttonClick(player);
 		MarketplaceState state = MarketplaceEconomy.state(player.level().getServer());
 		state.setMarkup(player.getUUID(), MarketService.nextMarkup(state.markup(player.getUUID())));
 		// Обновляем кнопку и данные на месте — окно не переоткрываем, чтобы мышка не прыгала.
@@ -926,9 +901,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.market.listed",
 					Component.literal(String.valueOf(created))).withStyle(ChatFormatting.GREEN));
 			MarketSounds.ordersPlaced(player);
-		} else {
-			// Ни один предмет выставить не удалось — это отказ, а не успех.
-			MarketSounds.refused(player);
 		}
 	}
 
@@ -953,7 +925,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		} else {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.slot.noMoney", money(price))
 					.withStyle(ChatFormatting.RED));
-			MarketSounds.refused(player);
 		}
 	}
 
@@ -972,8 +943,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				sendLimitMessage(player);
 			}
 
-			// Отдавать нечего (пусто или всё упёрлось в дневной лимит) — это отказ.
-			MarketSounds.refused(player);
+			// Отдавать нечего (пусто или всё упёрлось в дневной лимит) — просто выходим.
 			return;
 		}
 
@@ -1001,7 +971,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		MarketService.setShop(serverPlayer.getUUID(), MarketService.shop(serverPlayer.getUUID()).withSelected(stack.copy()));
-		MarketSounds.shopItemPicked(serverPlayer);
 		MarketplaceMenus.open(serverPlayer, WindowKind.BUY_ITEM);
 	}
 
@@ -1016,11 +985,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.loadShopPage();
 		this.updateData();
 		this.broadcastChanges();
-
-		// Листать нечего, если страница одна — тогда и звука нет.
-		if (pages > 1) {
-			MarketSounds.pageTurn(player);
-		}
 	}
 
 	/** Покупка выбранного предмета. Окно не закрывается — можно покупать дальше. */
@@ -1043,7 +1007,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		} else {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.buy.noMoney", money(cost))
 					.withStyle(ChatFormatting.RED));
-			MarketSounds.refused(player);
 		}
 
 		this.updateData();

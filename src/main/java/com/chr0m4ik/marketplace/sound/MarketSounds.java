@@ -26,6 +26,11 @@ import net.minecraft.sounds.SoundSource;
  *
  * <p>Громкость умеренная (0,25–0,6), питч слегка дрожит. Выключить всё можно флагом
  * {@code sounds} в {@code data/marketplace/economy.json} — проверка одна, в {@link #play}.
+ *
+ * <p><b>Звучат только содержательные события</b> (решение заказчика): покупка, продажа
+ * торговцу, проданный ордер, деньги за офлайн-продажу, покупка слота, подтверждение ордеров
+ * и смена режима/настройки. Обычные кнопки меню, страницы, открытие окон, забор предмета
+ * и отказ — молчат: это был фоновый шум.
  */
 public final class MarketSounds {
 	/** Категория громкости: звуки интерфейса идут по общему ползунку «Общая громкость». */
@@ -38,24 +43,13 @@ public final class MarketSounds {
 		// Класс только со статическими методами.
 	}
 
-	/** Нажатие кнопки, у которой нет своего звука. */
+	/**
+	 * Короткий щелчок смены режима или настройки. Играется только у кнопок, которые что-то
+	 * переключают: количество, способ выдачи, наценка, режим-мишень. У остальных кнопок
+	 * (выход, отмена, назад, разделы, справка) звука нет — иначе это фоновый шум.
+	 */
 	public static void buttonClick(ServerPlayer player) {
 		play(player, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.4F, 1.0F);
-	}
-
-	/** Вход в окна мода из игры (открытие окна). */
-	public static void windowOpen(ServerPlayer player) {
-		play(player, SoundEvents.UI_BUTTON_CLICK, 0.25F, 1.0F);
-	}
-
-	/** Перелистывание страниц магазина. */
-	public static void pageTurn(ServerPlayer player) {
-		play(player, SoundEvents.BOOK_PAGE_TURN, 0.5F, 1.0F);
-	}
-
-	/** Выбрали товар в списке магазина (открывается окно покупки). */
-	public static void shopItemPicked(ServerPlayer player) {
-		play(player, SoundEvents.EXPERIENCE_ORB_PICKUP, 0.4F, 1.1F);
 	}
 
 	/** Покупка в магазине: обычный предмет — арфа, набор («кит») — колокольчики. */
@@ -70,11 +64,6 @@ public final class MarketSounds {
 	/** Продажа торговцу: та же арфа, но нотой ниже — покупка и продажа различаются на слух. */
 	public static void traderSold(ServerPlayer player) {
 		play(player, SoundEvents.NOTE_BLOCK_HARP, 0.6F, 0.8F);
-	}
-
-	/** Отказ: не хватило денег, торговать нечем, лимит или снятие ордера без режима-мишени. */
-	public static void refused(ServerPlayer player) {
-		play(player, SoundEvents.VILLAGER_NO, 0.5F, 1.0F);
 	}
 
 	/** Ордер на рынке продался. */
@@ -95,11 +84,6 @@ public final class MarketSounds {
 	/** Ордера выставлены (подтверждение в окне рынка). */
 	public static void ordersPlaced(ServerPlayer player) {
 		play(player, SoundEvents.NOTE_BLOCK_PLING, 0.5F, 1.4F);
-	}
-
-	/** Забрали предмет из ячейки рынка. */
-	public static void cellTaken(ServerPlayer player) {
-		play(player, SoundEvents.ITEM_PICKUP, 0.4F, 1.0F);
 	}
 
 	/**
