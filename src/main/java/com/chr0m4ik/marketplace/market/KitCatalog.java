@@ -189,7 +189,7 @@ public final class KitCatalog {
 		double sum = 0.0;
 
 		for (ItemStack item : kit.items()) {
-			sum += ItemPrices.priceOf(item) * item.getCount();
+			sum += ItemPrices.priceOf(item);
 		}
 
 		sum += kit.shulkers() * ItemPrices.priceOf(Items.SHULKER_BOX);
@@ -283,20 +283,28 @@ public final class KitCatalog {
 				continue;
 			}
 
-			ItemStack stack = new ItemStack(item.get(), object.get("count").getAsInt());
+			Item entry = item.get();
+			int total = object.get("count").getAsInt();
+			int perStack = Math.max(1, entry.getDefaultMaxStackSize());
 
-			if (object.has("enchantments") && registries != null) {
-				applyEnchantments(stack, object.getAsJsonObject("enchantments"));
+			// Большие количества режем на нормальные стаки: стак из 128 предметов игра
+			// отправить не может (именно из-за этого вылетал мир при покупке набора).
+			for (int left = total; left > 0; left -= perStack) {
+				ItemStack stack = new ItemStack(entry, Math.min(perStack, left));
+
+				if (object.has("enchantments") && registries != null) {
+					applyEnchantments(stack, object.getAsJsonObject("enchantments"));
+				}
+
+				if (object.has("potion") && registries != null) {
+					Identifier potionId = Identifier.parse(object.get("potion").getAsString());
+					registries.lookup(Registries.POTION)
+							.flatMap(lookup -> lookup.get(net.minecraft.resources.ResourceKey.create(Registries.POTION, potionId)))
+							.ifPresent(holder -> stack.set(DataComponents.POTION_CONTENTS, new PotionContents(holder)));
+				}
+
+				items.add(stack);
 			}
-
-			if (object.has("potion") && registries != null) {
-				Identifier potionId = Identifier.parse(object.get("potion").getAsString());
-				registries.lookup(Registries.POTION)
-						.flatMap(lookup -> lookup.get(net.minecraft.resources.ResourceKey.create(Registries.POTION, potionId)))
-						.ifPresent(holder -> stack.set(DataComponents.POTION_CONTENTS, new PotionContents(holder)));
-			}
-
-			items.add(stack);
 		}
 
 		return List.copyOf(items);
