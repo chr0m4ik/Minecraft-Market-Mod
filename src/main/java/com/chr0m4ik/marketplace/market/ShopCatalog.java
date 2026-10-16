@@ -156,7 +156,9 @@ public final class ShopCatalog {
 
 		switch (category) {
 			case KITS -> {
-				// Киты появятся на этапе 8.
+				for (KitCatalog.Kit kit : KitCatalog.kits()) {
+					stacks.add(KitCatalog.iconOf(kit));
+				}
 			}
 			case POTIONS -> {
 				addPotions(stacks, true);

@@ -8,6 +8,7 @@ import com.chr0m4ik.marketplace.economy.TraderService;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
+import com.chr0m4ik.marketplace.market.KitCatalog;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
@@ -986,6 +987,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		setMoney(0, MarketplaceEconomy.getBalance(server, playerId));
 		// Список книг зачарований строится по реестру мира — отдаём его каталогу магазина.
 		ShopCatalog.setRegistries(server.registryAccess());
+		// Наборы тоже собираются из реестров (зачарования и зелья внутри).
+		KitCatalog.setRegistries(server.registryAccess());
 		this.data.set(8, (int) Math.round(state.markup(playerId) * 100.0));
 		this.data.set(9, MarketService.unlockedSlots(state, playerId));
 
