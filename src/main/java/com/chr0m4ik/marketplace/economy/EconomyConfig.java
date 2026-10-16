@@ -27,14 +27,21 @@ import java.nio.charset.StandardCharsets;
  *     <li>{@code market_markups} — наценки рынка (x1…x2);</li>
  *     <li>{@code markup_slowdowns} — во сколько раз наценка замедляет продажу (пары с {@code market_markups} по порядку);</li>
  *     <li>{@code drift_amplitude} — амплитуда микро-дрейфа (±доля цены);</li>
- *     <li>{@code craft_markup} и {@code smelt_markup} — наценки генератора прайса (для справки).</li>
+ *     <li>{@code craft_markup} и {@code smelt_markup} — наценки генератора прайса (для справки);</li>
+ *     <li>{@code sounds} — играть ли звуки мода ({@code false} выключает их все);</li>
+ *     <li>{@code event_*} — крупные экономические ивенты: шанс в игровой день, длительность
+ *     в секундах, максимальный процент изменения цены, максимальное число предметов и слухи
+ *     (см. {@link #eventMaxPercent()} и {@code event/EventService}).</li>
  * </ul>
  *
  * <p><b>Проверка при старте.</b> Покупка обязана быть дороже самой выгодной продажи даже
- * в худшем для игрока случае (дрейф): {@code buy × (1 − амплитуда)} должно быть больше
- * {@code max(наценки) × (1 + амплитуда)} и больше {@code торговец × (1 + надбавка) × (1 + амплитуда)}.
- * Если условие нарушено, в лог пишется {@code ERROR} с понятным текстом — иначе игрок сможет
- * покупать предмет и продавать его же дороже, то есть печатать деньги.
+ * в худшем для игрока случае (дрейф и ивент): {@code buy × (1 − амплитуда) × (1 − ивент)} должно
+ * быть больше {@code max(наценки) × (1 + амплитуда) × (1 − ивент)} и больше
+ * {@code торговец × (1 + надбавка) × (1 + амплитуда) × (1 − ивент)}. Ивент симметричен (одинаково
+ * удешевляет и покупку, и продажу), поэтому его множитель стоит с обеих сторон неравенства —
+ * именно так посчитаны числа в логе. Если условие нарушено, в лог пишется {@code ERROR}
+ * с понятным текстом — иначе игрок сможет покупать предмет и продавать его же дороже,
+ * то есть печатать деньги.
  *
  * <p>Надбавка торговца берётся из {@link TraderPrices#MAX_BONUS}: это его личная особенность,
  * а не мировая настройка экономики.
@@ -52,14 +59,18 @@ public final class EconomyConfig {
 	private static final double DEFAULT_CRAFT_MARKUP = 1.25;
 	private static final double DEFAULT_SMELT_MARKUP = 1.15;
 
+	/** Играть ли звуки мода. Заказчик может выключить их одним флагом в файле. */
+	private static final boolean DEFAULT_SOUNDS = true;
+
 	/** Набор значений из файла. Массивы не меняются после чтения. */
 	private record Values(double buyMultiplier, double traderMultiplier, double[] marketMarkups,
-			double[] markupSlowdowns, double driftAmplitude, double craftMarkup, double smeltMarkup) {
+			double[] markupSlowdowns, double driftAmplitude, double craftMarkup, double smeltMarkup,
+			boolean sounds) {
 	}
 
 	private static final Values DEFAULTS = new Values(DEFAULT_BUY_MULTIPLIER, DEFAULT_TRADER_MULTIPLIER,
 			DEFAULT_MARKET_MARKUPS, DEFAULT_MARKUP_SLOWDOWNS, DEFAULT_DRIFT_AMPLITUDE,
-			DEFAULT_CRAFT_MARKUP, DEFAULT_SMELT_MARKUP);
+			DEFAULT_CRAFT_MARKUP, DEFAULT_SMELT_MARKUP, DEFAULT_SOUNDS);
 
 	private static volatile Values values = DEFAULTS;
 	private static volatile boolean loadAttempted;
@@ -97,14 +108,16 @@ public final class EconomyConfig {
 						array(object, "markup_slowdowns", DEFAULT_MARKUP_SLOWDOWNS),
 						number(object, "drift_amplitude", DEFAULT_DRIFT_AMPLITUDE),
 						number(object, "craft_markup", DEFAULT_CRAFT_MARKUP),
-						number(object, "smelt_markup", DEFAULT_SMELT_MARKUP));
+						number(object, "smelt_markup", DEFAULT_SMELT_MARKUP),
+						flag(object, "sounds", DEFAULT_SOUNDS));
 				values = parsed;
 				loaded = true;
 
 				MarketplaceMod.LOGGER.info("Настройки экономики загружены: покупка ×{}, торговец ×{},"
-								+ " наценки рынка {}, дрейф ±{}%, наценка крафта {}, переплавки {}",
+								+ " наценки рынка {}, дрейф ±{}%, наценка крафта {}, переплавки {}, звуки {}",
 						parsed.buyMultiplier(), parsed.traderMultiplier(), format(parsed.marketMarkups()),
-						parsed.driftAmplitude() * 100.0, parsed.craftMarkup(), parsed.smeltMarkup());
+						parsed.driftAmplitude() * 100.0, parsed.craftMarkup(), parsed.smeltMarkup(),
+						parsed.sounds() ? "включены" : "выключены");
 				validate(parsed);
 			}
 		} catch (IOException | RuntimeException exception) {
@@ -125,6 +138,19 @@ public final class EconomyConfig {
 		}
 
 		return element.getAsDouble();
+	}
+
+	/** Да/нет из файла; если поля нет — значение по умолчанию. */
+	private static boolean flag(JsonObject object, String key, boolean fallback) {
+		JsonElement element = object.get(key);
+
+		if (element == null || !element.isJsonPrimitive() || !element.getAsJsonPrimitive().isBoolean()) {
+			MarketplaceMod.LOGGER.warn("В настройках экономики нет флага «{}» — беру значение по умолчанию {}",
+					key, fallback);
+			return fallback;
+		}
+
+		return element.getAsBoolean();
 	}
 
 	/** Список чисел из файла; если поля нет или список пуст — значения по умолчанию. */
@@ -280,6 +306,15 @@ public final class EconomyConfig {
 	public static double smeltMarkup() {
 		ensureLoaded();
 		return values.smeltMarkup();
+	}
+
+	/**
+	 * Включены ли звуки мода ({@code sounds} в {@code economy.json}). При {@code false}
+	 * не играет ни один звук мода: проверка стоит в одном месте — {@code MarketSounds}.
+	 */
+	public static boolean soundsEnabled() {
+		ensureLoaded();
+		return values.sounds();
 	}
 
 	/** Прочитан ли файл настроек (если нет — работают значения по умолчанию). */

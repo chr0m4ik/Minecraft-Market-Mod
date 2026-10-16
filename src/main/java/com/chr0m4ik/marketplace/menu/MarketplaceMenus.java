@@ -1,6 +1,7 @@
 package com.chr0m4ik.marketplace.menu;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
+import com.chr0m4ik.marketplace.sound.MarketSounds;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerPlayer;
@@ -58,6 +59,12 @@ public final class MarketplaceMenus {
 
 	/** Открывает игроку нужное окно. */
 	public static void open(ServerPlayer player, WindowKind kind) {
+		// Вход в рынок из игры озвучиваем один раз. Переходы между окнами мода — это нажатие
+		// кнопки, у него уже есть свой звук, и «открытие окна» звучало бы вторым звуком подряд.
+		if (!(player.containerMenu instanceof MarketplaceMenu)) {
+			MarketSounds.windowOpen(player);
+		}
+
 		player.openMenu(new SimpleMenuProvider(
 				(syncId, inventory, p) -> new MarketplaceMenu(kind, syncId, inventory),
 				kind.title()

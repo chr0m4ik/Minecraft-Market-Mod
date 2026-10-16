@@ -9,6 +9,7 @@ import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
 import com.chr0m4ik.marketplace.market.KitCatalog;
+import com.chr0m4ik.marketplace.sound.MarketSounds;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -351,6 +352,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				// Ордер без режима-мишени не снимаем: это защита от случайного клика.
 				player.sendSystemMessage(Component.translatable("marketplace.gui.market.needTarget")
 						.withStyle(ChatFormatting.RED));
+				MarketSounds.refused(this.serverPlayer);
 				return;
 			}
 
@@ -370,6 +372,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+		// Предмет (или снятый ордер) ушёл в инвентарь — короткий звук подбора.
+		MarketSounds.cellTaken(this.serverPlayer);
 		this.saveMarketCells();
 		this.updateData();
 		this.broadcastChanges();
@@ -670,6 +674,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				// Выставленный предмет нельзя ни поднять курсором, ни перетащить, ни выбросить:
 				// ордер лежит в сейве мира, и «взятый» предмет вернулся бы в ячейку при
 				// следующей перерисовке — то есть просто продублировался бы.
+				// Отказ озвучиваем: иначе клик по ордеру выглядит как «ничего не произошло».
+				this.refuse(player);
 				return;
 			}
 		}
@@ -687,6 +693,13 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		// Окна открывает и сделки проводит только сервер: на клиенте serverPlayer пустой.
 		if (!(player instanceof ServerPlayer serverPlayer)) {
 			return;
+		}
+
+		// Нажатие кнопки игрок слышит всегда (звук частицы опыта), но у кнопок с важным
+		// действием — покупка, продажа, страницы — есть свой звук, и тогда общий щелчок
+		// не играем: два звука разом сливаются в кашу.
+		if (!this.hasOwnSound(slotId)) {
+			MarketSounds.buttonClick(serverPlayer);
 		}
 
 		if (this.kind == WindowKind.MAIN) {
@@ -823,6 +836,29 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 	}
 
+	/**
+	 * Есть ли у кнопки свой звук. Такие кнопки играют его сами (в обработчике действия),
+	 * а общий щелчок нажатия им не достаётся.
+	 */
+	private boolean hasOwnSound(int slotId) {
+		return switch (this.kind) {
+			case TRADER -> slotId == TRADER_SLOT_TRADE;
+			case SELL -> slotId == MARKET_SLOT_BUY;
+			case CONFIRM -> slotId == CONFIRM_SLOT_CONFIRM;
+			case BUY_SLOT -> slotId == SLOT_WINDOW_CONFIRM;
+			case BUY_LIST -> slotId == BUY_LIST_PREV || slotId == BUY_LIST_NEXT;
+			case BUY_ITEM -> slotId == BUY_ITEM_CONFIRM;
+			default -> false;
+		};
+	}
+
+	/** Звук отказа — только на сервере и только этому игроку (на клиенте игрока-сервера нет). */
+	private void refuse(Player player) {
+		if (player instanceof ServerPlayer serverPlayer) {
+			MarketSounds.refused(serverPlayer);
+		}
+	}
+
 	/** Переключение наценки по кругу: x1 → x1,25 → x1,5 → x1,75 → x2 → x1. */
 	private void cycleMarkup(ServerPlayer player) {
 		MarketplaceState state = MarketplaceEconomy.state(player.level().getServer());
@@ -882,6 +918,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		if (created > 0) {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.market.listed",
 					Component.literal(String.valueOf(created))).withStyle(ChatFormatting.GREEN));
+			MarketSounds.ordersPlaced(player);
+		} else {
+			// Ни один предмет выставить не удалось — это отказ, а не успех.
+			MarketSounds.refused(player);
 		}
 	}
 
@@ -899,12 +939,14 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		if (MarketService.buySlot(server, player.getUUID())) {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.slot.bought", money(price))
 					.withStyle(ChatFormatting.GREEN));
+			MarketSounds.marketSlotBought(player);
 			// Окно не переоткрываем: обновляем данные, чтобы сразу показалась новая цена слота.
 			this.updateData();
 			this.broadcastChanges();
 		} else {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.slot.noMoney", money(price))
 					.withStyle(ChatFormatting.RED));
+			MarketSounds.refused(player);
 		}
 	}
 
@@ -923,6 +965,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				sendLimitMessage(player);
 			}
 
+			// Отдавать нечего (пусто или всё упёрлось в дневной лимит) — это отказ.
+			MarketSounds.refused(player);
 			return;
 		}
 
@@ -930,6 +974,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 		player.sendSystemMessage(Component.translatable("marketplace.gui.trader.sold",
 				Component.literal(String.valueOf(sale.itemCount())), money(sale.payout())));
+		MarketSounds.traderSold(player);
 
 		if (sale.limitReached()) {
 			sendLimitMessage(player);
@@ -949,6 +994,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		MarketService.setShop(serverPlayer.getUUID(), MarketService.shop(serverPlayer.getUUID()).withSelected(stack.copy()));
+		MarketSounds.shopItemPicked(serverPlayer);
 		MarketplaceMenus.open(serverPlayer, WindowKind.BUY_ITEM);
 	}
 
@@ -963,6 +1009,11 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.loadShopPage();
 		this.updateData();
 		this.broadcastChanges();
+
+		// Листать нечего, если страница одна — тогда и звука нет.
+		if (pages > 1) {
+			MarketSounds.pageTurn(player);
+		}
 	}
 
 	/** Покупка выбранного предмета. Окно не закрывается — можно покупать дальше. */
@@ -980,9 +1031,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.buy.bought",
 					Component.literal(String.valueOf(shop.count())), shop.selected().getHoverName(),
 					money(player.isCreative() ? 0.0 : cost)).withStyle(ChatFormatting.GREEN));
+			// У набора («кита») свой звук: покупка набора — событие покрупнее обычной покупки.
+			MarketSounds.shopBought(player, KitCatalog.kitOf(shop.selected()).isPresent());
 		} else {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.buy.noMoney", money(cost))
 					.withStyle(ChatFormatting.RED));
+			MarketSounds.refused(player);
 		}
 
 		this.updateData();

@@ -4,6 +4,7 @@ import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
+import com.chr0m4ik.marketplace.sound.MarketSounds;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.ChatFormatting;
@@ -59,6 +60,9 @@ public final class MarketTick {
 
 				if (online == null) {
 					state.addPendingSale(playerId, total);
+				} else {
+					// Ордер продался при игроке — звук поднятия уровня, один на всю пачку продаж.
+					MarketSounds.orderSold(online);
 				}
 			}
 		});
@@ -75,6 +79,8 @@ public final class MarketTick {
 			handler.getPlayer().sendSystemMessage(Component.translatable("marketplace.gui.market.offline",
 					Component.literal(String.valueOf((int) pending[0])),
 					Component.literal(MoneyFormat.format(pending[1]))).withStyle(ChatFormatting.GOLD));
+			// Деньги за проданное в отсутствие игрока — тихий звук получения.
+			MarketSounds.offlineMoney(handler.getPlayer());
 		});
 	}
 }
