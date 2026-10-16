@@ -1,12 +1,12 @@
 // Проверка микро-дрейфа цен (price/PriceDrift.java) без запуска игры.
 //
-// Зачем: формула дрейфа должна (1) всегда оставаться в пределах ±5% и (2) давать
+// Зачем: формула дрейфа должна (1) всегда оставаться в пределах ±3% и (2) давать
 // одинаковые числа на сервере и на клиенте. В игре её считает один и тот же класс,
 // поэтому достаточно проверить саму формулу на больших объёмах.
 //
 // Важно: ниже формула повторена по строкам из PriceDrift.java (drift + itemPhase + itemIdHash).
 // Если PriceDrift.java изменится, эту функцию нужно поправить так же — в конце есть
-// проверка контрольных значений из настоящего сервера (REAL_VALUES), она это заметит.
+// проверка контрольных значений (REAL_VALUES), она это заметит.
 //
 // Запуск: node tools/verify-drift.js
 import { readFileSync } from 'node:fs';
@@ -16,7 +16,7 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 
 // --- Настройки: должны совпадать с константами в PriceDrift.java ---
-const AMPLITUDE = 0.05;
+const AMPLITUDE = 0.03;
 const WAVES = [
 	{ weight: 0.50, period: 24_000, phaseSalt: 0x9E37 },
 	{ weight: 0.30, period: 6_000, phaseSalt: 0x85EB },
@@ -62,23 +62,27 @@ function multiplier(id, gameTime, seed) {
 // Контрольные значения, снятые с настоящего сервера (временный отчёт PriceDriftReport
 // на мире с зерном -8485521596771069071). Если формула здесь разойдётся с PriceDrift.java,
 // проверка сразу это покажет.
+//
+// Поправка на амплитуду: сервер печатал множители при амплитуде 0,05. После перехода на 0,03
+// волнистая часть формулы не изменилась, а сама амплитуда — общий множитель, поэтому старые
+// значения пересчитаны точно: новое = 1 + (старое − 1) × 0,03 / 0,05 = 1 + (старое − 1) × 0,6.
 const REAL_SEED = -8485521596771069071n;
 const REAL_VALUES = [
-	{ id: 'minecraft:diamond', time: 0, expected: 1.030108 },
-	{ id: 'minecraft:apple', time: 0, expected: 1.027170 },
-	{ id: 'minecraft:netherite_ingot', time: 0, expected: 1.000553 },
-	{ id: 'minecraft:coal', time: 0, expected: 0.970713 },
-	{ id: 'minecraft:shulker_box', time: 0, expected: 0.974049 },
-	{ id: 'minecraft:diamond', time: 72_000, expected: 1.030108 },
-	{ id: 'minecraft:apple', time: 72_000, expected: 1.027170 },
-	{ id: 'minecraft:netherite_ingot', time: 72_000, expected: 1.000553 },
-	{ id: 'minecraft:coal', time: 72_000, expected: 0.970713 },
-	{ id: 'minecraft:shulker_box', time: 72_000, expected: 0.974049 },
-	{ id: 'minecraft:diamond', time: 583_777, expected: 0.973910 },
-	{ id: 'minecraft:apple', time: 583_777, expected: 0.950630 },
-	{ id: 'minecraft:netherite_ingot', time: 583_777, expected: 1.021922 },
-	{ id: 'minecraft:coal', time: 583_777, expected: 0.994366 },
-	{ id: 'minecraft:shulker_box', time: 583_777, expected: 0.989778 },
+	{ id: 'minecraft:diamond', time: 0, expected: 1.018065 },
+	{ id: 'minecraft:apple', time: 0, expected: 1.016302 },
+	{ id: 'minecraft:netherite_ingot', time: 0, expected: 1.000332 },
+	{ id: 'minecraft:coal', time: 0, expected: 0.982428 },
+	{ id: 'minecraft:shulker_box', time: 0, expected: 0.984429 },
+	{ id: 'minecraft:diamond', time: 72_000, expected: 1.018065 },
+	{ id: 'minecraft:apple', time: 72_000, expected: 1.016302 },
+	{ id: 'minecraft:netherite_ingot', time: 72_000, expected: 1.000332 },
+	{ id: 'minecraft:coal', time: 72_000, expected: 0.982428 },
+	{ id: 'minecraft:shulker_box', time: 72_000, expected: 0.984429 },
+	{ id: 'minecraft:diamond', time: 583_777, expected: 0.984346 },
+	{ id: 'minecraft:apple', time: 583_777, expected: 0.970378 },
+	{ id: 'minecraft:netherite_ingot', time: 583_777, expected: 1.013153 },
+	{ id: 'minecraft:coal', time: 583_777, expected: 0.996620 },
+	{ id: 'minecraft:shulker_box', time: 583_777, expected: 0.993867 },
 ];
 
 const seed = REAL_SEED;
@@ -93,12 +97,12 @@ const times = [0, 72_000, 583_777];
 
 console.log('=== Множители дрейфа (5 предметов × 3 момента времени) ===');
 console.log(`зерно мира: ${seed}`);
-console.log('предмет                     тик      множитель    отклонение      покупка x2.5     торговец x0.75');
+console.log('предмет                     тик      множитель    отклонение      покупка x2.2     торговец x0.75');
 
 for (const time of times) {
 	for (const item of items) {
 		const m = multiplier(item.id, time, seed);
-		const buy = item.price * m * 2.5;
+		const buy = item.price * m * 2.2;
 		const trader = item.price * m * 0.75;
 
 		console.log(`${item.id.padEnd(27)} ${String(time).padStart(6)}  x${m.toFixed(6)}  `
