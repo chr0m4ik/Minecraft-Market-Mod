@@ -545,3 +545,100 @@ for (const row of kitRows.filter((value) => ['pvp_pro', 'pvp_extra', 'legendary_
 	console.log(`  ${row.kit.id}: цена ${money(price)} — распродажа x1 ${percent(row.resaleX1 / price - 1)},`
 		+ ` x2 ${percent(row.resaleX2 / price - 1)}`);
 }
+
+// ---------------------------------------------------------------------------
+// 4. Крупные ивенты: проверка настроек и «печати денег» с ивентом.
+//
+// Множитель ивента симметричен: он одинаково опускает (или поднимает) и покупку, и продажу.
+// Поэтому в неравенстве «покупка дороже продажи» он стоит с обеих сторон и сокращается:
+//   покупка × (1 − дрейф) × (1 − ивент)  >  рынок × (1 + дрейф) × (1 − ивент)
+//   покупка × (1 − дрейф) × (1 − ивент)  >  торговец × (1 + надбавка) × (1 + дрейф) × (1 − ивент)
+// Числа ниже — как в economy/EconomyConfig.java (validate). Настройки ивентов читаются из
+// economy.json теми же ключами event_*.
+// ---------------------------------------------------------------------------
+const EVENT = {
+	daily_chance: ECONOMY.event_daily_chance ?? 0.33,
+	min_seconds: ECONOMY.event_min_seconds ?? 180,
+	max_seconds: ECONOMY.event_max_seconds ?? 600,
+	max_percent: ECONOMY.event_max_percent ?? 0.2,
+	max_items: ECONOMY.event_max_items ?? 10,
+	rumor_chance: ECONOMY.event_rumor_chance ?? 0.5,
+	rumor_min_seconds: ECONOMY.event_rumor_min_seconds ?? 30,
+	rumor_max_seconds: ECONOMY.event_rumor_max_seconds ?? 120,
+};
+
+console.log('\n=== 4. Крупные ивенты ===');
+console.log(`настройки: шанс ${(EVENT.daily_chance * 100).toFixed(1)}% в игровой день,`
+	+ ` длительность ${EVENT.min_seconds}–${EVENT.max_seconds} с,`
+	+ ` максимум ±${(EVENT.max_percent * 100).toFixed(1)}%, до ${EVENT.max_items} предметов,`
+	+ ` слух с шансом ${(EVENT.rumor_chance * 100).toFixed(1)}% за`
+	+ ` ${EVENT.rumor_min_seconds}–${EVENT.rumor_max_seconds} с`);
+
+// Разумность настроек: те же пределы, что в EconomyConfig.sanitize.
+const EVENT_PERCENT_LIMIT = 0.2;
+const EVENT_MAX_ITEMS_LIMIT = 10;
+const sanity = [
+	['event_daily_chance в 0…1', EVENT.daily_chance >= 0 && EVENT.daily_chance <= 1],
+	['event_rumor_chance в 0…1', EVENT.rumor_chance >= 0 && EVENT.rumor_chance <= 1],
+	['event_max_percent > 0 и ≤ 0,2', EVENT.max_percent > 0 && EVENT.max_percent <= EVENT_PERCENT_LIMIT],
+	['event_min_seconds ≥ 1', EVENT.min_seconds >= 1],
+	['event_max_seconds ≤ 3600', EVENT.max_seconds <= 3600],
+	['event_min_seconds ≤ event_max_seconds', EVENT.min_seconds <= EVENT.max_seconds],
+	['event_max_items в 1…10', EVENT.max_items >= 1 && EVENT.max_items <= EVENT_MAX_ITEMS_LIMIT],
+	['event_rumor_min_seconds ≥ 1', EVENT.rumor_min_seconds >= 1],
+	['event_rumor_min_seconds ≤ event_rumor_max_seconds', EVENT.rumor_min_seconds <= EVENT.rumor_max_seconds],
+];
+
+for (const [name, passed] of sanity) {
+	console.log(`  ${passed ? 'OK  ' : 'ОШИБКА'} ${name}`);
+}
+
+const EVENT_LOW = 1 - EVENT.max_percent;
+// Худший случай: купили на дне дрейфа во время ивента на падение, продаём в тот же момент.
+const buyWorst = BUY * (1 - DRIFT) * EVENT_LOW;
+const marketWorstEvent = MAX_MARKUP * (1 + DRIFT) * EVENT_LOW;
+const traderWorstEvent = TRADER * (1 + TRADER_BONUS) * (1 + DRIFT) * EVENT_LOW;
+
+console.log(`худшая покупка: ${BUY} × ${(1 - DRIFT).toFixed(2)} × ${EVENT_LOW.toFixed(2)} = ${buyWorst.toFixed(4)}`);
+console.log(`рынок в тот же момент: ${MAX_MARKUP} × ${(1 + DRIFT).toFixed(2)} × ${EVENT_LOW.toFixed(2)}`
+	+ ` = ${marketWorstEvent.toFixed(4)} → запас ${percent(buyWorst / marketWorstEvent - 1)}`);
+console.log(`торговец в тот же момент: ${TRADER} × ${(1 + TRADER_BONUS).toFixed(2)} × ${(1 + DRIFT).toFixed(2)}`
+	+ ` × ${EVENT_LOW.toFixed(2)} = ${traderWorstEvent.toFixed(4)} → запас`
+	+ ` ${percent(buyWorst / traderWorstEvent - 1)}`);
+
+// Перебор всех предметов прайса: запас у ивента не зависит от предмета (множитель общий),
+// поэтому проверяем, что ни один предмет не выбивается из общего правила.
+let checkedItems = 0;
+let printable = 0;
+let worstMarketItem = { id: '', margin: Infinity };
+let worstTraderItem = { id: '', margin: Infinity };
+
+for (const id of Object.keys(PRICE)) {
+	if (NOT_BUYABLE.has(id)) continue;
+
+	checkedItems++;
+	const price = basePrice(id);
+	const buy = price * BUY * (1 - DRIFT) * EVENT_LOW;
+	const market = price * MAX_MARKUP * (1 + DRIFT) * EVENT_LOW;
+	const trader = price * TRADER * (1 + TRADER_BONUS) * (1 + DRIFT) * EVENT_LOW;
+	const marketMargin = buy / market - 1;
+	const traderMargin = buy / trader - 1;
+
+	if (marketMargin <= 0 || traderMargin <= 0) printable++;
+	if (marketMargin < worstMarketItem.margin) worstMarketItem = { id, margin: marketMargin };
+	if (traderMargin < worstTraderItem.margin) worstTraderItem = { id, margin: traderMargin };
+}
+
+console.log(`проверено предметов (можно купить): ${checkedItems}, печатают деньги: ${printable}`);
+console.log(`наименьший запас против рынка: ${percent(worstMarketItem.margin)} (${worstMarketItem.id})`);
+console.log(`наименьший запас против торговца: ${percent(worstTraderItem.margin)} (${worstTraderItem.id})`);
+
+// Отдельно — следствие симметричности: купить во время ивента на падение и продать уже ПОСЛЕ
+// его окончания. Это заложено в согласованной схеме (мгновенной наживы нет), но числа показываем.
+const afterEventMarket = MAX_MARKUP * (1 + DRIFT);
+console.log(`следствие: покупка на падении ${buyWorst.toFixed(4)}, рынок после ивента до`
+	+ ` ${afterEventMarket.toFixed(4)} → разница ${percent(afterEventMarket / buyWorst - 1)}`
+	+ ` (в моде оставлено осознанно: продажа идёт часами, см. market/SaleTimes.java)`);
+
+const eventsOk = sanity.every(([, passed]) => passed) && buyWorst > marketWorstEvent && buyWorst > traderWorstEvent;
+console.log(`ИТОГ: ${eventsOk ? 'ВЫПОЛНЕНО (настройки ивентов разумны, мгновенной печати денег нет)' : 'НАРУШЕНО'}`);

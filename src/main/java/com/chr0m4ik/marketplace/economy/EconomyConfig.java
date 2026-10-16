@@ -62,15 +62,49 @@ public final class EconomyConfig {
 	/** Играть ли звуки мода. Заказчик может выключить их одним флагом в файле. */
 	private static final boolean DEFAULT_SOUNDS = true;
 
+	/** Ивенты: шанс в игровой день, длительность в секундах, максимальный процент изменения цены. */
+	private static final double DEFAULT_EVENT_DAILY_CHANCE = 0.33;
+	private static final double DEFAULT_EVENT_MIN_SECONDS = 180.0;
+	private static final double DEFAULT_EVENT_MAX_SECONDS = 600.0;
+	private static final double DEFAULT_EVENT_MAX_PERCENT = 0.2;
+	private static final int DEFAULT_EVENT_MAX_ITEMS = 10;
+	private static final double DEFAULT_EVENT_RUMOR_CHANCE = 0.5;
+	private static final double DEFAULT_EVENT_RUMOR_MIN_SECONDS = 30.0;
+	private static final double DEFAULT_EVENT_RUMOR_MAX_SECONDS = 120.0;
+
+	/**
+	 * Пределы, за которые мод не выпускает настройки ивентов (при выходе — ERROR в лог
+	 * и значение по умолчанию). {@value #EVENT_PERCENT_LIMIT} — договорённые ±20%:
+	 * больше нельзя, иначе ивент перестаёт быть «до ±20%» и ломает проверку экономики.
+	 */
+	private static final double EVENT_PERCENT_LIMIT = 0.2;
+
+	/** Самая короткая и самая длинная длительность ивента, которую примет мод (секунды). */
+	private static final double EVENT_MIN_SECONDS_LIMIT = 1.0;
+	private static final double EVENT_MAX_SECONDS_LIMIT = 3600.0;
+
+	/** Больше этого числа предметов ивент не затронет: договорились про «до 10». */
+	private static final int EVENT_MAX_ITEMS_LIMIT = 10;
+
+	/** Настройки крупных ивентов (см. {@code event/EventService}). */
+	private record EventSettings(double dailyChance, double minSeconds, double maxSeconds, double maxPercent,
+			int maxItems, double rumorChance, double rumorMinSeconds, double rumorMaxSeconds) {
+	}
+
 	/** Набор значений из файла. Массивы не меняются после чтения. */
 	private record Values(double buyMultiplier, double traderMultiplier, double[] marketMarkups,
 			double[] markupSlowdowns, double driftAmplitude, double craftMarkup, double smeltMarkup,
-			boolean sounds) {
+			boolean sounds, EventSettings events) {
 	}
+
+	private static final EventSettings EVENT_DEFAULTS = new EventSettings(DEFAULT_EVENT_DAILY_CHANCE,
+			DEFAULT_EVENT_MIN_SECONDS, DEFAULT_EVENT_MAX_SECONDS, DEFAULT_EVENT_MAX_PERCENT,
+			DEFAULT_EVENT_MAX_ITEMS, DEFAULT_EVENT_RUMOR_CHANCE, DEFAULT_EVENT_RUMOR_MIN_SECONDS,
+			DEFAULT_EVENT_RUMOR_MAX_SECONDS);
 
 	private static final Values DEFAULTS = new Values(DEFAULT_BUY_MULTIPLIER, DEFAULT_TRADER_MULTIPLIER,
 			DEFAULT_MARKET_MARKUPS, DEFAULT_MARKUP_SLOWDOWNS, DEFAULT_DRIFT_AMPLITUDE,
-			DEFAULT_CRAFT_MARKUP, DEFAULT_SMELT_MARKUP, DEFAULT_SOUNDS);
+			DEFAULT_CRAFT_MARKUP, DEFAULT_SMELT_MARKUP, DEFAULT_SOUNDS, EVENT_DEFAULTS);
 
 	private static volatile Values values = DEFAULTS;
 	private static volatile boolean loadAttempted;
@@ -101,6 +135,17 @@ public final class EconomyConfig {
 
 			try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
 				JsonObject object = JsonParser.parseReader(reader).getAsJsonObject();
+				// Настройки ивентов проверяем сразу: заказчик может вписать что угодно, а мод
+				// обязан работать только с разумными числами (процент ≤ 0.2 и так далее).
+				EventSettings events = sanitize(new EventSettings(
+						number(object, "event_daily_chance", DEFAULT_EVENT_DAILY_CHANCE),
+						number(object, "event_min_seconds", DEFAULT_EVENT_MIN_SECONDS),
+						number(object, "event_max_seconds", DEFAULT_EVENT_MAX_SECONDS),
+						number(object, "event_max_percent", DEFAULT_EVENT_MAX_PERCENT),
+						(int) Math.round(number(object, "event_max_items", DEFAULT_EVENT_MAX_ITEMS)),
+						number(object, "event_rumor_chance", DEFAULT_EVENT_RUMOR_CHANCE),
+						number(object, "event_rumor_min_seconds", DEFAULT_EVENT_RUMOR_MIN_SECONDS),
+						number(object, "event_rumor_max_seconds", DEFAULT_EVENT_RUMOR_MAX_SECONDS)));
 				Values parsed = new Values(
 						number(object, "buy_multiplier", DEFAULT_BUY_MULTIPLIER),
 						number(object, "trader_multiplier", DEFAULT_TRADER_MULTIPLIER),
@@ -109,7 +154,8 @@ public final class EconomyConfig {
 						number(object, "drift_amplitude", DEFAULT_DRIFT_AMPLITUDE),
 						number(object, "craft_markup", DEFAULT_CRAFT_MARKUP),
 						number(object, "smelt_markup", DEFAULT_SMELT_MARKUP),
-						flag(object, "sounds", DEFAULT_SOUNDS));
+						flag(object, "sounds", DEFAULT_SOUNDS),
+						events);
 				values = parsed;
 				loaded = true;
 
@@ -118,6 +164,12 @@ public final class EconomyConfig {
 						parsed.buyMultiplier(), parsed.traderMultiplier(), format(parsed.marketMarkups()),
 						parsed.driftAmplitude() * 100.0, parsed.craftMarkup(), parsed.smeltMarkup(),
 						parsed.sounds() ? "включены" : "выключены");
+				MarketplaceMod.LOGGER.info("Настройки ивентов: шанс {}% в игровой день, длительность"
+								+ " {}–{} с, максимум ±{}%, до {} предметов, слух с шансом {}% за {}–{} с",
+						one(events.dailyChance() * 100.0), one(events.minSeconds()), one(events.maxSeconds()),
+						one(events.maxPercent() * 100.0), events.maxItems(),
+						one(events.rumorChance() * 100.0), one(events.rumorMinSeconds()),
+						one(events.rumorMaxSeconds()));
 				validate(parsed);
 			}
 		} catch (IOException | RuntimeException exception) {
@@ -202,35 +254,121 @@ public final class EconomyConfig {
 	}
 
 	/**
+	 * Приводит настройки ивентов к разумным. Всё, что вне пределов, заменяется значением
+	 * по умолчанию, а в лог идёт {@code ERROR} с числами — молчаливых исправлений не делаем:
+	 * заказчик должен видеть, что именно в файле не так.
+	 */
+	private static EventSettings sanitize(EventSettings settings) {
+		double dailyChance = chance(settings.dailyChance(), "event_daily_chance", DEFAULT_EVENT_DAILY_CHANCE);
+		double rumorChance = chance(settings.rumorChance(), "event_rumor_chance", DEFAULT_EVENT_RUMOR_CHANCE);
+		double percent = settings.maxPercent();
+
+		if (percent <= 0.0 || percent > EVENT_PERCENT_LIMIT) {
+			MarketplaceMod.LOGGER.error("НАСТРОЙКА ИВЕНТОВ НЕДОПУСТИМА: event_max_percent = {}, а допустимо"
+							+ " больше 0 и не больше {} (±{}%). Беру значение по умолчанию {} в {}",
+					num(percent), num(EVENT_PERCENT_LIMIT), num(EVENT_PERCENT_LIMIT * 100.0),
+					num(DEFAULT_EVENT_MAX_PERCENT), FILE_PATH);
+			percent = DEFAULT_EVENT_MAX_PERCENT;
+		}
+
+		double minSeconds = seconds(settings.minSeconds(), "event_min_seconds", DEFAULT_EVENT_MIN_SECONDS);
+		double maxSeconds = seconds(settings.maxSeconds(), "event_max_seconds", DEFAULT_EVENT_MAX_SECONDS);
+
+		if (minSeconds > maxSeconds) {
+			MarketplaceMod.LOGGER.error("НАСТРОЙКА ИВЕНТОВ НЕДОПУСТИМА: event_min_seconds = {} больше"
+							+ " event_max_seconds = {} — беру {} с для обоих в {}",
+					num(minSeconds), num(maxSeconds), num(minSeconds), FILE_PATH);
+			maxSeconds = minSeconds;
+		}
+
+		int maxItems = settings.maxItems();
+
+		if (maxItems < 1 || maxItems > EVENT_MAX_ITEMS_LIMIT) {
+			MarketplaceMod.LOGGER.error("НАСТРОЙКА ИВЕНТОВ НЕДОПУСТИМА: event_max_items = {}, а допустимо"
+							+ " от 1 до {}. Беру {} в {}",
+					maxItems, EVENT_MAX_ITEMS_LIMIT, DEFAULT_EVENT_MAX_ITEMS, FILE_PATH);
+			maxItems = DEFAULT_EVENT_MAX_ITEMS;
+		}
+
+		double rumorMin = seconds(settings.rumorMinSeconds(), "event_rumor_min_seconds",
+				DEFAULT_EVENT_RUMOR_MIN_SECONDS);
+		double rumorMax = seconds(settings.rumorMaxSeconds(), "event_rumor_max_seconds",
+				DEFAULT_EVENT_RUMOR_MAX_SECONDS);
+
+		if (rumorMin > rumorMax) {
+			MarketplaceMod.LOGGER.error("НАСТРОЙКА ИВЕНТОВ НЕДОПУСТИМА: event_rumor_min_seconds = {} больше"
+							+ " event_rumor_max_seconds = {} — беру {} с для обоих в {}",
+					num(rumorMin), num(rumorMax), num(rumorMin), FILE_PATH);
+			rumorMax = rumorMin;
+		}
+
+		return new EventSettings(dailyChance, minSeconds, maxSeconds, percent, maxItems, rumorChance,
+				rumorMin, rumorMax);
+	}
+
+	/** Шанс: должен быть в пределах 0…1, иначе берём значение по умолчанию. */
+	private static double chance(double value, String key, double fallback) {
+		if (value < 0.0 || value > 1.0) {
+			MarketplaceMod.LOGGER.error("НАСТРОЙКА ИВЕНТОВ НЕДОПУСТИМА: {} = {}, а допустимо от 0 до 1."
+							+ " Беру {} в {}",
+					key, num(value), num(fallback), FILE_PATH);
+			return fallback;
+		}
+
+		return value;
+	}
+
+	/** Длительность в секундах: от {@value #EVENT_MIN_SECONDS_LIMIT} до {@value #EVENT_MAX_SECONDS_LIMIT}. */
+	private static double seconds(double value, String key, double fallback) {
+		if (value < EVENT_MIN_SECONDS_LIMIT || value > EVENT_MAX_SECONDS_LIMIT) {
+			MarketplaceMod.LOGGER.error("НАСТРОЙКА ИВЕНТОВ НЕДОПУСТИМА: {} = {}, а допустимо от {} до {} с."
+							+ " Беру {} в {}",
+					key, num(value), num(EVENT_MIN_SECONDS_LIMIT), num(EVENT_MAX_SECONDS_LIMIT),
+					num(fallback), FILE_PATH);
+			return fallback;
+		}
+
+		return value;
+	}
+
+	/**
 	 * Проверка «печати денег». Покупка должна быть дороже любой продажи даже в худшем
-	 * для мода случае: купили на самом дне дрейфа, продали на самом пике.
+	 * для мода случае: купили на самом дне дрейфа и во время ивента на падение, продали
+	 * на самом пике. Ивент симметричен (одинаково опускает и покупку, и продажу), поэтому
+	 * его множитель стоит с обеих сторон неравенства — ровно как в числах лога.
 	 */
 	private static void validate(Values checked) {
 		double amplitude = Math.max(0.0, checked.driftAmplitude());
+		double event = Math.max(0.0, checked.events().maxPercent());
 		double low = 1.0 - amplitude;
 		double high = 1.0 + amplitude;
-		double buy = checked.buyMultiplier() * low;
-		double market = maxOf(checked.marketMarkups()) * high;
-		double trader = checked.traderMultiplier() * (1.0 + TraderPrices.MAX_BONUS) * high;
+		double eventLow = 1.0 - event;
+		double buy = checked.buyMultiplier() * low * eventLow;
+		double market = maxOf(checked.marketMarkups()) * high * eventLow;
+		double trader = checked.traderMultiplier() * (1.0 + TraderPrices.MAX_BONUS) * high * eventLow;
 		boolean ok = true;
 
 		if (buy <= market) {
 			ok = false;
 			MarketplaceMod.LOGGER.error("НАСТРОЙКИ ЭКОНОМИКИ ПОЗВОЛЯЮТ ПЕЧАТАТЬ ДЕНЬГИ: покупка даёт {}"
-							+ " (buy_multiplier {} × {}), а рынок платит до {} (наценка {} × {}) — покупка обязана"
-							+ " быть дороже. Уменьшите market_markups или увеличьте buy_multiplier в {}",
-					num(buy), checked.buyMultiplier(), num(low), num(market),
-					num(maxOf(checked.marketMarkups())), num(high), FILE_PATH);
+							+ " (buy_multiplier {} × дрейф {} × ивент {}), а рынок платит до {}"
+							+ " (наценка {} × дрейф {} × ивент {}) — покупка обязана быть дороже."
+							+ " Уменьшите market_markups или event_max_percent, либо увеличьте"
+							+ " buy_multiplier в {}",
+					num(buy), num(checked.buyMultiplier()), num(low), num(eventLow), num(market),
+					num(maxOf(checked.marketMarkups())), num(high), num(eventLow), FILE_PATH);
 		}
 
 		if (buy <= trader) {
 			ok = false;
 			MarketplaceMod.LOGGER.error("НАСТРОЙКИ ЭКОНОМИКИ ПОЗВОЛЯЮТ ПЕЧАТАТЬ ДЕНЬГИ: покупка даёт {}"
-							+ " (buy_multiplier {} × {}), а торговец с максимальной надбавкой {} платит до {}"
-							+ " (trader_multiplier {} × {} × {}) — покупка обязана быть дороже. Уменьшите"
-							+ " trader_multiplier или увеличьте buy_multiplier в {}",
-					num(buy), checked.buyMultiplier(), num(low), num(TraderPrices.MAX_BONUS), num(trader),
-					checked.traderMultiplier(), num(1.0 + TraderPrices.MAX_BONUS), num(high), FILE_PATH);
+							+ " (buy_multiplier {} × дрейф {} × ивент {}), а торговец с максимальной"
+							+ " надбавкой {} платит до {} (trader_multiplier {} × {} × дрейф {} × ивент {})"
+							+ " — покупка обязана быть дороже. Уменьшите trader_multiplier или"
+							+ " event_max_percent, либо увеличьте buy_multiplier в {}",
+					num(buy), num(checked.buyMultiplier()), num(low), num(eventLow),
+					num(TraderPrices.MAX_BONUS), num(trader), num(checked.traderMultiplier()),
+					num(1.0 + TraderPrices.MAX_BONUS), num(high), num(eventLow), FILE_PATH);
 		}
 
 		if (checked.marketMarkups().length != checked.markupSlowdowns().length) {
@@ -242,12 +380,26 @@ public final class EconomyConfig {
 		if (ok) {
 			MarketplaceMod.LOGGER.info("Проверка экономики пройдена: худшая покупка {} > рынок {} и торговец {}",
 					num(buy), num(market), num(trader));
+			// Мгновенной наживы нет: ивент симметричен. Но купить предмет во время ивента на падение
+			// и продать его уже после окончания ивента — выгодно, и это заложено в согласованной схеме.
+			// Пишем числа в лог, чтобы это не всплыло сюрпризом.
+			double afterEvent = maxOf(checked.marketMarkups()) * high;
+			MarketplaceMod.LOGGER.info("Известное следствие ивентов: во время падения цены предмет стоит {}"
+							+ " (buy_multiplier {} × дрейф {} × ивент {}), а после окончания ивента рынок"
+							+ " платит до {} — разница до {} в пользу покупки на падении",
+					num(buy), num(checked.buyMultiplier()), num(low), num(eventLow), num(afterEvent),
+					num(afterEvent - buy));
 		}
 	}
 
 	/** Число для лога: 4 знака после точки и точка как разделитель, независимо от языка системы. */
 	private static String num(double value) {
 		return String.format(java.util.Locale.ROOT, "%.4f", value);
+	}
+
+	/** Число для лога покороче: один знак после точки (проценты, секунды ивентов). */
+	private static String one(double value) {
+		return String.format(java.util.Locale.ROOT, "%.1f", value);
 	}
 
 	/** Самая большая наценка рынка. */
@@ -315,6 +467,59 @@ public final class EconomyConfig {
 	public static boolean soundsEnabled() {
 		ensureLoaded();
 		return values.sounds();
+	}
+
+	// --- Крупные ивенты (см. event/EventService) ---
+
+	/** Шанс, что в игровой день случится ивент (0…1). Бросок делается раз в игровой день. */
+	public static double eventDailyChance() {
+		ensureLoaded();
+		return values.events().dailyChance();
+	}
+
+	/** Самая короткая длительность ивента в секундах реального времени. */
+	public static double eventMinSeconds() {
+		ensureLoaded();
+		return values.events().minSeconds();
+	}
+
+	/** Самая длинная длительность ивента в секундах реального времени. */
+	public static double eventMaxSeconds() {
+		ensureLoaded();
+		return values.events().maxSeconds();
+	}
+
+	/**
+	 * Максимальное изменение цены ивентом: доля от базовой цены (0.2 = ±20%).
+	 * Больше {@value #EVENT_PERCENT_LIMIT} мод не принимает — см. {@link #sanitize}.
+	 */
+	public static double eventMaxPercent() {
+		ensureLoaded();
+		return values.events().maxPercent();
+	}
+
+	/** Сколько предметов максимум затронет ивент на несколько предметов (договорились про «до 10»). */
+	public static int eventMaxItems() {
+		ensureLoaded();
+		return values.events().maxItems();
+	}
+
+	/** Шанс, что перед ивентом придёт слух (0…1). */
+	public static double eventRumorChance() {
+		ensureLoaded();
+		return values.events().rumorChance();
+	}
+
+	/** За сколько секунд до начала ивента слух может прийти (минимум). */
+	public static double eventRumorMinSeconds() {
+		ensureLoaded();
+		return values.events().rumorMinSeconds();
+	}
+
+	/** За сколько секунд до начала ивента слух может прийти (максимум). */
+	public static double eventRumorMaxSeconds() {
+		ensureLoaded();
+		return values.events().rumorMaxSeconds();
 	}
 
 	/** Прочитан ли файл настроек (если нет — работают значения по умолчанию). */
