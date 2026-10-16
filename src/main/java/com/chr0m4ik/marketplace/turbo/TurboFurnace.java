@@ -1,14 +1,19 @@
 package com.chr0m4ik.marketplace.turbo;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -86,6 +91,14 @@ public final class TurboFurnace {
 			MarketplaceMod.id("turbo_furnace"),
 			new BlockEntityType<>(TurboFurnaceBlockEntity::new, Set.of(BLOCK)));
 
+	/**
+	 * Вкладка креатива «Функциональные блоки» — та, в которой лежит ванильная печь.
+	 * В 26.3 ключи вкладок в {@code CreativeModeTabs} приватные, поэтому ключ собираем сами:
+	 * имя вкладки — {@code functional_blocks} (видно в {@code CreativeModeTabs.createKey}).
+	 */
+	private static final ResourceKey<CreativeModeTab> FUNCTIONAL_BLOCKS = ResourceKey.create(
+			Registries.CREATIVE_MODE_TAB, Identifier.withDefaultNamespace("functional_blocks"));
+
 	private TurboFurnace() {
 		// Класс только со статическими полями и методами.
 	}
@@ -100,6 +113,11 @@ public final class TurboFurnace {
 		if (ITEM instanceof BlockItem blockItem) {
 			blockItem.registerBlocks(Item.BY_BLOCK, ITEM);
 		}
+
+		// В креативном меню печка стоит сразу после ванильной печи. Это только удобство для
+		// тестов и построек: покупается печка по-прежнему в магазине.
+		CreativeModeTabEvents.modifyOutputEvent(FUNCTIONAL_BLOCKS)
+				.register(output -> output.insertAfter(Items.FURNACE, new ItemStack(ITEM)));
 	}
 
 	/** Множитель скорости уровня: время плавки ваниль делит на это число. */
