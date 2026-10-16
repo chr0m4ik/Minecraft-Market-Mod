@@ -170,8 +170,8 @@ public final class MarketplaceCommands {
 				.withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.money.add")
 				.withStyle(ChatFormatting.GRAY), false);
-		source.sendSuccess(() -> Component.translatable("marketplace.command.help.drift")
-				.withStyle(ChatFormatting.GRAY), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.help.drift",
+				amplitude()).withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.event")
 				.withStyle(ChatFormatting.GRAY), false);
 
@@ -341,9 +341,9 @@ public final class MarketplaceCommands {
 		source.sendSuccess(() -> Component.translatable("marketplace.command.drift.multiplier",
 				Component.literal(String.format("%.4f", multiplier)).withStyle(
 						multiplier >= 1.0 ? ChatFormatting.GREEN : ChatFormatting.RED),
-				percent(multiplier - 1.0)).withStyle(ChatFormatting.GRAY), false);
+				percent(multiplier - 1.0), amplitude()).withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.drift.unit",
-				money(unit), Component.literal(String.format("%.1f", PriceDrift.amplitude() * 100.0)))
+				money(unit), amplitude())
 				.withStyle(ChatFormatting.WHITE), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.drift.buy",
 				money(unit * EconomyConfig.buyMultiplier())), false);
@@ -397,5 +397,10 @@ public final class MarketplaceCommands {
 	/** Отклонение дрейфа в процентах со знаком. */
 	private static Component percent(double fraction) {
 		return Component.literal(String.format("%+.2f%%", fraction * 100.0));
+	}
+
+	/** Амплитуда микро-дрейфа в процентах (берётся из настроек экономики) — для подсказок. */
+	private static Component amplitude() {
+		return Component.literal(String.format("%.1f", PriceDrift.amplitude() * 100.0));
 	}
 }

@@ -69,7 +69,7 @@
 	"marketplace.command.help.money.get": "/market money get [игрок] — посмотреть баланс",
 	"marketplace.command.help.money.set": "/market money set <игрок> <сумма> — установить баланс",
 	"marketplace.command.help.money.add": "/market money add <игрок> <сумма> — изменить баланс (отрицательная сумма вычитает)",
-	"marketplace.command.help.drift": "/market drift <предмет> [тик] — показать микро-дрейф цены (±5%)",
+	"marketplace.command.help.drift": "/market drift <предмет> [тик] — показать микро-дрейф цены (±%s%%)",
 	"marketplace.command.help.event": "/market event list — крупные ивенты (пока не реализованы)",
 
 	"marketplace.command.money.balance.self": "Твой баланс: %s",
@@ -89,7 +89,7 @@
 
 	"marketplace.command.drift.header": "Микро-дрейф цены: %s",
 	"marketplace.command.drift.base": "Базовая цена: %s",
-	"marketplace.command.drift.multiplier": "Множитель дрейфа: x%s (%s) — пределы ±5%%",
+	"marketplace.command.drift.multiplier": "Множитель дрейфа: x%s (%s) — пределы ±%s%%",
 	"marketplace.command.drift.unit": "Цена сейчас: %s (дрейф ходит в пределах ±%s%%)",
 	"marketplace.command.drift.buy": "Купить в магазине: %s",
 	"marketplace.command.drift.trader": "Сдать торговцу: %s",

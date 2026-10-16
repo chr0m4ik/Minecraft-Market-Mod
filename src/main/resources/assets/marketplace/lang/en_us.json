@@ -69,7 +69,7 @@
 	"marketplace.command.help.money.get": "/market money get [player] — show balance",
 	"marketplace.command.help.money.set": "/market money set <player> <amount> — set balance",
 	"marketplace.command.help.money.add": "/market money add <player> <amount> — change balance (negative amount subtracts)",
-	"marketplace.command.help.drift": "/market drift <item> [tick] — show the price micro-drift (±5%)",
+	"marketplace.command.help.drift": "/market drift <item> [tick] — show the price micro-drift (±%s%%)",
 	"marketplace.command.help.event": "/market event list — big events (not implemented yet)",
 
 	"marketplace.command.money.balance.self": "Your balance: %s",
@@ -89,7 +89,7 @@
 
 	"marketplace.command.drift.header": "Price micro-drift: %s",
 	"marketplace.command.drift.base": "Base price: %s",
-	"marketplace.command.drift.multiplier": "Drift multiplier: x%s (%s) — limits ±5%%",
+	"marketplace.command.drift.multiplier": "Drift multiplier: x%s (%s) — limits ±%s%%",
 	"marketplace.command.drift.unit": "Price right now: %s (drift stays within ±%s%%)",
 	"marketplace.command.drift.buy": "Buy in the shop: %s",
 	"marketplace.command.drift.trader": "Sell to the trader: %s",
