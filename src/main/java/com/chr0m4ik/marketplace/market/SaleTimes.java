@@ -7,11 +7,14 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BundleContents;
+import net.minecraft.world.item.component.ItemContainerContents;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,6 +35,10 @@ import java.util.Optional;
  * <p>Настоящее время получается случайным: от {@value #MIN_FACTOR} до {@value #MAX_FACTOR} от
  * среднего, причём чем дороже предмет, тем выше шанс, что продажа затянется. Кроме того, наценка
  * замедляет продажу (см. {@link #markupSlowdown}).
+ *
+ * <p>Время считается вместе с содержимым контейнеров (см. {@link #secondsOf}): шалкер с полным
+ * составом продаётся столько же, сколько его состав по отдельности. Это осознанный баланс
+ * «прибыль против времени» — см. комментарий в {@link #secondsOf}.
  */
 public final class SaleTimes {
 	private static final String FILE_PATH = "/data/marketplace/market_times.json";
@@ -50,11 +57,18 @@ public final class SaleTimes {
 	public static final long MIN_TICKS = 10L;
 
 	/**
-	 * Потолок времени продажи: сутки реального времени. Нужен, потому что для дорогих предметов
-	 * складываются сразу три множителя (долгое базовое время, случайный разброс до ×10 и замедление
-	 * от наценки до ×10) — без потолка ордер мог бы висеть неделями.
+	 * Потолок времени продажи: трое реальных суток. Нужен, потому что для дорогих предметов
+	 * складываются сразу три множителя: время самого предмета **вместе с содержимым**
+	 * (см. {@link #secondsOf}), случайный разброс до ×10 и замедление от наценки до ×10.
+	 *
+	 * <p>Суток не хватало: набор «ПВП про» на x2 продаётся дольше 24 часов, и потолок обрезал
+	 * бы замысел заказчика («прибыль против времени» — см. {@code KitCatalog}). Поэтому потолок
+	 * поднят до 72 часов: даже с потолком один ордер с полным набором на x2 занимает дни.
 	 */
-	public static final long MAX_TICKS = 24L * 60L * 60L * 20L;
+	public static final long MAX_TICKS = 72L * 60L * 60L * 20L;
+
+	/** Насколько глубоко разворачиваем содержимое контейнеров (защита от зацикливания). */
+	private static final int MAX_CONTENT_DEPTH = 8;
 
 	private static Map<Item, Double> seconds = Map.of();
 	private static boolean loadAttempted;
@@ -150,9 +164,46 @@ public final class SaleTimes {
 		return MIN_FACTOR + Math.pow(random.nextDouble(), skew) * (MAX_FACTOR - MIN_FACTOR);
 	}
 
+	/**
+	 * Время продажи одной штуки вместе с содержимым контейнеров. Считаем рекурсивно, как
+	 * лимиты торговца ({@code TraderService.limitCost}): время самого предмета плюс время
+	 * каждого предмета внутри. Так шалкер с полным составом продаётся столько же, сколько
+	 * его содержимое по отдельности, — это осознанный баланс «прибыль против времени»:
+	 * наценка x2 к такому ордеру обменивает двойную выплату на дни ожидания.
+	 */
+	public static double secondsOf(ItemStack stack) {
+		return secondsOf(stack, 0);
+	}
+
+	private static double secondsOf(ItemStack stack, int depth) {
+		if (stack.isEmpty() || depth > MAX_CONTENT_DEPTH) {
+			return 0.0;
+		}
+
+		double total = secondsPerItem(stack.getItem()) * stack.getCount();
+
+		ItemContainerContents container = stack.get(DataComponents.CONTAINER);
+
+		if (container != null) {
+			for (ItemStack inside : container.itemCopies().toList()) {
+				total += secondsOf(inside, depth + 1);
+			}
+		}
+
+		BundleContents bundle = stack.get(DataComponents.BUNDLE_CONTENTS);
+
+		if (bundle != null) {
+			for (ItemStack inside : bundle.itemCopies().toList()) {
+				total += secondsOf(inside, depth + 1);
+			}
+		}
+
+		return total;
+	}
+
 	/** Сколько тиков будет продаваться этот стак при такой наценке. */
 	public static long ticksFor(ItemStack stack, double markup, RandomSource random) {
-		double secondsForStack = secondsPerItem(stack.getItem()) * stack.getCount();
+		double secondsForStack = secondsOf(stack);
 		double slowdown = markupSlowdown(markup);
 		double factor = randomFactor(ItemPrices.priceOf(stack), random);
 		long ticks = Math.round(secondsForStack * slowdown * factor * 20.0);
