@@ -84,6 +84,15 @@ public final class DrillHandler {
 		// Класс только со статическими методами.
 	}
 
+	/**
+	 * Ломает ли бур блоки прямо сейчас. Нужно «Магниту»: слои куба ломаются своим вызовом
+	 * {@code destroyBlock} каждый тик, но это всё ещё одно нажатие игрока — запас магнита на них
+	 * не должен сбрасываться.
+	 */
+	static boolean isActive() {
+		return ACTIVE.get();
+	}
+
 	/** Подключает обработчики. Вызывается один раз при загрузке мода. */
 	public static void register() {
 		PlayerBlockBreakEvents.AFTER.register(DrillHandler::afterBlockBreak);
