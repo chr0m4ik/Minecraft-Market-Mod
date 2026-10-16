@@ -35,6 +35,7 @@
 	"marketplace.gui.button.target.off": "выключено",
 	"marketplace.gui.button.target.hint": "Включите и сделайте Shift-клик (ПКМ или ЛКМ) по ячейке с ордером",
 	"marketplace.tooltip.market.markedUp": "С наценкой x%s: %s",
+	"marketplace.tooltip.market.fixed": "Выплата зафиксирована при выставлении: %s (ивент и дрейф её не меняют)",
 
 	"marketplace.tooltip.market.orders": "За все ордера: %s (%s шт.)",
 	"marketplace.tooltip.market.stagedMoney": "За неподтверждённые: %s (%s шт.)",

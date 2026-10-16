@@ -158,6 +158,17 @@ public final class MarketplaceTooltips {
 		}
 
 		if (menu.isCellOrder(cell)) {
+			// Выплата по ордеру зафиксирована при выставлении: если цена с тех пор ушла
+			// (микро-дрейф или ивент), говорим об этом прямо, чтобы сумма не выглядела ошибкой.
+			double fixed = menu.getCellPayout(cell);
+
+			if (Math.abs(fixed - ItemPrices.priceOf(stack) * markup) > 0.005) {
+				lines.add(Component.translatable("marketplace.tooltip.market.fixed", money(fixed))
+						.withStyle(ChatFormatting.GOLD));
+			}
+		}
+
+		if (menu.isCellOrder(cell)) {
 			// Подтверждённый ордер: он лежит в сейве мира и продаётся сам. Забрать его можно
 			// только в режиме-мишени и только shift-кликом. Состояние режима приходит с сервера
 			// данными окна, поэтому подсказка говорит правду, а не догадывается.

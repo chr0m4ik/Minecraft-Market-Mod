@@ -49,6 +49,11 @@ public class MarketplaceState extends SavedData {
 	private static final String ORDER_ITEM_KEY = "item";
 	private static final String ORDER_MARKUP_KEY = "markup";
 	private static final String ORDER_READY_KEY = "ready";
+	/**
+	 * Зафиксированная при выставлении выплата ордера. В старых сейвах ключа нет — тогда
+	 * выплата считается по-старому от текущей цены, чтобы сейвы читались без миграции.
+	 */
+	private static final String ORDER_PAYOUT_KEY = "payout";
 	private static final String BOUGHT_SLOTS_KEY = "bought_slots";
 	private static final String PENDING_SALES_KEY = "pending_sales";
 	private static final String PENDING_COUNT_KEY = "count";
@@ -520,7 +525,10 @@ public class MarketplaceState extends SavedData {
 				}
 
 				parsed.put(slot, new MarketOrder(item.get(),
-						entry.getDoubleOr(ORDER_MARKUP_KEY, 1.0), entry.getLongOr(ORDER_READY_KEY, 0L)));
+						entry.getDoubleOr(ORDER_MARKUP_KEY, 1.0), entry.getLongOr(ORDER_READY_KEY, 0L),
+						entry.contains(ORDER_PAYOUT_KEY)
+								? entry.getDoubleOr(ORDER_PAYOUT_KEY, MarketOrder.LEGACY_PAYOUT)
+								: MarketOrder.LEGACY_PAYOUT));
 			}
 
 			state.orders.put(playerId.get(), parsed);
@@ -682,6 +690,12 @@ public class MarketplaceState extends SavedData {
 
 				entry.putDouble(ORDER_MARKUP_KEY, order.markup());
 				entry.putLong(ORDER_READY_KEY, order.readyAt());
+
+				// Выплата, зафиксированная при выставлении: ивенты и дрейф её не меняют.
+				if (order.hasFixedPayout()) {
+					entry.putDouble(ORDER_PAYOUT_KEY, order.fixedPayout());
+				}
+
 				playerTag.put(String.valueOf(slot), entry);
 			});
 

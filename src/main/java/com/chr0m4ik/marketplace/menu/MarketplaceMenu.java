@@ -84,8 +84,18 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Сколько ячеек занимает шапка данных: суммы, счётчики, наценка, открытые ячейки и мишень. */
 	private static final int HEADER_SIZE = TARGET_DATA + 1;
 
+	/** С какого места начинаются наценки по ячейкам. */
+	private static final int CELL_MARKUP_START = HEADER_SIZE + MarketService.SLOTS;
+
+	/**
+	 * С какого места начинается выплата, зафиксированная при выставлении ордера, — по
+	 * {@link #MONEY_CELLS} ячеек на каждую ячейку рынка. Нужна клиенту, чтобы подсказка показывала
+	 * ровно ту сумму, которую заплатит ордер, даже если цена с тех пор изменилась (дрейф или ивент).
+	 */
+	private static final int CELL_PAYOUT_START = CELL_MARKUP_START + MarketService.SLOTS;
+
 	/** Сколько всего ячеек данных синхронизируется с клиентом. */
-	private static final int DATA_SIZE = HEADER_SIZE + MarketService.SLOTS * 2;
+	private static final int DATA_SIZE = CELL_PAYOUT_START + MarketService.SLOTS * MONEY_CELLS;
 
 	/**
 	 * С какого места в данных начинается состояние ячеек рынка: {@link #CELL_ORDER} — в ячейке
@@ -102,9 +112,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 	/** Где лежат номер страницы магазина, всего страниц и номер раздела. */
 	private static final int PAGE_DATA = HEADER_SIZE;
-
-	/** С какого места начинаются наценки по ячейкам. */
-	private static final int CELL_MARKUP_START = HEADER_SIZE + MarketService.SLOTS;
 
 	/** Слоты кнопок главного меню (средний ряд: 10, 13, 16). */
 	public static final int MAIN_SLOT_TRADER = 10;
@@ -1246,6 +1253,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			this.data.set(CELL_MARKUP_START + i,
 					order != null ? (int) Math.round(order.markup() * 100.0)
 							: (staged == null ? 0 : (int) Math.round(state.markup(playerId) * 100.0)));
+			// Выплата по ордеру зафиксирована при выставлении: подсказка показывает именно её.
+			setMoney(CELL_PAYOUT_START + i * MONEY_CELLS, order != null ? order.payout() : 0.0);
 		}
 	}
 
@@ -1256,6 +1265,18 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		return this.data.get(CELL_MARKUP_START + cell) / 100.0;
+	}
+
+	/**
+	 * Сколько заплатит ордер из этой ячейки. Выплата зафиксирована в момент выставления,
+	 * поэтому она не меняется от микро-дрейфа и крупных ивентов — подсказка говорит правду.
+	 */
+	public double getCellPayout(int cell) {
+		if (cell < 0 || cell >= MarketService.SLOTS) {
+			return 0.0;
+		}
+
+		return money(CELL_PAYOUT_START + cell * MONEY_CELLS);
 	}
 
 	/**

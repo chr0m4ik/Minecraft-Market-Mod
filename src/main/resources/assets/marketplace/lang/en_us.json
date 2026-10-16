@@ -35,6 +35,7 @@
 	"marketplace.gui.button.target.off": "disabled",
 	"marketplace.gui.button.target.hint": "Enable it and shift-click (RMB or LMB) a cell with an order",
 	"marketplace.tooltip.market.markedUp": "With markup x%s: %s",
+	"marketplace.tooltip.market.fixed": "Payout is fixed at listing time: %s (events and drift do not change it)",
 
 	"marketplace.tooltip.market.orders": "For all orders: %s (%s pcs)",
 	"marketplace.tooltip.market.stagedMoney": "For unconfirmed: %s (%s pcs)",

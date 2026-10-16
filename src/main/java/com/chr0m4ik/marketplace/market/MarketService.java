@@ -93,6 +93,9 @@ public final class MarketService {
 	/**
 	 * Выставить ордер в ячейку.
 	 *
+	 * <p>Выплата считается один раз здесь и запоминается в ордере: микро-дрейф и крупные ивенты
+	 * на уже выставленный ордер не влияют (решение заказчика).
+	 *
 	 * @return созданный ордер или {@code null}, если ячейка занята/закрыта или стак пустой
 	 */
 	public static MarketOrder placeOrder(MarketplaceState state, UUID playerId, int slot, ItemStack stack,
@@ -106,7 +109,7 @@ public final class MarketService {
 		}
 
 		MarketOrder order = new MarketOrder(stack.copy(), markup,
-				now + SaleTimes.ticksFor(stack, markup, random));
+				now + SaleTimes.ticksFor(stack, markup, random), payoutFor(stack, markup));
 		state.setOrder(playerId, slot, order);
 		return order;
 	}
@@ -145,7 +148,10 @@ public final class MarketService {
 		return sold;
 	}
 
-	/** Сколько дадут за стак при такой наценке (без учёта случайного времени продажи). */
+	/**
+	 * Сколько дадут за стак при такой наценке (без учёта случайного времени продажи).
+	 * Этой же формулой фиксируется выплата ордера в момент выставления.
+	 */
 	public static double payoutFor(ItemStack stack, double markup) {
 		return MoneyFormat.round(ItemPrices.priceOf(stack) * markup);
 	}
