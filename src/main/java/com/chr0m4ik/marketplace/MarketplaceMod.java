@@ -9,6 +9,7 @@ import com.chr0m4ik.marketplace.event.EventService;
 import com.chr0m4ik.marketplace.market.MarketTick;
 import com.chr0m4ik.marketplace.market.SaleTimes;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
+import com.chr0m4ik.marketplace.mining.VeinMinerHandler;
 import com.chr0m4ik.marketplace.network.MarketplaceNetworking;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import com.chr0m4ik.marketplace.price.PriceDrift;
@@ -52,6 +53,9 @@ public class MarketplaceMod implements ModInitializer {
 
 		// Рынок: ордера продаются со временем, даже если игрок вышел.
 		MarketTick.register();
+
+		// «Жилковый майнер»: инструмент с нашим зачарованием ломает всю жилу руды вокруг блока.
+		VeinMinerHandler.register();
 
 		// Крупные экономические ивенты: броски раз в игровой день и отсчёт по активному времени
 		// мира (без игроков ивенты замирают).
