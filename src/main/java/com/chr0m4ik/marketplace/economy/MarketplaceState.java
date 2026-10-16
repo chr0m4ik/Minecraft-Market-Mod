@@ -3,10 +3,14 @@ package com.chr0m4ik.marketplace.economy;
 import com.chr0m4ik.marketplace.MarketplaceMod;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -89,6 +93,24 @@ public class MarketplaceState extends SavedData {
 			CODEC,
 			null // datafixer не нужен: свои старые форматы мы разбираем сами
 	);
+
+	/**
+	 * Реестры мира — нужны, чтобы читать и писать предметы в сейв. Зачарования лежат
+	 * в динамическом реестре, поэтому с обычным {@link NbtOps} зачарованный предмет
+	 * вообще не кодируется: ордер молча терял бы предмет. Значение выставляет
+	 * {@link MarketplaceEconomy#state} до первого чтения сейва.
+	 */
+	private static HolderLookup.Provider registries;
+
+	/** Отдаём реестры мира (вызывается перед работой с сейвом). */
+	public static void setRegistries(HolderLookup.Provider value) {
+		registries = value;
+	}
+
+	/** Операции для NBT: с доступом к реестрам, если они уже известны. */
+	private static DynamicOps<Tag> ops() {
+		return registries == null ? NbtOps.INSTANCE : RegistryOps.create(NbtOps.INSTANCE, registries);
+	}
 
 	/** Возвращает баланс игрока. Если игрока нет в таблице — 0. */
 	public double getBalance(UUID playerId) {
@@ -357,7 +379,7 @@ public class MarketplaceState extends SavedData {
 				int slot = parseSlot(slotKey, playerKey);
 				CompoundTag entry = playerOrders.getCompoundOrEmpty(slotKey);
 				Optional<ItemStack> item = ItemStack.CODEC
-						.parse(NbtOps.INSTANCE, entry.getCompoundOrEmpty(ORDER_ITEM_KEY)).result();
+						.parse(ops(), entry.getCompoundOrEmpty(ORDER_ITEM_KEY)).result();
 
 				if (slot < 0) {
 					continue;
@@ -412,7 +434,7 @@ public class MarketplaceState extends SavedData {
 			for (String slotKey : playerStaging.keySet()) {
 				int slot = parseSlot(slotKey, playerKey);
 				Optional<ItemStack> item = ItemStack.CODEC
-						.parse(NbtOps.INSTANCE, playerStaging.getCompoundOrEmpty(slotKey).getCompoundOrEmpty(STAGING_ITEM_KEY))
+						.parse(ops(), playerStaging.getCompoundOrEmpty(slotKey).getCompoundOrEmpty(STAGING_ITEM_KEY))
 						.result();
 
 				if (slot < 0 || item.isEmpty() || item.get().isEmpty()) {
@@ -486,8 +508,11 @@ public class MarketplaceState extends SavedData {
 			playerOrders.forEach((slot, order) -> {
 				CompoundTag entry = new CompoundTag();
 
-				ItemStack.CODEC.encodeStart(NbtOps.INSTANCE, order.stack()).result()
-						.ifPresent(encoded -> entry.put(ORDER_ITEM_KEY, encoded));
+				// Ошибку кодирования не прячем: без неё предмет ордера просто исчезнет из сейва.
+				ItemStack.CODEC.encodeStart(ops(), order.stack()).result().ifPresentOrElse(
+						encoded -> entry.put(ORDER_ITEM_KEY, encoded),
+						() -> MarketplaceMod.LOGGER.error(
+								"Не удалось сохранить предмет ордера игрока {} (ячейка {})", playerId, slot));
 
 				entry.putDouble(ORDER_MARKUP_KEY, order.markup());
 				entry.putLong(ORDER_READY_KEY, order.readyAt());
@@ -522,8 +547,11 @@ public class MarketplaceState extends SavedData {
 			items.forEach((slot, item) -> {
 				CompoundTag entry = new CompoundTag();
 
-				ItemStack.CODEC.encodeStart(NbtOps.INSTANCE, item).result()
-						.ifPresent(encoded -> entry.put(STAGING_ITEM_KEY, encoded));
+				// То же, что и с ордерами: ошибку кодирования показываем в логе.
+				ItemStack.CODEC.encodeStart(ops(), item).result().ifPresentOrElse(
+						encoded -> entry.put(STAGING_ITEM_KEY, encoded),
+						() -> MarketplaceMod.LOGGER.error(
+								"Не удалось сохранить неподтверждённый предмет игрока {} (ячейка {})", playerId, slot));
 
 				playerTag.put(String.valueOf(slot), entry);
 			});

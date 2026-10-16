@@ -31,6 +31,8 @@ public final class MarketplaceEconomy {
 
 	/** Достаёт данные экономики из сейва мира (при первом обращении создаёт их). */
 	public static MarketplaceState state(MinecraftServer server) {
+		// Реестры нужны до чтения сейва: без них зачарованные предметы из ордеров не разбираются.
+		MarketplaceState.setRegistries(server.registryAccess());
 		return server.overworld().getDataStorage().computeIfAbsent(MarketplaceState.TYPE);
 	}
 
