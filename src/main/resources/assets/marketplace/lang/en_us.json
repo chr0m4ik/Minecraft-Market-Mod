@@ -110,6 +110,26 @@
 	"marketplace.event.hype": "hype",
 	"marketplace.event.shortage": "shortage",
 	"marketplace.event.blackday": "black day",
+	"marketplace.event.goldrush": "gold rush",
+	"marketplace.event.resellers": "resellers",
+	"marketplace.event.crisis": "crisis",
+
+	"marketplace.event.direction.rise": "the price rises",
+	"marketplace.event.direction.fall": "the price falls",
+	"marketplace.event.direction.any": "the price goes either way",
+
+	"marketplace.event.chat.title": "Big event: %s",
+	"marketplace.event.chat.items": "Affected items: %s",
+	"marketplace.event.chat.category": "Affected category: %s",
+	"marketplace.event.chat.unknown": "items that no longer exist in the game",
+	"marketplace.event.chat.end": "The event is over: %s",
+	"marketplace.event.rumor.up": "Market rumor: %s is about to rise in price",
+	"marketplace.event.rumor.down": "Market rumor: %s is about to fall in price",
+	"marketplace.event.rumor.category.up": "Market rumor: items in the «%s» category are about to rise in price",
+	"marketplace.event.rumor.category.down": "Market rumor: items in the «%s» category are about to fall in price",
+
+	"marketplace.time.seconds": "%s s",
+	"marketplace.time.minutes": "%s min %s s",
 
 	"marketplace.hud.balance": "Balance: %s",
 	"marketplace.hud.inventory": "Inventory: %s"

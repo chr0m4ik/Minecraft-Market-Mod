@@ -1,6 +1,7 @@
 package com.chr0m4ik.marketplace.economy;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
+import com.chr0m4ik.marketplace.event.MarketEvent;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DynamicOps;
@@ -56,6 +57,15 @@ public class MarketplaceState extends SavedData {
 	private static final String STAGING_KEY = "staging";
 	private static final String STAGING_ITEM_KEY = "item";
 	private static final String MARKUP_KEY = "markup";
+	/** Ключи крупных ивентов: активное время мира, идущий ивент и запланированный. */
+	private static final String EVENT_TIME_KEY = "event_active_time";
+	private static final String EVENT_ACTIVE_KEY = "event_active";
+	private static final String EVENT_REMAINING_KEY = "event_remaining";
+	private static final String EVENT_PENDING_KEY = "event_pending";
+	private static final String EVENT_PENDING_AT_KEY = "event_pending_at";
+	private static final String EVENT_RUMOR_AT_KEY = "event_rumor_at";
+	private static final String EVENT_RUMOR_DONE_KEY = "event_rumor_done";
+	private static final String EVENT_ROLLED_DAY_KEY = "event_rolled_day";
 
 	private final Map<UUID, Double> balances = new HashMap<>();
 	/** Игрок → (id предмета → сколько стаков уже сдано за день). */
@@ -76,6 +86,26 @@ public class MarketplaceState extends SavedData {
 	private final Map<UUID, Map<Integer, ItemStack>> staging = new HashMap<>();
 	/** Игрок → выбранная наценка для новых ордеров. */
 	private final Map<UUID, Double> markup = new HashMap<>();
+
+	/**
+	 * Активное время мира: тики, когда в игре был хотя бы один игрок. Ивенты считают время по нему,
+	 * а не по игровому времени, поэтому без игроков они замирают (см. {@code event/EventService}).
+	 * Значение копится в сейве, значит перезапуск сервера ивент не «съедает».
+	 */
+	private long activeTicks;
+
+	/** Идущий крупный ивент (null — ивента нет) и сколько тиков активного времени ему осталось. */
+	private MarketEvent activeEvent;
+	private long eventRemaining;
+
+	/** Ивент, выпавший на текущий игровой день: начнётся, когда активное время дойдёт до {@link #eventPendingAt}. */
+	private MarketEvent pendingEvent;
+	private long eventPendingAt;
+	/** Когда рассказать слух (активное время) и рассказали ли его уже. −1 — слуха нет. */
+	private long eventRumorAt = -1L;
+	private boolean eventRumorDone;
+	/** Номер игрового дня, за который бросок ивента уже сделан. Long.MIN_VALUE — ещё ни одного. */
+	private long eventRolledDay = Long.MIN_VALUE;
 
 	public MarketplaceState() {
 	}
@@ -312,6 +342,105 @@ public class MarketplaceState extends SavedData {
 		setDirty();
 	}
 
+	// --- Крупные ивенты ---
+
+	/** Активное время мира в тиках: копится, только пока в игре есть игроки. */
+	public long activeTicks() {
+		return this.activeTicks;
+	}
+
+	/** Ещё один тик с игроками в мире. */
+	public void addActiveTick() {
+		this.activeTicks++;
+		setDirty();
+	}
+
+	/** Идущий ивент или {@code null}, если ивента нет. */
+	public MarketEvent activeEvent() {
+		return this.activeEvent;
+	}
+
+	/** Сколько тиков активного времени осталось идущему ивенту. */
+	public long eventRemaining() {
+		return this.eventRemaining;
+	}
+
+	/** Начинает ивент: он становится идущим, запланированный и слух убираются. */
+	public void startEvent(MarketEvent event, long remainingTicks) {
+		this.activeEvent = event;
+		this.eventRemaining = Math.max(0L, remainingTicks);
+		clearPending();
+		setDirty();
+	}
+
+	/** Сколько ивенту осталось (пересчитывается раз в тик активного времени). */
+	public void setEventRemaining(long ticks) {
+		this.eventRemaining = Math.max(0L, ticks);
+		setDirty();
+	}
+
+	/** Ивент закончился. */
+	public void clearEvent() {
+		this.activeEvent = null;
+		this.eventRemaining = 0L;
+		setDirty();
+	}
+
+	/** Ивент, выпавший на текущий игровой день, но ещё не начавшийся (или {@code null}). */
+	public MarketEvent pendingEvent() {
+		return this.pendingEvent;
+	}
+
+	/** Активное время, когда начнётся запланированный ивент. */
+	public long eventPendingAt() {
+		return this.eventPendingAt;
+	}
+
+	/** Планирует ивент на будущее. {@code rumorAt < 0} — слуха не будет. */
+	public void scheduleEvent(MarketEvent event, long at, long rumorAt) {
+		this.pendingEvent = event;
+		this.eventPendingAt = at;
+		this.eventRumorAt = rumorAt;
+		this.eventRumorDone = false;
+		setDirty();
+	}
+
+	/** Убирает запланированный ивент и слух (ручной запуск, отмена). */
+	public void clearPending() {
+		this.pendingEvent = null;
+		this.eventPendingAt = 0L;
+		this.eventRumorAt = -1L;
+		this.eventRumorDone = false;
+		setDirty();
+	}
+
+	/** Когда рассказать слух, в активном времени. −1 — слуха нет. */
+	public long eventRumorAt() {
+		return this.eventRumorAt;
+	}
+
+	/** Рассказан ли уже слух про запланированный ивент. */
+	public boolean eventRumorDone() {
+		return this.eventRumorDone;
+	}
+
+	/** Помечает слух рассказанным — второй раз он не придёт. */
+	public void setEventRumorDone() {
+		this.eventRumorDone = true;
+		setDirty();
+	}
+
+	/** Игровой день, за который бросок ивента уже сделан. */
+	public long eventRolledDay() {
+		return this.eventRolledDay;
+	}
+
+	/** Запоминает, что бросок ивента на этот игровой день уже был. */
+	public void setEventRolledDay(long day) {
+		this.eventRolledDay = day;
+		setDirty();
+	}
+
 	// --- Превращение в NBT и обратно ---
 
 	private static MarketplaceState fromTag(CompoundTag tag) {
@@ -454,7 +583,44 @@ public class MarketplaceState extends SavedData {
 			playerId.ifPresent(id -> state.markup.put(id, storedMarkup.getDoubleOr(key, 1.0)));
 		}
 
+		// Крупные ивенты. Старые сейвы этих ключей не знают — тогда ивентов просто нет,
+		// а счётчик активного времени начинается с нуля: следующий ивент выпадет в свой день.
+		state.activeTicks = tag.getLongOr(EVENT_TIME_KEY, 0L);
+		state.eventRemaining = tag.getLongOr(EVENT_REMAINING_KEY, 0L);
+		state.eventPendingAt = tag.getLongOr(EVENT_PENDING_AT_KEY, 0L);
+		state.eventRumorAt = tag.getLongOr(EVENT_RUMOR_AT_KEY, -1L);
+		state.eventRumorDone = tag.getBooleanOr(EVENT_RUMOR_DONE_KEY, false);
+		state.eventRolledDay = tag.getLongOr(EVENT_ROLLED_DAY_KEY, Long.MIN_VALUE);
+		state.activeEvent = readEvent(tag.getCompoundOrEmpty(EVENT_ACTIVE_KEY), "идущий");
+		state.pendingEvent = readEvent(tag.getCompoundOrEmpty(EVENT_PENDING_KEY), "запланированный");
+
+		if (state.pendingEvent == null) {
+			// Запланированного ивента нет — значит, и слуха быть не может.
+			state.eventRumorAt = -1L;
+			state.eventRumorDone = false;
+		}
+
 		return state;
+	}
+
+	/**
+	 * Читает описание ивента из NBT. Повреждённую запись не прячем: пишем в лог, что именно
+	 * не так, и продолжаем без ивента — терять из-за неё весь сейв нельзя.
+	 */
+	private static MarketEvent readEvent(CompoundTag tag, String what) {
+		if (tag.isEmpty()) {
+			return null;
+		}
+
+		Optional<MarketEvent> event = MarketEvent.fromTag(tag);
+
+		if (event.isEmpty()) {
+			MarketplaceMod.LOGGER.warn("В сейве повреждено описание {} ивента — запись пропущена: {}",
+					what, tag);
+			return null;
+		}
+
+		return event.get();
 	}
 
 	private static int parseSlot(String slotKey, String playerKey) {
@@ -564,6 +730,22 @@ public class MarketplaceState extends SavedData {
 		CompoundTag storedMarkup = new CompoundTag();
 		state.markup.forEach((playerId, value) -> storedMarkup.putDouble(playerId.toString(), value));
 		tag.put(MARKUP_KEY, storedMarkup);
+
+		// Крупные ивенты: активное время, идущий ивент с остатком, запланированный со слухом.
+		tag.putLong(EVENT_TIME_KEY, state.activeTicks);
+		tag.putLong(EVENT_REMAINING_KEY, state.eventRemaining);
+		tag.putLong(EVENT_PENDING_AT_KEY, state.eventPendingAt);
+		tag.putLong(EVENT_RUMOR_AT_KEY, state.eventRumorAt);
+		tag.putBoolean(EVENT_RUMOR_DONE_KEY, state.eventRumorDone);
+		tag.putLong(EVENT_ROLLED_DAY_KEY, state.eventRolledDay);
+
+		if (state.activeEvent != null) {
+			tag.put(EVENT_ACTIVE_KEY, state.activeEvent.toTag());
+		}
+
+		if (state.pendingEvent != null) {
+			tag.put(EVENT_PENDING_KEY, state.pendingEvent.toTag());
+		}
 
 		return tag;
 	}

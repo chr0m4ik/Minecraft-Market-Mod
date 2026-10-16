@@ -110,6 +110,26 @@
 	"marketplace.event.hype": "ажиотаж",
 	"marketplace.event.shortage": "дефицит",
 	"marketplace.event.blackday": "чёрный день",
+	"marketplace.event.goldrush": "золотая лихорадка",
+	"marketplace.event.resellers": "перекупщики",
+	"marketplace.event.crisis": "кризис",
+
+	"marketplace.event.direction.rise": "цена растёт",
+	"marketplace.event.direction.fall": "цена падает",
+	"marketplace.event.direction.any": "цена в любую сторону",
+
+	"marketplace.event.chat.title": "Крупный ивент: %s",
+	"marketplace.event.chat.items": "Затронуты предметы: %s",
+	"marketplace.event.chat.category": "Затронут раздел: %s",
+	"marketplace.event.chat.unknown": "предметы, которых больше нет в игре",
+	"marketplace.event.chat.end": "Ивент закончился: %s",
+	"marketplace.event.rumor.up": "По рынку слух: скоро подорожает %s",
+	"marketplace.event.rumor.down": "По рынку слух: скоро подешевеет %s",
+	"marketplace.event.rumor.category.up": "По рынку слух: скоро подорожают товары раздела «%s»",
+	"marketplace.event.rumor.category.down": "По рынку слух: скоро подешевеют товары раздела «%s»",
+
+	"marketplace.time.seconds": "%s с",
+	"marketplace.time.minutes": "%s мин %s с",
 
 	"marketplace.hud.balance": "Баланс: %s",
 	"marketplace.hud.inventory": "Инвентарь: %s"

@@ -5,6 +5,7 @@ import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
+import com.chr0m4ik.marketplace.event.EventService;
 import com.chr0m4ik.marketplace.market.MarketTick;
 import com.chr0m4ik.marketplace.market.SaleTimes;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
@@ -51,6 +52,10 @@ public class MarketplaceMod implements ModInitializer {
 
 		// Рынок: ордера продаются со временем, даже если игрок вышел.
 		MarketTick.register();
+
+		// Крупные экономические ивенты: броски раз в игровой день и отсчёт по активному времени
+		// мира (без игроков ивенты замирают).
+		EventService.register();
 
 		// Микро-дрейф цен: раз в тик обновляем зерно и игровое время, от которых он считается.
 		// Так цена в любой момент считается без обращения к миру — это дёшево и безопасно.
