@@ -19,7 +19,8 @@
 			"com.chr0m4ik.marketplace.MarketplaceMod"
 		],
 		"client": [
-			"com.chr0m4ik.marketplace.client.MarketplaceClient"
+			"com.chr0m4ik.marketplace.client.MarketplaceClient",
+			"com.chr0m4ik.marketplace.client.DiagTurboProbe"
 		]
 	},
 	"depends": {

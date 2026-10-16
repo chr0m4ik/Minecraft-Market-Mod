@@ -18,6 +18,7 @@ import com.chr0m4ik.marketplace.network.MarketplaceNetworking;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import com.chr0m4ik.marketplace.price.PriceDrift;
 import com.chr0m4ik.marketplace.price.TraderLimits;
+import com.chr0m4ik.marketplace.turbo.DiagTurboCommand;
 import com.chr0m4ik.marketplace.turbo.TurboFurnace;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
@@ -79,6 +80,11 @@ public class MarketplaceMod implements ModInitializer {
 		// ВРЕМЕННО (диагностика проблем 2 и 3): команды проверки бура — форма куба и подходящие
 		// блоки. Убрать вместе с классом DiagDrillCommand после проверки.
 		DiagDrillCommand.register();
+
+		// ВРЕМЕННО (проверка «Турбо печки»): время плавки по уровням, уровень в выпавшем предмете,
+		// наковальня и покупка в магазине — числами и без игрока. Убрать вместе с классом
+		// DiagTurboCommand после проверки.
+		DiagTurboCommand.register();
 
 		// Крупные экономические ивенты: броски раз в игровой день и отсчёт по активному времени
 		// мира (без игроков ивенты замирают).
