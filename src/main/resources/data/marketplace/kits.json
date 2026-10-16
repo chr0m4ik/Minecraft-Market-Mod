@@ -71,7 +71,6 @@
 			"items": [
 				{ "item": "minecraft:netherite_pickaxe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:fortune": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
 				{ "item": "minecraft:netherite_shovel", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
-				{ "item": "minecraft:netherite_hoe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
 				{ "item": "minecraft:shield", "count": 1, "enchantments": { "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
 				{ "item": "minecraft:torch", "count": 64 },
 				{ "item": "minecraft:ladder", "count": 128 },
@@ -89,7 +88,6 @@
 			"shulkers": 0,
 			"items": [
 				{ "item": "minecraft:netherite_axe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
-				{ "item": "minecraft:netherite_hoe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
 				{ "item": "minecraft:shield", "count": 1, "enchantments": { "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
 				{ "item": "minecraft:shears", "count": 1 },
 				{ "item": "minecraft:oak_sapling", "count": 64 },
@@ -188,7 +186,6 @@
 				{ "item": "minecraft:netherite_pickaxe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:fortune": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
 				{ "item": "minecraft:netherite_axe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
 				{ "item": "minecraft:netherite_shovel", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
-				{ "item": "minecraft:netherite_hoe", "count": 1, "enchantments": { "minecraft:efficiency": 5, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
 				{ "item": "minecraft:netherite_spear", "count": 1, "enchantments": { "minecraft:sharpness": 5, "minecraft:lunge": 3, "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
 				{ "item": "minecraft:bow", "count": 1, "enchantments": { "minecraft:power": 5, "minecraft:unbreaking": 3, "minecraft:infinity": 1 } },
 				{ "item": "minecraft:shield", "count": 1, "enchantments": { "minecraft:unbreaking": 3, "minecraft:mending": 1 } },
