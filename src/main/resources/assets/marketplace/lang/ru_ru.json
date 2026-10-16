@@ -115,4 +115,16 @@
 	"marketplace.gui.category.books": "Книги зачарований",
 	"marketplace.gui.category.spawnEggs": "Яйца призыва и спавнеры"
 ,	"marketplace.gui.category.other": "Прочее"
+,	"marketplace.kit.pvp_pro": "ПВП про",
+	"marketplace.kit.pvp_extra": "ПВП экстра",
+	"marketplace.kit.pvp_crystal": "ПВП кристалл",
+	"marketplace.kit.miner_dream": "Мечта шахтёра",
+	"marketplace.kit.lumberjack_dream": "Мечта дровосека",
+	"marketplace.kit.builder": "Строитель",
+	"marketplace.kit.glutton": "Обжора",
+	"marketplace.kit.pro_set": "Профессиональный сет",
+	"marketplace.kit.legendary_set": "Легендарный сет",
+	"marketplace.kit.price": "Цена набора: %s",
+	"marketplace.kit.shulkers": "Шлякеров: %s (в один не влезает)",
+	"marketplace.kit.more": "…и ещё предметов: %s"
 }

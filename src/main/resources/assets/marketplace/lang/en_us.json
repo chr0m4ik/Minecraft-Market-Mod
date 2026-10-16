@@ -115,4 +115,16 @@
 	"marketplace.gui.category.books": "Enchanted books",
 	"marketplace.gui.category.spawnEggs": "Spawn eggs and spawners"
 ,	"marketplace.gui.category.other": "Other"
+,	"marketplace.kit.pvp_pro": "PvP Pro",
+	"marketplace.kit.pvp_extra": "PvP Extra",
+	"marketplace.kit.pvp_crystal": "PvP Crystal",
+	"marketplace.kit.miner_dream": "Miner's Dream",
+	"marketplace.kit.lumberjack_dream": "Lumberjack's Dream",
+	"marketplace.kit.builder": "Builder",
+	"marketplace.kit.glutton": "Glutton",
+	"marketplace.kit.pro_set": "Professional Set",
+	"marketplace.kit.legendary_set": "Legendary Set",
+	"marketplace.kit.price": "Kit price: %s",
+	"marketplace.kit.shulkers": "Shulkers: %s (does not fit in one)",
+	"marketplace.kit.more": "…and %s more items"
 }
