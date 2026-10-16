@@ -74,6 +74,7 @@
 	"marketplace.command.help.money.add": "/market money add <игрок> <сумма> — изменить баланс (отрицательная сумма вычитает)",
 	"marketplace.command.help.drift": "/market drift <предмет> [тик] — показать микро-дрейф цены (±%s%%)",
 	"marketplace.command.help.event": "/market event start|stop|list — крупные экономические ивенты",
+	"marketplace.command.help.shop": "/market shop <раздел> — что лежит в разделе магазина",
 
 	"marketplace.command.money.balance.self": "Твой баланс: %s",
 	"marketplace.command.money.balance.other": "Баланс %s: %s",
@@ -110,9 +111,13 @@
 	"marketplace.command.event.activeTime": "Активное время мира: %s (идёт только когда в мире есть игроки)",
 	"marketplace.command.event.names": "Возможные названия:",
 	"marketplace.command.event.name": "%s — %s",
+
+	"marketplace.command.shop.header": "Магазин: раздел «%s» — товаров %s",
+	"marketplace.command.shop.item": "%s%s — %s",
+	"marketplace.command.shop.more": "…и ещё товаров: %s",
+	"marketplace.command.shop.unknown": "Нет такого раздела: %s. Разделы: %s",
 	"marketplace.command.event.startHint": "Запуск: /market event start <id|random>, остановка: /market event stop",
-	"marketplace.command.event.started": "Запущен ивент: %s — цель %s, цена %s, длительность %s",
-	"marketplace.command.event.already": "Ивент уже идёт: %s — сначала остановите его (/market event stop)",
+	"marketplace.command.event.started": "Запущен ивент: %s — цель %s, цена %s, длительность %s",	"marketplace.command.event.already": "Ивент уже идёт: %s — сначала остановите его (/market event stop)",
 	"marketplace.command.event.stopped": "Ивент остановлен: %s",
 	"marketplace.command.event.unknown": "Нет такого названия ивента: %s. Возможные: %s",
 	"marketplace.command.event.failed": "Не удалось выбрать цели ивента — прайс пуст?",

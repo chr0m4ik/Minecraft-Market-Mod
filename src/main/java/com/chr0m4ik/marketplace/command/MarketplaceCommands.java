@@ -10,6 +10,8 @@ import com.chr0m4ik.marketplace.event.MarketEvent;
 import com.chr0m4ik.marketplace.event.MarketEvents;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.menu.WindowKind;
+import com.chr0m4ik.marketplace.market.ShopCatalog;
+import com.chr0m4ik.marketplace.market.SpecialCatalog;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import com.chr0m4ik.marketplace.price.PriceDrift;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
@@ -37,6 +39,7 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalDouble;
 
 /**
  * Команды мода.
@@ -69,6 +72,10 @@ public final class MarketplaceCommands {
 	private static final String ARG_COUNT = "count";
 	private static final String ARG_EVENT = "id";
 	private static final String ARG_TICK = "tick";
+	private static final String ARG_SECTION = "section";
+
+	/** Сколько товаров раздела показывать в команде (списки бывают на сотни предметов). */
+	private static final int SHOP_SHOWN = 20;
 	/** Особое «название» для команды: запустить ивент со случайным названием. */
 	private static final String EVENT_RANDOM = "random";
 
@@ -134,6 +141,13 @@ public final class MarketplaceCommands {
 					.then(Commands.literal("stop")
 							.executes(MarketplaceCommands::stopEvent));
 
+			// Что лежит в разделе магазина. Нужно для проверки: список собирает сервер,
+			// а игрок видит его только в окне — командой это видно и из консоли.
+			LiteralArgumentBuilder<CommandSourceStack> shop = Commands.literal("shop")
+					.requires(Commands.hasPermission(new PermissionCheck.Require(Permissions.COMMANDS_GAMEMASTER)))
+					.then(Commands.argument(ARG_SECTION, StringArgumentType.word())
+							.executes(MarketplaceCommands::showShopSection));
+
 			dispatcher.register(Commands.literal("market")
 					.executes(MarketplaceCommands::openMainMenu)
 					.then(Commands.literal("help")
@@ -141,6 +155,7 @@ public final class MarketplaceCommands {
 					.then(price)
 					.then(money)
 					.then(drift)
+					.then(shop)
 					.then(event));
 		});
 	}
@@ -172,6 +187,8 @@ public final class MarketplaceCommands {
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.drift",
 				amplitude()).withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.event")
+				.withStyle(ChatFormatting.GRAY), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.help.shop")
 				.withStyle(ChatFormatting.GRAY), false);
 
 		return 1;
@@ -229,6 +246,52 @@ public final class MarketplaceCommands {
 	/** Сумма в виде цветного текста — так её видно в сообщении. */
 	private static Component money(double amount) {
 		return Component.literal(MoneyFormat.format(amount)).withStyle(ChatFormatting.GREEN);
+	}
+
+	/**
+	 * {@code /market shop <раздел>} — что лежит в разделе магазина.
+	 *
+	 * <p>Список собирает сервер: у клиента реестров мира нет, и книги своих зачарований там
+	 * не построить (см. {@link ShopCatalog}). Команда берёт реестры у сервера и собирает
+	 * список заново — так видно ровно то, что получит окно магазина.
+	 */
+	private static int showShopSection(CommandContext<CommandSourceStack> context) {
+		CommandSourceStack source = context.getSource();
+		String name = StringArgumentType.getString(context, ARG_SECTION);
+		Optional<ShopCatalog.Category> found = ShopCatalog.byName(name);
+
+		if (found.isEmpty()) {
+			source.sendFailure(Component.translatable("marketplace.command.shop.unknown",
+					Component.literal(name), Component.literal(ShopCatalog.names())));
+			return 0;
+		}
+
+		ShopCatalog.Category category = found.get();
+		ShopCatalog.refresh(source.registryAccess());
+		List<ItemStack> items = ShopCatalog.items(category);
+
+		source.sendSuccess(() -> Component.translatable("marketplace.command.shop.header",
+				Component.translatable(category.titleKey()),
+				Component.literal(String.valueOf(items.size()))).withStyle(ChatFormatting.GOLD), false);
+
+		for (int index = 0; index < items.size() && index < SHOP_SHOWN; index++) {
+			ItemStack stack = items.get(index);
+			OptionalDouble special = SpecialCatalog.priceOf(stack);
+			double price = special.isPresent() ? special.getAsDouble() : ItemPrices.priceOf(stack);
+			int number = index + 1;
+
+			source.sendSuccess(() -> Component.translatable("marketplace.command.shop.item",
+					Component.literal(number + ". "), stack.getHoverName(), money(price))
+					.withStyle(special.isPresent() ? ChatFormatting.LIGHT_PURPLE : ChatFormatting.GRAY), false);
+		}
+
+		if (items.size() > SHOP_SHOWN) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.shop.more",
+					Component.literal(String.valueOf(items.size() - SHOP_SHOWN)))
+					.withStyle(ChatFormatting.DARK_GRAY), false);
+		}
+
+		return items.size();
 	}
 
 	/** {@code /market price <предмет>} — показать цену одного предмета. */

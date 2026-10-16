@@ -74,6 +74,7 @@
 	"marketplace.command.help.money.add": "/market money add <player> <amount> — change balance (negative amount subtracts)",
 	"marketplace.command.help.drift": "/market drift <item> [tick] — show the price micro-drift (±%s%%)",
 	"marketplace.command.help.event": "/market event start|stop|list — big economic events",
+	"marketplace.command.help.shop": "/market shop <section> — what is inside a shop section",
 
 	"marketplace.command.money.balance.self": "Your balance: %s",
 	"marketplace.command.money.balance.other": "%s's balance: %s",
@@ -117,6 +118,11 @@
 	"marketplace.command.event.unknown": "No such event name: %s. Possible: %s",
 	"marketplace.command.event.failed": "Could not pick event targets — is the price list empty?",
 	"marketplace.command.event.stop": "There are no active events — nothing to stop",
+
+	"marketplace.command.shop.header": "Shop: section \"%s\" — %s items",
+	"marketplace.command.shop.item": "%s%s — %s",
+	"marketplace.command.shop.more": "…and %s more items",
+	"marketplace.command.shop.unknown": "No such section: %s. Sections: %s",
 
 	"marketplace.event.sale": "sale",
 	"marketplace.event.crash": "market crash",

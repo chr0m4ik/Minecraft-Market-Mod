@@ -113,6 +113,14 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Где лежат номер страницы магазина, всего страниц и номер раздела. */
 	private static final int PAGE_DATA = HEADER_SIZE;
 
+	/**
+	 * С какого места лежат числа товаров по разделам магазина (только для окна разделов):
+	 * по одному на раздел, в порядке {@code ShopCatalog.Category.values()}. Считает их сервер —
+	 * у клиента нет реестров мира, поэтому список книг зачарований там построить нельзя.
+	 * Место выбрано после данных страницы, чтобы те же ячейки не значили разное в разных окнах.
+	 */
+	private static final int SHOP_COUNT_DATA = PAGE_DATA + 3;
+
 	/** Слоты кнопок главного меню (средний ряд: 10, 13, 16). */
 	public static final int MAIN_SLOT_TRADER = 10;
 	public static final int MAIN_SLOT_SELL = 13;
@@ -177,6 +185,13 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Ячейки, которые сейчас показывают подтверждённый ордер (по ним ловим момент продажи). */
 	private final Set<Integer> orderCells = new HashSet<>();
 
+	/**
+	 * Числа товаров по разделам магазина (для сетки разделов). Считаются один раз на окно
+	 * и только на сервере: если считать их каждый тик, каталог пересобирал бы все списки.
+	 * На клиенте остаётся {@code null} — он берёт числа из данных окна.
+	 */
+	private int[] shopCounts;
+
 	public MarketplaceMenu(WindowKind kind, int syncId, Inventory inventory) {
 		super(MarketplaceMenus.typeOf(kind), syncId);
 		this.kind = kind;
@@ -224,6 +239,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		if (this.serverPlayer == null || this.kind != WindowKind.BUY_LIST) {
 			return;
 		}
+
+		// Список собираем прямо сейчас и на сервере: у клиента реестров мира нет, а страница
+		// должна показать товары (книги своих зачарований строятся из реестра зачарований).
+		ShopCatalog.refresh(this.serverPlayer.registryAccess());
 
 		MarketService.ShopState shop = MarketService.shop(this.serverPlayer.getUUID());
 		ShopCatalog.Category[] categories = ShopCatalog.Category.values();
@@ -494,9 +513,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 					ItemStack button = new ItemStack(categories[index].icon());
 					button.set(DataComponents.CUSTOM_NAME, plain(Component.translatable("marketplace.gui.category",
 							Component.translatable(categories[index].titleKey()))));
+					// Число товаров берём из данных окна: их считает сервер (см. updateData).
+					// Клиент списки не строит — у него нет реестров мира, и книги своих
+					// зачарований там получились бы пустыми (см. ShopCatalog).
 					button.set(DataComponents.LORE, new ItemLore(List.of(
 							Component.translatable("marketplace.gui.category.count",
-									Component.literal(String.valueOf(ShopCatalog.items(categories[index]).size())))
+									Component.literal(String.valueOf(this.data.get(SHOP_COUNT_DATA + index))))
 									.withStyle(ChatFormatting.GRAY))));
 					this.setButtonStack(row * 9 + col, button);
 					index++;
@@ -974,6 +996,28 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		MarketplaceMenus.open(serverPlayer, WindowKind.BUY_ITEM);
 	}
 
+	/**
+	 * Числа товаров по разделам. Считаем один раз на окно: сборка списков — дело не бесплатное,
+	 * а окно разделов открыто, пока игрок выбирает раздел. Списки собирает только сервер:
+	 * у клиента нет реестров мира (книги своих зачарований там получились бы пустыми).
+	 */
+	private int[] shopCounts() {
+		if (this.shopCounts == null) {
+			// Реестры мира нужны каталогу для сборки списков — берём их у сервера.
+			ShopCatalog.refresh(this.serverPlayer.registryAccess());
+			ShopCatalog.Category[] categories = ShopCatalog.Category.values();
+			int[] counts = new int[categories.length];
+
+			for (int index = 0; index < categories.length; index++) {
+				counts[index] = ShopCatalog.items(categories[index]).size();
+			}
+
+			this.shopCounts = counts;
+		}
+
+		return this.shopCounts;
+	}
+
 	/** Перелистывание страниц списка товаров (без переоткрытия окна). */
 	private void turnShopPage(ServerPlayer player, int delta) {
 		MarketService.ShopState shop = MarketService.shop(player.getUUID());
@@ -1156,14 +1200,26 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		MarketplaceState state = MarketplaceEconomy.state(server);
 
 		setMoney(BALANCE_DATA, MarketplaceEconomy.getBalance(server, playerId));
-		// Список книг зачарований строится по реестру мира — отдаём его каталогу магазина.
-		ShopCatalog.setRegistries(server.registryAccess());
-		// Наборы тоже собираются из реестров (зачарования и зелья внутри).
+		// Наборы собираются из реестров мира (зачарования и зелья внутри). Каталог магазина
+		// реестры получает не здесь, а там, где реально собирает список товаров: у клиента
+		// реестров нет, а пересобирать списки каждый тик нельзя (см. ShopCatalog.refresh).
 		KitCatalog.setRegistries(server.registryAccess());
 		this.data.set(MARKUP_DATA, (int) Math.round(state.markup(playerId) * 100.0));
 		this.data.set(UNLOCKED_DATA, MarketService.unlockedSlots(state, playerId));
 		// Режим-мишень — часть состояния окна: клиент должен знать его так же, как наценку.
 		this.data.set(TARGET_DATA, this.targetMode ? 1 : 0);
+
+		if (this.kind == WindowKind.BUY) {
+			// Числа товаров по разделам: их показывает сетка разделов. Считает сервер —
+			// у клиента нет реестров мира, и книги своих зачарований там не собрать.
+			int[] counts = this.shopCounts();
+
+			for (int index = 0; index < counts.length; index++) {
+				this.data.set(SHOP_COUNT_DATA + index, counts[index]);
+			}
+
+			return;
+		}
 
 		if (this.kind == WindowKind.BUY_ITEM) {
 			// Номер выбранного количества — клиент считает по нему цену в подсказке.

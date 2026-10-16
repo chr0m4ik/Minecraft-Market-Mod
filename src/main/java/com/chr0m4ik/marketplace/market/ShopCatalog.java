@@ -1,5 +1,6 @@
 package com.chr0m4ik.marketplace.market;
 
+import com.chr0m4ik.marketplace.MarketplaceMod;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
@@ -148,6 +149,17 @@ public final class ShopCatalog {
 		}
 	}
 
+	/**
+	 * Пересобрать списки заново с этими реестрами мира. Вызывается при открытии страницы
+	 * магазина: список должен быть собран именно сейчас — до этого реестры могли быть ещё
+	 * не готовы (или их перечитал {@code /reload}), а показать игроку пустой раздел нельзя.
+	 */
+	public static void refresh(HolderLookup.Provider value) {
+		registries = value;
+		CACHE.clear();
+		ENCHANTMENT_ORDER = null;
+	}
+
 	/** Товары раздела. Список строится один раз. */
 	public static List<ItemStack> items(Category category) {
 		List<ItemStack> cached = CACHE.get(category);
@@ -167,7 +179,13 @@ public final class ShopCatalog {
 			case SPECIAL -> {
 				// Свои книги со своей ценой: по предмету их не отличить (это всё та же
 				// книга зачарований), поэтому раздел собирается отдельно, как и «Киты».
-				if (registries != null) {
+				if (registries == null) {
+					// Такого быть не должно: окно магазина всегда открывает сервер, а он отдаёт
+					// каталогу реестры мира. Молча пустой раздел — это ошибка, поэтому пишем её
+					// в лог громко: иначе игрок видит пустой магазин, а причину не видно.
+					MarketplaceMod.LOGGER.error("Магазин: раздел «Особые предметы» собирается без реестров "
+							+ "мира — книги зачарований построить нельзя");
+				} else {
 					stacks.addAll(SpecialCatalog.items(registries));
 				}
 			}
@@ -191,7 +209,13 @@ public final class ShopCatalog {
 
 		stacks.sort(Comparator.comparing(stack -> sortKey(category, stack), SORT_KEY_ORDER));
 		List<ItemStack> result = List.copyOf(stacks);
-		CACHE.put(category, result);
+
+		// Пустой раздел «Особые предметы» без реестров мира не запоминаем: как только реестры
+		// появятся, список соберётся заново — иначе ошибка закрепилась бы до перезапуска игры.
+		if (category != Category.SPECIAL || registries != null) {
+			CACHE.put(category, result);
+		}
+
 		return result;
 	}
 
@@ -530,6 +554,28 @@ public final class ShopCatalog {
 		int from = Math.max(0, Math.min(page, pages(category) - 1) * PAGE_SIZE);
 		int to = Math.min(all.size(), from + PAGE_SIZE);
 		return from >= to ? List.of() : all.subList(from, to);
+	}
+
+	/** Раздел по его имени (то же, что в команде). Регистр не важен. */
+	public static Optional<Category> byName(String name) {
+		for (Category category : Category.values()) {
+			if (category.name().equalsIgnoreCase(name)) {
+				return Optional.of(category);
+			}
+		}
+
+		return Optional.empty();
+	}
+
+	/** Имена всех разделов через запятую — для подсказки в команде. */
+	public static String names() {
+		List<String> names = new ArrayList<>();
+
+		for (Category category : Category.values()) {
+			names.add(category.name().toLowerCase(java.util.Locale.ROOT));
+		}
+
+		return String.join(", ", names);
 	}
 
 	/** К какому разделу относится предмет. */
