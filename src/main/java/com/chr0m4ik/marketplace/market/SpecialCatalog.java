@@ -36,8 +36,11 @@ import java.util.OptionalDouble;
  * не нужен, ванильная наковальня уже умеет переносить зачарование на инструмент.
  */
 public final class SpecialCatalog {
-	/** Название раздела в магазине — там же, где и цены. */
+	/** «Жилковый майнер»: путь зачарования в нашем пространстве имён. */
 	private static final String VEIN_MINER = "vein_miner";
+
+	/** «Бур»: путь зачарования в нашем пространстве имён. */
+	private static final String VEIN_DRILL = "vein_drill";
 
 	/** Одна книга: зачарование, уровень и цена за штуку. */
 	private record Entry(String path, int level, double price) {
@@ -45,12 +48,16 @@ public final class SpecialCatalog {
 
 	/**
 	 * Все «особые предметы» и их цены. Цены — из ТЗ заказчика:
-	 * «Жилковый майнер» I/II/III — 200 000 000 / 750 000 000 / 1 600 000 000.
+	 * «Жилковый майнер» I/II/III — 200 000 000 / 750 000 000 / 1 600 000 000,
+	 * «Бур» I/II/III — 100 000 000 / 600 000 000 / 1 300 000 000.
 	 */
 	private static final List<Entry> ENTRIES = List.of(
 			new Entry(VEIN_MINER, 1, 200_000_000.0),
 			new Entry(VEIN_MINER, 2, 750_000_000.0),
-			new Entry(VEIN_MINER, 3, 1_600_000_000.0));
+			new Entry(VEIN_MINER, 3, 1_600_000_000.0),
+			new Entry(VEIN_DRILL, 1, 100_000_000.0),
+			new Entry(VEIN_DRILL, 2, 600_000_000.0),
+			new Entry(VEIN_DRILL, 3, 1_300_000_000.0));
 
 	private SpecialCatalog() {
 		// Класс только со статическими методами.

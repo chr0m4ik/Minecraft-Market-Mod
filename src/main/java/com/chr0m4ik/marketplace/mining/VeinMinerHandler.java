@@ -11,7 +11,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -130,7 +129,7 @@ public final class VeinMinerHandler {
 		}
 
 		ItemStack tool = serverPlayer.getMainHandItem();
-		int minerLevel = enchantmentLevel(serverPlayer, tool);
+		int minerLevel = MiningSupport.level(serverPlayer, VEIN_MINER, tool);
 
 		if (minerLevel <= 0) {
 			return;   // на инструменте нет нашего зачарования — не наше дело
@@ -152,7 +151,7 @@ public final class VeinMinerHandler {
 
 		// Прочности должно хватить на все дополнительные блоки и ещё на одну единицу для
 		// исходного блока (её игра нанесёт уже после нас). Не хватает — ломается только он.
-		if (!hasDurabilityFor(serverPlayer, tool, targets.size() + 1)) {
+		if (!MiningSupport.hasDurabilityFor(serverPlayer, tool, targets.size() + 1)) {
 			return;
 		}
 
@@ -161,7 +160,7 @@ public final class VeinMinerHandler {
 		try {
 			for (BlockPos target : targets) {
 				// Инструмент мог износиться по дороге (например, с «Прочностью» урон случаен).
-				if (!hasDurabilityFor(serverPlayer, tool, 1)) {
+				if (!MiningSupport.hasDurabilityFor(serverPlayer, tool, 1)) {
 					break;
 				}
 
@@ -171,18 +170,6 @@ public final class VeinMinerHandler {
 		} finally {
 			ACTIVE.set(false);
 		}
-	}
-
-	/**
-	 * Уровень нашего зачарования на инструменте (0 — зачарования нет). Держатель берём из
-	 * реестров мира каждый раз: реестр зачарований динамический.
-	 */
-	private static int enchantmentLevel(ServerPlayer player, ItemStack tool) {
-		return player.registryAccess()
-				.lookup(Registries.ENCHANTMENT)
-				.flatMap(lookup -> lookup.get(VEIN_MINER))
-				.map(holder -> EnchantmentHelper.getItemEnchantmentLevel(holder, tool))
-				.orElse(0);
 	}
 
 	/** Руда ли это (см. {@link #ORES}). */
@@ -248,22 +235,5 @@ public final class VeinMinerHandler {
 		}
 
 		return targets;
-	}
-
-	/**
-	 * Хватит ли прочности на {@code blocks} ударов так, чтобы инструмент остался целым.
-	 *
-	 * <p>Урон считаем той же формулой, что и игра ({@link EnchantmentHelper#processDurabilityChange}),
-	 * поэтому «Прочность» (Unbreaking) учитывается. Оставляем минимум одну единицу: при
-	 * {@code damage >= maxDamage} игра уничтожает предмет, и игрок теряет инструмент.
-	 * В креативе прочность не тратится вовсе.
-	 */
-	private static boolean hasDurabilityFor(ServerPlayer player, ItemStack tool, int blocks) {
-		if (player.hasInfiniteMaterials() || !tool.isDamageableItem()) {
-			return true;
-		}
-
-		int cost = EnchantmentHelper.processDurabilityChange((ServerLevel) player.level(), tool, blocks);
-		return tool.getDamageValue() + cost < tool.getMaxDamage();
 	}
 }

@@ -1,6 +1,7 @@
 {
 	"values": [
 		"marketplace:vein_miner",
+		"marketplace:vein_drill",
 		"minecraft:silk_touch"
 	]
 }

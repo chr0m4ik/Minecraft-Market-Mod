@@ -200,6 +200,13 @@
 	"marketplace.special.vein_miner.level.2": "Vein Miner II — area 9×9×9",
 	"marketplace.special.vein_miner.level.3": "Vein Miner III — area 13×13×13",
 	"marketplace.special.vein_miner.hint": "Pickaxe, shovel, axe. Incompatible with Silk Touch.",
+
+	"enchantment.marketplace.vein_drill": "Drill",
+	"enchantment.marketplace.vein_drill.desc": "Breaks a cube around the mined block — any block the tool can mine, one layer per tick.",
+	"marketplace.special.vein_drill.level.1": "Drill I — area 3×3×3",
+	"marketplace.special.vein_drill.level.2": "Drill II — area 5×5×5",
+	"marketplace.special.vein_drill.level.3": "Drill III — area 7×7×7",
+	"marketplace.special.vein_drill.hint": "Pickaxe, shovel, axe. Compatible with Silk Touch and Fortune. Incompatible with Vein Miner.",
 	"marketplace.gui.category.special": "Special items",
 	"marketplace.tooltip.buy.special": "Special item: %s (fixed price)"
 }
