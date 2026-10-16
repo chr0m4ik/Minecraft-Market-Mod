@@ -1,6 +1,5 @@
 package com.chr0m4ik.marketplace.menu;
 
-import com.chr0m4ik.marketplace.MarketplaceMod;
 import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
@@ -636,9 +635,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	 */
 	@Override
 	public void clicked(int slotId, int button, ContainerInput input, Player player) {
-		// ВРЕМЕННО: диагностика снятия ордера (см. logMarketClick) — убрать после проверки.
-		this.logMarketClick(slotId, button, input, player);
-
 		if (this.isButtonSlot(slotId)) {
 			if (input == ContainerInput.PICKUP && button == 0) {
 				this.onButtonClick(slotId, player);
@@ -679,27 +675,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		super.clicked(slotId, button, input, player);
-	}
-
-	/**
-	 * ВРЕМЕННО: диагностика снятия ордера. Пишет в лог сервера ровно одну строку на клик
-	 * в окне рынка: слот, кнопка, тип клика, shift, режим-мишень, есть ли в ячейке ордер.
-	 * Спама нет — строк столько же, сколько кликов. Убрать, когда заказчик подтвердит, что
-	 * ордер снимается (тогда же снять и вызов в начале {@link #clicked}).
-	 */
-	private void logMarketClick(int slotId, int button, ContainerInput input, Player player) {
-		// Только сервер: на клиенте serverPlayer пустой и лог дублировался бы.
-		if (this.serverPlayer == null || (this.kind != WindowKind.SELL && this.kind != WindowKind.CONFIRM)) {
-			return;
-		}
-
-		boolean cell = slotId >= 0 && slotId < this.kind.tradeSlots();
-		ItemStack stack = cell ? this.tradeContainer.getItem(slotId) : ItemStack.EMPTY;
-		MarketplaceMod.LOGGER.info(
-				"Клик рынка: слот={}, кнопка={}, input={}, shift={}, target={}, ордер={}, окно={}, открыта={}, предмет={}",
-				slotId, button, input, player.isShiftKeyDown(), this.targetMode,
-				cell && this.isCellOrder(slotId), this.kind, cell && this.isCellUnlocked(slotId),
-				stack.isEmpty() ? "пусто" : stack.getCount() + "x " + stack.getHoverName().getString());
 	}
 
 	/** Является ли слот верхней части окна кнопкой. */
@@ -756,9 +731,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				// а клиент узнаёт новое состояние данными окна (updateData → TARGET_DATA).
 				this.targetMode = !this.targetMode;
 				this.updateTargetButton();
-				// ВРЕМЕННО: видно, что сервер действительно переключил режим.
-				MarketplaceMod.LOGGER.info("Клик рынка: режим-мишень переключён сервером — {}",
-						this.targetMode ? "включён" : "выключен");
 				this.updateData();
 				this.broadcastChanges();
 			}
