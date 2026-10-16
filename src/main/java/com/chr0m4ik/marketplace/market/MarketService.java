@@ -157,8 +157,8 @@ public final class MarketService {
 
 	// --- Магазин: выбор игрока и покупка ---
 
-	/** Сколько стаков можно выбрать в окне покупки (0 = половина стака). */
-	public static final int[] QUANTITIES = {0, 1, 2, 5, 10, 25};
+	/** Сколько предметов можно выбрать в окне покупки. */
+	public static final int[] QUANTITIES = {1, 4, 8, 16, 32, 64, 128, 256, 512, 1024};
 
 	/**
 	 * Что игрок выбрал в магазине: раздел, страница, предмет, количество и способ выдачи.
@@ -190,26 +190,28 @@ public final class MarketService {
 			return new ShopState(this.category, this.page, this.selected, this.quantityIndex, value);
 		}
 
-		/** Сколько предметов покупаем: количество стаков × размер стака. */
+		/** Сколько предметов покупаем. */
 		public int count() {
-			if (this.selected.isEmpty()) {
-				return 0;
+			return this.selected.isEmpty() ? 0 : quantity();
+		}
+
+		/** Выбранное количество предметов. */
+		public int quantity() {
+			return QUANTITIES[Math.max(0, Math.min(this.quantityIndex, QUANTITIES.length - 1))];
+		}
+
+		/** Надпись с количеством: «32 шт.» или «2 стака». */
+		public String quantityText() {
+			int count = quantity();
+			int maxStack = this.selected.isEmpty() ? 64
+					: Math.max(1, this.selected.getItem().getDefaultMaxStackSize());
+
+			if (count >= maxStack && count % maxStack == 0) {
+				int stacks = count / maxStack;
+				return stacks + (stacks == 1 ? " стак" : (stacks < 5 ? " стака" : " стаков"));
 			}
 
-			int maxStack = Math.max(1, this.selected.getItem().getDefaultMaxStackSize());
-			int stacks = QUANTITIES[Math.max(0, Math.min(this.quantityIndex, QUANTITIES.length - 1))];
-			return stacks == 0 ? Math.max(1, maxStack / 2) : stacks * maxStack;
-		}
-
-		/** Доступно ли «половина стака»: для нестакающихся предметов — нет. */
-		public boolean halfStackAllowed() {
-			return !this.selected.isEmpty() && this.selected.getItem().getDefaultMaxStackSize() > 1;
-		}
-
-		/** Надпись с количеством: «0.5», «1», «25». */
-		public String quantityText() {
-			int stacks = QUANTITIES[Math.max(0, Math.min(this.quantityIndex, QUANTITIES.length - 1))];
-			return stacks == 0 ? "0.5" : String.valueOf(stacks);
+			return count + " шт.";
 		}
 	}
 
@@ -224,19 +226,9 @@ public final class MarketService {
 		SHOP.put(playerId, state);
 	}
 
-	/** Следующее количество по кругу; «половина стака» пропускается для нестакающихся. */
+	/** Следующее количество по кругу. */
 	public static int nextQuantity(ShopState state) {
-		int next = state.quantityIndex();
-
-		for (int i = 0; i < QUANTITIES.length; i++) {
-			next = (next + 1) % QUANTITIES.length;
-
-			if (next != 0 || state.halfStackAllowed()) {
-				break;
-			}
-		}
-
-		return next;
+		return (state.quantityIndex() + 1) % QUANTITIES.length;
 	}
 
 	/**
