@@ -23,10 +23,16 @@ const BUY_MULTIPLIER = economy.buy_multiplier ?? 2.2;
 const TRADER_MULTIPLIER = economy.trader_multiplier ?? 0.75;
 const WAVES = [
 	{ weight: 0.50, period: 24_000, phaseSalt: 0x9E37 },
-	{ weight: 0.30, period: 6_000, phaseSalt: 0x85EB },
-	{ weight: 0.20, period: 1_200, phaseSalt: 0xC2B2 },
+	{ weight: 0.30, period: 8_000, phaseSalt: 0x85EB },
+	{ weight: 0.20, period: 2_400, phaseSalt: 0xC2B2 },
 ];
 const TOTAL_WEIGHT = WAVES.reduce((sum, wave) => sum + wave.weight, 0);
+
+/** Сколько тиков в игровой секунде: множитель обновляется раз в секунду (PriceDrift.update). */
+const TICKS_PER_SECOND = 20;
+
+/** Округление игрового времени вниз до целой секунды — как PriceDrift.quantize. */
+const quantize = (gameTime) => Math.floor(gameTime / TICKS_PER_SECOND) * TICKS_PER_SECOND;
 
 /** Хеш строки в Java: s[0]*31^(n-1) + … + s[n-1], с переполнением как у int. */
 function javaStringHash(text) {
@@ -51,43 +57,45 @@ function itemPhase(id, wave, seed) {
 	return (mixed + Math.imul(javaStringHash(id), 0x27D4EB2D)) | 0;
 }
 
-/** Множитель дрейфа — повторяет PriceDrift.drift + multiplier. */
+/** Множитель дрейфа — повторяет PriceDrift.drift + multiplier (с округлением времени до секунды). */
 function multiplier(id, gameTime, seed) {
+	const time = quantize(gameTime);
 	let sum = 0;
 
 	for (const wave of WAVES) {
-		const phase = ((gameTime % wave.period) + wave.phaseSalt + itemPhase(id, wave, seed)) | 0;
+		const phase = ((time % wave.period) + wave.phaseSalt + itemPhase(id, wave, seed)) | 0;
 		sum += wave.weight * Math.sin(2 * Math.PI * phase / wave.period);
 	}
 
 	return 1 + AMPLITUDE * sum / TOTAL_WEIGHT;
 }
 
-// Контрольные значения, снятые с настоящего сервера (временный отчёт PriceDriftReport
-// на мире с зерном -8485521596771069071) при амплитуде 0,05. Если формула здесь разойдётся
-// с PriceDrift.java, проверка сразу это покажет.
+// Контрольные значения, снятые с настоящего сервера командой /market debug driftdump
+// на мире с зерном -8485521596771069071 при амплитуде 0,03 (то есть при текущей).
+// Если формула здесь разойдётся с PriceDrift.java (волны, веса, соли, округление времени
+// до секунды), проверка сразу это покажет.
 //
 // Поправка на амплитуду: волнистая часть формулы не зависит от амплитуды, а сама амплитуда —
 // общий множитель, поэтому при другой амплитуде значения пересчитываются точно:
-// ожидаемое = 1 + (записанное − 1) × амплитуда / 0,05.
-const RECORDED_AMPLITUDE = 0.05;
+// ожидаемое = 1 + (записанное − 1) × амплитуда / 0,03.
+const RECORDED_AMPLITUDE = 0.03;
 const REAL_SEED = -8485521596771069071n;
 const REAL_VALUES = [
-	{ id: 'minecraft:diamond', time: 0, expected: 1.030108 },
-	{ id: 'minecraft:apple', time: 0, expected: 1.027170 },
-	{ id: 'minecraft:netherite_ingot', time: 0, expected: 1.000553 },
-	{ id: 'minecraft:coal', time: 0, expected: 0.970713 },
-	{ id: 'minecraft:shulker_box', time: 0, expected: 0.974049 },
-	{ id: 'minecraft:diamond', time: 72_000, expected: 1.030108 },
-	{ id: 'minecraft:apple', time: 72_000, expected: 1.027170 },
-	{ id: 'minecraft:netherite_ingot', time: 72_000, expected: 1.000553 },
-	{ id: 'minecraft:coal', time: 72_000, expected: 0.970713 },
-	{ id: 'minecraft:shulker_box', time: 72_000, expected: 0.974049 },
-	{ id: 'minecraft:diamond', time: 583_777, expected: 0.973910 },
-	{ id: 'minecraft:apple', time: 583_777, expected: 0.950630 },
-	{ id: 'minecraft:netherite_ingot', time: 583_777, expected: 1.021922 },
-	{ id: 'minecraft:coal', time: 583_777, expected: 0.994366 },
-	{ id: 'minecraft:shulker_box', time: 583_777, expected: 0.989778 },
+	{ id: 'minecraft:diamond', time: 0, expected: 1.004718 },
+	{ id: 'minecraft:apple', time: 0, expected: 1.018301 },
+	{ id: 'minecraft:netherite_ingot', time: 0, expected: 0.981085 },
+	{ id: 'minecraft:coal', time: 0, expected: 0.986206 },
+	{ id: 'minecraft:shulker_box', time: 0, expected: 0.987657 },
+	{ id: 'minecraft:diamond', time: 72_000, expected: 1.004718 },
+	{ id: 'minecraft:apple', time: 72_000, expected: 1.018301 },
+	{ id: 'minecraft:netherite_ingot', time: 72_000, expected: 0.981085 },
+	{ id: 'minecraft:coal', time: 72_000, expected: 0.986206 },
+	{ id: 'minecraft:shulker_box', time: 72_000, expected: 0.987657 },
+	{ id: 'minecraft:diamond', time: 583_780, expected: 0.985498 },
+	{ id: 'minecraft:apple', time: 583_780, expected: 0.998451 },
+	{ id: 'minecraft:netherite_ingot', time: 583_780, expected: 1.002388 },
+	{ id: 'minecraft:coal', time: 583_780, expected: 1.008993 },
+	{ id: 'minecraft:shulker_box', time: 583_780, expected: 1.009646 },
 ];
 
 /** Пересчёт записанного значения на текущую амплитуду. */
@@ -101,7 +109,7 @@ const items = [
 	{ id: 'minecraft:coal', price: 50 },
 	{ id: 'minecraft:shulker_box', price: 100000000 },
 ];
-const times = [0, 72_000, 583_777];
+const times = [0, 72_000, 583_780];
 
 console.log('=== Множители дрейфа (5 предметов × 3 момента времени) ===');
 console.log(`зерно мира: ${seed}, амплитуда ±${(AMPLITUDE * 100).toFixed(1)}%`);
@@ -142,7 +150,8 @@ let sum = 0;
 let count = 0;
 
 for (const currentSeed of seeds) {
-	// Быстрая волна повторяется каждые 1200 тиков: 3 игровых дня покрывают её целиком.
+	// Самая быстрая волна повторяется каждые 2400 тиков: 3 игровых дня покрывают её целиком.
+	// Шаг 100 тиков кратен секунде (20 тиков), поэтому проверяются те же значения, что и в игре.
 	for (const id of ids) {
 		for (let time = 0; time < 24_000 * 3; time += 100) {
 			const m = multiplier(id, time, currentSeed);
