@@ -18,6 +18,7 @@ import com.chr0m4ik.marketplace.network.MarketplaceNetworking;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import com.chr0m4ik.marketplace.price.PriceDrift;
 import com.chr0m4ik.marketplace.price.TraderLimits;
+import com.chr0m4ik.marketplace.turbo.TurboFurnace;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -47,6 +48,10 @@ public class MarketplaceMod implements ModInitializer {
 		MarketplaceCommands.register();
 		MarketplaceMenus.initialize();
 		MarketplaceNetworking.registerServer();
+
+		// «Турбо печка»: блок, предмет и своя блочная сущность. Регистрация обязана пройти
+		// при инициализации мода — после загрузки модов реестры игры замораживаются.
+		TurboFurnace.register();
 
 		// Читаем прайс, настройки экономики, лимиты и время продажи сразу при загрузке: если файлы
 		// повреждены, это видно в логе, а не при первой сделке. Заодно проверяем, что настройки

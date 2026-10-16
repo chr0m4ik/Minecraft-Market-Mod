@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "condition": {
+        "type": "minecraft:survives_explosion"
+      },
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "modifier": {
+            "type": "minecraft:copy_components",
+            "include": [
+              "minecraft:custom_data",
+              "minecraft:custom_name",
+              "minecraft:lore"
+            ],
+            "source": "block_entity"
+          },
+          "name": "marketplace:turbo_furnace"
+        }
+      ],
+      "rolls": 1
+    }
+  ],
+  "random_sequence": "marketplace:blocks/turbo_furnace"
+}

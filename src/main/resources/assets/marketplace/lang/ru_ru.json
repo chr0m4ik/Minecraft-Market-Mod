@@ -225,6 +225,18 @@
 	"marketplace.special.smelter.name.1": "Книга «Плавильня» I",
 	"marketplace.special.smelter.level.1": "Переплавка руды",
 	"marketplace.special.smelter.hint": "Кирка, лопата, топор. Только руды. Несовместимо с «Шёлковым касанием».",
+
+	"block.marketplace.turbo_furnace": "Турбо печка",
+	"container.marketplace.turbo_furnace": "Турбо печка",
+	"marketplace.special.turbo_furnace.name.1": "Турбо печка I",
+	"marketplace.special.turbo_furnace.name.2": "Турбо печка II",
+	"marketplace.special.turbo_furnace.name.3": "Турбо печка III",
+	"marketplace.special.turbo_furnace.name.4": "Турбо печка IV",
+	"marketplace.special.turbo_furnace.level.1": "Плавка ×5 быстрее",
+	"marketplace.special.turbo_furnace.level.2": "Плавка ×2.5 быстрее",
+	"marketplace.special.turbo_furnace.level.3": "Плавка ×1.7 быстрее",
+	"marketplace.special.turbo_furnace.level.4": "Плавка ×1.25 быстрее",
+	"marketplace.special.turbo_furnace.hint": "Обычная печь: топливо, рецепты, воронки, опыт, редстоун, книга рецептов. Уровень выше — соединение двух одинаковых печек в наковальне.",
 	"marketplace.gui.category.special": "Особые предметы",
 	"marketplace.tooltip.buy.special": "Особый предмет: %s (цена фиксированная)"
 }

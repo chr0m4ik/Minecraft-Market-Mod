@@ -226,6 +226,18 @@
 	"marketplace.special.smelter.name.1": "Smelter I book",
 	"marketplace.special.smelter.level.1": "Smelts mined ore",
 	"marketplace.special.smelter.hint": "Pickaxe, shovel, axe. Ores only. Incompatible with Silk Touch.",
+
+	"block.marketplace.turbo_furnace": "Turbo Furnace",
+	"container.marketplace.turbo_furnace": "Turbo Furnace",
+	"marketplace.special.turbo_furnace.name.1": "Turbo Furnace I",
+	"marketplace.special.turbo_furnace.name.2": "Turbo Furnace II",
+	"marketplace.special.turbo_furnace.name.3": "Turbo Furnace III",
+	"marketplace.special.turbo_furnace.name.4": "Turbo Furnace IV",
+	"marketplace.special.turbo_furnace.level.1": "Smelts ×5 faster",
+	"marketplace.special.turbo_furnace.level.2": "Smelts ×2.5 faster",
+	"marketplace.special.turbo_furnace.level.3": "Smelts ×1.7 faster",
+	"marketplace.special.turbo_furnace.level.4": "Smelts ×1.25 faster",
+	"marketplace.special.turbo_furnace.hint": "A normal furnace: fuel, recipes, hoppers, experience, redstone, recipe book. A higher level comes from combining two furnaces of the same level in an anvil.",
 	"marketplace.gui.category.special": "Special items",
 	"marketplace.tooltip.buy.special": "Special item: %s (fixed price)"
 }

@@ -5,7 +5,8 @@
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
 		"BlockMixin",
-		"ServerPlayerGameModeMixin"
+		"ServerPlayerGameModeMixin",
+		"TurboFurnaceSpeedMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
