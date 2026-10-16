@@ -11,6 +11,7 @@ import com.chr0m4ik.marketplace.event.MarketEvent;
 import com.chr0m4ik.marketplace.event.MarketEvents;
 import com.chr0m4ik.marketplace.market.KitCatalog;
 import com.chr0m4ik.marketplace.market.MarketService;
+import com.chr0m4ik.marketplace.market.SpecialCatalog;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenu;
 import com.chr0m4ik.marketplace.menu.WindowKind;
 import com.chr0m4ik.marketplace.price.ItemPrices;
@@ -26,6 +27,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TooltipFlag;
 
 import java.util.List;
+import java.util.OptionalDouble;
 
 /**
  * Дописывает в подсказки предметов их цену.
@@ -98,6 +100,9 @@ public final class MarketplaceTooltips {
 			return;
 		}
 
+		// У «особого предмета» цена своя (см. SpecialCatalog): показываем её и обычную —
+		// по обычной платят рынок и торговец.
+		addSpecialPrice(lines, stack);
 		addBasePriceLines(lines, stack);
 	}
 
@@ -126,6 +131,24 @@ public final class MarketplaceTooltips {
 					money(MoneyFormat.round(KitCatalog.priceOf(kit)))).withStyle(ChatFormatting.GOLD));
 			return true;
 		}).orElse(false);
+	}
+
+	/**
+	 * Цена «особого предмета» (книги своего зачарования): она задана явно и множитель покупки
+	 * к ней не применяется — см. {@link SpecialCatalog}.
+	 *
+	 * @return {@code false}, если это не особый предмет
+	 */
+	private static boolean addSpecialPrice(List<Component> lines, ItemStack stack) {
+		OptionalDouble special = SpecialCatalog.priceOf(stack);
+
+		if (special.isEmpty()) {
+			return false;
+		}
+
+		lines.add(Component.translatable("marketplace.tooltip.buy.special",
+				money(MoneyFormat.round(special.getAsDouble()))).withStyle(ChatFormatting.GOLD));
+		return true;
 	}
 
 	/** Подсказка для ячейки рынка: обычная цена, наценка и как забрать предмет. */
@@ -291,6 +314,17 @@ public final class MarketplaceTooltips {
 		int maxStack = Math.max(1, stack.getItem().getDefaultMaxStackSize());
 		int index = Math.max(0, Math.min(menu.getShopQuantityIndex(), MarketService.QUANTITIES.length - 1));
 		int count = MarketService.QUANTITIES[index];
+
+		// У «особого предмета» цена тоже своя — показываем её без множителя покупки.
+		OptionalDouble special = SpecialCatalog.priceOf(stack);
+
+		if (special.isPresent()) {
+			lines.add(Component.translatable("marketplace.tooltip.buy.special",
+					money(MoneyFormat.round(special.getAsDouble() * maxStack))).withStyle(ChatFormatting.GOLD));
+			lines.add(Component.translatable("marketplace.tooltip.buy.total",
+					money(MoneyFormat.round(special.getAsDouble() * count))).withStyle(ChatFormatting.GREEN));
+			return true;
+		}
 
 		lines.add(Component.translatable("marketplace.tooltip.buy.unit",
 				money(MoneyFormat.round(ItemPrices.priceOf(stack) * maxStack * EconomyConfig.buyMultiplier())))

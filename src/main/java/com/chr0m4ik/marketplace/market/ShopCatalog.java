@@ -44,6 +44,10 @@ public final class ShopCatalog {
 	/** Разделы магазина. Иконка — предмет, которым раздел показывается в меню. */
 	public enum Category {
 		KITS("marketplace.gui.category.kits", () -> Items.SHULKER_BOX),
+		// «Особые предметы»: книги своих зачарований со своей ценой (см. SpecialCatalog).
+		// Иконка — золотое яблоко: «особый предмет» и при этом не совпадает с иконками
+		// других разделов (у «Книг зачарований» — книга, у «Инструментов» — кирка).
+		SPECIAL("marketplace.gui.category.special", () -> Items.ENCHANTED_GOLDEN_APPLE),
 		WEAPONS("marketplace.gui.category.weapons", () -> Items.DIAMOND_SWORD),
 		ARMOR("marketplace.gui.category.armor", () -> Items.DIAMOND_CHESTPLATE),
 		TOOLS("marketplace.gui.category.tools", () -> Items.DIAMOND_PICKAXE),
@@ -160,6 +164,13 @@ public final class ShopCatalog {
 					stacks.add(KitCatalog.iconOf(kit));
 				}
 			}
+			case SPECIAL -> {
+				// Свои книги со своей ценой: по предмету их не отличить (это всё та же
+				// книга зачарований), поэтому раздел собирается отдельно, как и «Киты».
+				if (registries != null) {
+					stacks.addAll(SpecialCatalog.items(registries));
+				}
+			}
 			case POTIONS -> {
 				addPotions(stacks, true);
 				addOminousBottles(stacks);
@@ -236,6 +247,12 @@ public final class ShopCatalog {
 		}
 
 		registries.lookup(Registries.ENCHANTMENT).ifPresent(lookup -> lookup.listElements().forEach(enchantment -> {
+			// Наши зачарования продаются в разделе «Особые предметы» по своей цене —
+			// по формуле веса они стоили бы в десятки раз дешевле.
+			if (SpecialCatalog.isSpecial(enchantment)) {
+				return;
+			}
+
 			for (int level = 1; level <= enchantment.value().getMaxLevel(); level++) {
 				ItemStack stack = new ItemStack(Items.ENCHANTED_BOOK);
 				ItemEnchantments.Mutable enchantments = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
@@ -259,8 +276,9 @@ public final class ShopCatalog {
 		String id = BuiltInRegistries.ITEM.getKey(item).getPath();
 
 		// Зелья, стрелы с эффектом и книги зачарований — один и тот же предмет с разным содержимым:
-		// порядок задаёт содержимое, а не сам предмет.
-		if (category == Category.POTIONS || category == Category.ARROWS || category == Category.BOOKS) {
+		// порядок задаёт содержимое, а не сам предмет. «Особые предметы» — тоже книги.
+		if (category == Category.POTIONS || category == Category.ARROWS || category == Category.BOOKS
+				|| category == Category.SPECIAL) {
 			return new SortKey(0, 0, 0, contentKey(stack), contentLevel(stack), 0, id);
 		}
 
@@ -518,7 +536,9 @@ public final class ShopCatalog {
 	public static Category categoryOf(Item item) {
 		String id = BuiltInRegistries.ITEM.getKey(item).getPath();
 
-		// Книги зачарований, зелья и стрелы собираются отдельно (switch в items).
+		// Книги зачарований, зелья и стрелы собираются отдельно (switch в items). «Особые предметы»
+		// по предмету не отличить (это те же книги зачарований), поэтому раздел собирается
+		// списком в items, а categoryOf его, как и «Киты», не возвращает.
 		if (item == Items.ENCHANTED_BOOK) {
 			return Category.BOOKS;
 		}

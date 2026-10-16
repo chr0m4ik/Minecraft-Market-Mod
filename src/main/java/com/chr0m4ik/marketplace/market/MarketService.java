@@ -247,7 +247,8 @@ public final class MarketService {
 
 	/**
 	 * Сколько стоит выбранное в магазине, без списания денег. Набор считается по своей цене
-	 * (множитель покупки к нему не применяется), обычный предмет — по цене стака с множителем.
+	 * (множитель покупки к нему не применяется), «особый предмет» — по своей фиксированной цене
+	 * (тоже без множителя, но за каждую штуку), обычный предмет — по цене стака с множителем.
 	 */
 	public static double costOf(ShopState state) {
 		if (state.selected().isEmpty()) {
@@ -260,6 +261,14 @@ public final class MarketService {
 			return MoneyFormat.round(KitCatalog.priceOf(kit.get()));
 		}
 
+		java.util.OptionalDouble special = SpecialCatalog.priceOf(state.selected());
+
+		if (special.isPresent()) {
+			// Цена «особого предмета» задана явно (ТЗ заказчика), поэтому множитель покупки
+			// к ней не применяется — иначе книга стоила бы в 2,2 раза дороже заявленной.
+			return MoneyFormat.round(special.getAsDouble() * state.count());
+		}
+
 		return MoneyFormat.round(ItemPrices.priceOf(state.selected())
 				* EconomyConfig.buyMultiplier() * state.count());
 	}
@@ -268,7 +277,9 @@ public final class MarketService {
 	 * Покупка: списывает деньги и выдаёт предметы. В креативе покупка бесплатная.
 	 *
 	 * <p>Набор («кит») выдаётся ровно один: цена набора считается за один набор и не умножается
-	 * на выбранное количество, поэтому «пачку» наборов купить нельзя.
+	 * на выбранное количество, поэтому «пачку» наборов купить нельзя. «Особые предметы» (книги
+	 * своих зачарований) идут обычным путём: цена у них своя, за штуку, а выдаётся столько книг,
+	 * сколько выбрано.
 	 *
 	 * @return {@code false}, если денег не хватило
 	 */

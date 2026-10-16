@@ -192,5 +192,8 @@
 	"enchantment.marketplace.vein_miner.desc": "Ломает всю жилу руды вокруг добытого блока — только блоки того же типа и только руды.",
 	"marketplace.special.vein_miner.level.1": "Жилковый майнер I — область 5×5×5",
 	"marketplace.special.vein_miner.level.2": "Жилковый майнер II — область 9×9×9",
-	"marketplace.special.vein_miner.level.3": "Жилковый майнер III — область 13×13×13"
+	"marketplace.special.vein_miner.level.3": "Жилковый майнер III — область 13×13×13",
+	"marketplace.special.vein_miner.hint": "Кирка, лопата, топор. Несовместимо с «Шёлковым касанием».",
+	"marketplace.gui.category.special": "Особые предметы",
+	"marketplace.tooltip.buy.special": "Особый предмет: %s (цена фиксированная)"
 }

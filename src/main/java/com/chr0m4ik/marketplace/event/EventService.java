@@ -440,13 +440,14 @@ public final class EventService {
 	}
 
 	/**
-	 * Случайный раздел магазина. «Киты» пропускаем: это не раздел предметов, а наборы, и по
-	 * предметам он не определяется ({@code ShopCatalog.categoryOf} его не возвращает) — ивент
-	 * на нём не задел бы ничего.
+	 * Случайный раздел магазина. «Киты» и «Особые предметы» пропускаем: это не разделы предметов
+	 * (наборы и книги своих зачарований), по предметам они не определяются
+	 * ({@code ShopCatalog.categoryOf} их не возвращает) — ивент на них не задел бы ничего.
 	 */
 	private static ShopCatalog.Category rollCategory(RandomSource random) {
 		List<ShopCatalog.Category> pool = Arrays.stream(ShopCatalog.Category.values())
-				.filter(category -> category != ShopCatalog.Category.KITS)
+				.filter(category -> category != ShopCatalog.Category.KITS
+						&& category != ShopCatalog.Category.SPECIAL)
 				.toList();
 
 		return pool.get(random.nextInt(pool.size()));
