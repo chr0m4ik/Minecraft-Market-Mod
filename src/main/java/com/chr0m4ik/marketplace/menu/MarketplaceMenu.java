@@ -615,6 +615,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				MarketplaceMenus.open(serverPlayer, WindowKind.BUY_SLOT);
 			} else if (slotId == MARKET_SLOT_CHECKOUT) {
 				this.saveMarketCells();
+				MarketService.setWindowTransition(true);
 				MarketplaceMenus.open(serverPlayer, WindowKind.CONFIRM);
 			} else if (slotId == MARKET_SLOT_TARGET) {
 				// Безопасный режим: пока он включён, shift-клик снимает ордер.
@@ -935,20 +936,27 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 		if (this.kind == WindowKind.SELL) {
 			// Игрок положил предметы, но не оформил продажу — возвращаем их в инвентарь,
-			// иначе рынок превращается в бесплатное хранилище. Ордера не трогаем.
-			for (int i = 0; i < this.kind.tradeSlots(); i++) {
-				if (this.orderCells.contains(i)) {
-					continue;
+			// иначе рынок превращается в бесплатное хранилище. Ордера и переход в другое
+			// окно рынка (подтверждение) не трогаем — иначе предметы не выставить.
+			boolean transition = MarketService.isWindowTransition();
+			MarketService.setWindowTransition(false);
+
+			if (!transition) {
+				for (int i = 0; i < this.kind.tradeSlots(); i++) {
+					// Закрытые ячейки показывают панели — их возвращать нельзя.
+					if (i >= this.getUnlockedSlots() || this.orderCells.contains(i)) {
+						continue;
+					}
+
+					ItemStack stack = this.tradeContainer.getItem(i);
+
+					if (stack.isEmpty()) {
+						continue;
+					}
+
+					this.tradeContainer.setItem(i, ItemStack.EMPTY);
+					player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
 				}
-
-				ItemStack stack = this.tradeContainer.getItem(i);
-
-				if (stack.isEmpty()) {
-					continue;
-				}
-
-				this.tradeContainer.setItem(i, ItemStack.EMPTY);
-				player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
 			}
 
 			this.saveMarketCells();

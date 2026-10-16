@@ -271,4 +271,17 @@ public final class MarketService {
 
 		return true;
 	}
-}
+
+	/**
+	 * Идёт ли переход между окнами рынка (например, из рынка в подтверждение).
+	 * В этот момент нельзя возвращать неподтверждённые предметы — игрок ещё не вышел.
+	 */
+	private static boolean windowTransition;
+
+	public static void setWindowTransition(boolean value) {
+		windowTransition = value;
+	}
+
+	public static boolean isWindowTransition() {
+		return windowTransition;
+	}}
