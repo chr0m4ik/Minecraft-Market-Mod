@@ -1,5 +1,6 @@
 package com.chr0m4ik.marketplace.client.screen;
 
+import com.chr0m4ik.marketplace.client.MarketplaceCursor;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenu;
 import com.chr0m4ik.marketplace.menu.WindowKind;
@@ -43,6 +44,22 @@ public class MarketplaceScreen extends AbstractContainerScreen<MarketplaceMenu> 
 
 	public MarketplaceScreen(MarketplaceMenu menu, Inventory inventory, Component title) {
 		super(menu, inventory, title, WindowKind.IMAGE_WIDTH, menu.getKind().imageHeight());
+	}
+
+	/**
+	 * Пока открыто наше окно, просим миксин мыши возвращать курсор на место: игра при смене
+	 * окна ставит его в центр экрана, а это опасно — можно случайно нажать не туда.
+	 */
+	@Override
+	protected void init() {
+		super.init();
+		MarketplaceCursor.keep(true);
+	}
+
+	@Override
+	public void removed() {
+		super.removed();
+		MarketplaceCursor.keep(false);
 	}
 
 	/**

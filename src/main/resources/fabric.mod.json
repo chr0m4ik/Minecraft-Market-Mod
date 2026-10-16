@@ -1,6 +1,9 @@
 {
 	"schemaVersion": 1,
 	"id": "marketplace",
+	"mixins": [
+		"marketplace.mixins.json"
+	],
 	"version": "${version}",
 	"name": "Minecraft Marketplace Mod",
 	"description": "Внутриигровая экономика: продажа и покупка предметов за доллары, динамические цены, слоты продажи, события и киты.",
