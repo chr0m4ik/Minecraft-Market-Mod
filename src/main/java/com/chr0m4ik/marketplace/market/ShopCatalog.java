@@ -6,16 +6,16 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.world.item.component.OminousBottleAmplifier;
-import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 
@@ -25,6 +25,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Каталог магазина: на какие разделы делятся предметы и что лежит в каждом разделе.
@@ -76,7 +77,30 @@ public final class ShopCatalog {
 	/** С какой цены предмет считается редким. */
 	private static final double RARE_PRICE = 1_000_000.0;
 
-	/** Кэш: раздел → товары (отсортированы по названию, как в креативном инвентаре). */
+	/**
+	 * Порядок цветов — как в ванильной вкладке «Цветные блоки».
+	 * Нужен, чтобы цветовые варианты шли привычно: белый, светло-серый, серый, чёрный и так далее.
+	 */
+	private static final List<String> COLOR_ORDER = List.of(
+			"white", "light_gray", "gray", "black", "brown", "red", "orange", "yellow",
+			"lime", "green", "cyan", "light_blue", "blue", "purple", "magenta", "pink");
+
+	/**
+	 * Типы брони по порядку. Сначала обычная броня для игрока (шлем, нагрудник, поножи, ботинки),
+	 * затем элитры, броня для питомцев и упряжь — они идут отдельными группами после обычной брони.
+	 */
+	private static final List<String> ARMOR_TYPES = List.of(
+			"_helmet", "_chestplate", "_leggings", "_boots", "elytra", "wolf_armor",
+			"horse_armor", "nautilus_armor", "harness");
+
+	/**
+	 * Материалы брони по порядку: кожаная → медная → золотая → кольчужная → железная → алмазная → незеритовая,
+	 * черепаший панцирь — в самом конце. Порядок меняется здесь одной строкой.
+	 */
+	private static final List<String> ARMOR_MATERIALS = List.of(
+			"leather", "copper", "golden", "chainmail", "iron", "diamond", "netherite", "turtle");
+
+	/** Кэш: раздел → товары (отсортированы «по-человечески»). */
 	private static final Map<Category, List<ItemStack>> CACHE = new EnumMap<>(Category.class);
 
 	/** Доступ к реестрам мира: зачарования в 26.3 лежат в динамическом реестре, вне мира их не видно. */
@@ -84,6 +108,26 @@ public final class ShopCatalog {
 
 	/** Порядок предметов из креативного инвентаря (строится один раз). */
 	private static Map<Item, Integer> CREATIVE_ORDER;
+
+	/** Порядок семейств предметов: семейство → место в креативном инвентаре (строится один раз). */
+	private static Map<String, Integer> FAMILY_ORDER;
+
+	/** Порядок зачарований по алфавиту их идентификаторов (строится один раз из реестров мира). */
+	private static Map<Enchantment, Integer> ENCHANTMENT_ORDER;
+
+	/** Ключ сортировки товара. Поля сравниваются по очереди, сверху вниз. */
+	private record SortKey(int group, int family, int color, int content, int contentLevel, int creative, String id) {
+	}
+
+	/** Порядок полей ключа: группа → семейство → цвет → содержимое → порядок в креативе → идентификатор. */
+	private static final Comparator<SortKey> SORT_KEY_ORDER = Comparator
+			.comparingInt(SortKey::group)
+			.thenComparingInt(SortKey::family)
+			.thenComparingInt(SortKey::color)
+			.thenComparingInt(SortKey::content)
+			.thenComparingInt(SortKey::contentLevel)
+			.thenComparingInt(SortKey::creative)
+			.thenComparing(SortKey::id);
 
 	private ShopCatalog() {
 		// Класс только со статическими методами.
@@ -94,6 +138,9 @@ public final class ShopCatalog {
 		if (registries != value) {
 			registries = value;
 			CACHE.clear();
+			CREATIVE_ORDER = null;
+			FAMILY_ORDER = null;
+			ENCHANTMENT_ORDER = null;
 		}
 	}
 
@@ -129,7 +176,7 @@ public final class ShopCatalog {
 			}
 		}
 
-		stacks.sort(Comparator.comparingInt(ShopCatalog::creativeOrder).thenComparing(ShopCatalog::details));
+		stacks.sort(Comparator.comparing(stack -> sortKey(category, stack), SORT_KEY_ORDER));
 		List<ItemStack> result = List.copyOf(stacks);
 		CACHE.put(category, result);
 		return result;
@@ -193,29 +240,258 @@ public final class ShopCatalog {
 	}
 
 	/**
-	 * Порядок предметов как в креативном инвентаре: обходим ванильные вкладки по очереди и
-	 * запоминаем, какой предмет где стоял. Так список в магазине выглядит привычно.
+	 * Ключ сортировки одного товара.
+	 *
+	 * <p>Сначала идут крупные группы (у брони это тип), затем семейство предметов, цвет,
+	 * содержимое (зелья, книги, стрелы) и только в самом конце — место в креативном инвентаре
+	 * и идентификатор. Так семейства (шалкеры всех цветов, стекло, терракота) не разрываются,
+	 * а предметы, которых в креативных вкладках нет, всё равно стоят на предсказуемом месте.
 	 */
-	private static int creativeOrder(ItemStack stack) {
-		if (CREATIVE_ORDER == null) {
-			Map<Item, Integer> order = new HashMap<>();
-			int index = 0;
+	private static SortKey sortKey(Category category, ItemStack stack) {
+		Item item = stack.getItem();
+		String id = BuiltInRegistries.ITEM.getKey(item).getPath();
 
-			for (CreativeModeTab tab : BuiltInRegistries.CREATIVE_MODE_TAB) {
-				for (ItemStack display : tab.getDisplayItems()) {
-					order.putIfAbsent(display.getItem(), index++);
+		// Зелья, стрелы с эффектом и книги зачарований — один и тот же предмет с разным содержимым:
+		// порядок задаёт содержимое, а не сам предмет.
+		if (category == Category.POTIONS || category == Category.ARROWS || category == Category.BOOKS) {
+			return new SortKey(0, 0, 0, contentKey(stack), contentLevel(stack), 0, id);
+		}
+
+		// Броня: сначала тип (шлем → нагрудник → поножи → ботинки), внутри типа — по материалу.
+		if (category == Category.ARMOR) {
+			return new SortKey(armorType(id), armorMaterial(id), colorRank(id), 0, 0, creativeOrder(item), id);
+		}
+
+		// Остальные разделы: порядок как в креативе, но семейства не разрываются.
+		String family = family(id);
+		return new SortKey(0, familyOrder(family), colorRank(id), 0, 0, creativeOrder(item), id);
+	}
+
+	/** Семейство предмета: цветовые варианты сводим в одно семейство (шалкеры, шерсть, терракота, стекло). */
+	private static String family(String id) {
+		for (String color : COLOR_ORDER) {
+			if (id.startsWith(color + "_")) {
+				return id.substring(color.length() + 1);
+			}
+		}
+
+		return id;
+	}
+
+	/** Место семейства в креативном инвентаре: берём самый первый предмет этого семейства. */
+	private static int familyOrder(String family) {
+		if (FAMILY_ORDER == null) {
+			Map<String, Integer> order = new HashMap<>();
+
+			for (Item item : BuiltInRegistries.ITEM) {
+				String id = BuiltInRegistries.ITEM.getKey(item).getPath();
+				order.merge(family(id), creativeOrder(item), Math::min);
+			}
+
+			FAMILY_ORDER = order;
+		}
+
+		return FAMILY_ORDER.getOrDefault(family, Integer.MAX_VALUE);
+	}
+
+	/** Номер цвета: 0 — предмет без цвета, дальше как в ванильной вкладке цветных блоков. */
+	private static int colorRank(String id) {
+		for (int index = 0; index < COLOR_ORDER.size(); index++) {
+			if (id.startsWith(COLOR_ORDER.get(index) + "_")) {
+				return index + 1;
+			}
+		}
+
+		return 0;
+	}
+
+	/** Тип брони: шлем, нагрудник, поножи, ботинки, элитры, волчья, конская, наутилусова броня, упряжь. */
+	private static int armorType(String id) {
+		for (int index = 0; index < ARMOR_TYPES.size(); index++) {
+			if (id.endsWith(ARMOR_TYPES.get(index))) {
+				return index;
+			}
+		}
+
+		return ARMOR_TYPES.size();
+	}
+
+	/** Материал брони: кожаная → медная → золотая → кольчужная → железная → алмазная → незеритовая. */
+	private static int armorMaterial(String id) {
+		for (int index = 0; index < ARMOR_MATERIALS.size(); index++) {
+			if (id.startsWith(ARMOR_MATERIALS.get(index) + "_")) {
+				return index;
+			}
+		}
+
+		return ARMOR_MATERIALS.size();
+	}
+
+	/** Содержимое предмета: номер зелья в реестре, номер зачарования, служебные значения для обычных стрел. */
+	private static int contentKey(ItemStack stack) {
+		Item item = stack.getItem();
+
+		if (item == Items.POTION || item == Items.SPLASH_POTION || item == Items.LINGERING_POTION
+				|| item == Items.TIPPED_ARROW) {
+			return potionIndex(stack);
+		}
+
+		if (item == Items.ARROW) {
+			return -2;
+		}
+
+		if (item == Items.SPECTRAL_ARROW) {
+			return -1;
+		}
+
+		if (item == Items.ENCHANTED_BOOK) {
+			return enchantmentIndex(stack);
+		}
+
+		if (item == Items.OMINOUS_BOTTLE) {
+			// Дурные зелья — после всех обычных зелий.
+			return BuiltInRegistries.POTION.size() + ominousLevel(stack);
+		}
+
+		return 0;
+	}
+
+	/** Уточнение содержимого: вид зелья (обычное, брызгающее, туманное) или уровень зачарования. */
+	private static int contentLevel(ItemStack stack) {
+		Item item = stack.getItem();
+
+		if (item == Items.POTION) {
+			return 0;
+		}
+
+		if (item == Items.SPLASH_POTION) {
+			return 1;
+		}
+
+		if (item == Items.LINGERING_POTION) {
+			return 2;
+		}
+
+		if (item == Items.ENCHANTED_BOOK) {
+			return enchantmentLevel(stack);
+		}
+
+		return 0;
+	}
+
+	/** Номер зелья в реестре: зелья идут в том порядке, в каком их зарегистрировала игра. */
+	private static int potionIndex(ItemStack stack) {
+		PotionContents contents = stack.get(DataComponents.POTION_CONTENTS);
+
+		if (contents == null) {
+			return Integer.MAX_VALUE;
+		}
+
+		return contents.potion()
+				.map(potion -> BuiltInRegistries.POTION.getId(potion.value()))
+				.orElse(Integer.MAX_VALUE);
+	}
+
+	/** Уровень силы дурного зелья. */
+	private static int ominousLevel(ItemStack stack) {
+		OminousBottleAmplifier amplifier = stack.get(DataComponents.OMINOUS_BOTTLE_AMPLIFIER);
+		return amplifier == null ? 0 : amplifier.value();
+	}
+
+	/**
+	 * Номер зачарования: зачарования лежат в динамическом реестре и приходят из датапака,
+	 * поэтому строим порядок по алфавиту их идентификаторов — он не зависит от языка и от порядка загрузки.
+	 */
+	private static int enchantmentIndex(ItemStack stack) {
+		if (ENCHANTMENT_ORDER == null) {
+			Map<Enchantment, Integer> order = new HashMap<>();
+
+			if (registries != null) {
+				List<Holder.Reference<Enchantment>> all = registries.lookupOrThrow(Registries.ENCHANTMENT)
+						.listElements()
+						.sorted(Comparator.comparing(holder -> holder.key().identifier().toString()))
+						.toList();
+
+				for (int index = 0; index < all.size(); index++) {
+					order.put(all.get(index).value(), index);
 				}
+			}
+
+			ENCHANTMENT_ORDER = order;
+		}
+
+		return bookEnchantment(stack)
+				.map(enchantment -> ENCHANTMENT_ORDER.getOrDefault(enchantment, Integer.MAX_VALUE))
+				.orElse(Integer.MAX_VALUE);
+	}
+
+	/** Уровень зачарования в книге. */
+	private static int enchantmentLevel(ItemStack stack) {
+		ItemEnchantments enchantments = stack.get(DataComponents.STORED_ENCHANTMENTS);
+
+		if (enchantments == null || enchantments.isEmpty()) {
+			return 0;
+		}
+
+		Holder<Enchantment> holder = enchantments.keySet().iterator().next();
+		return enchantments.getLevel(holder);
+	}
+
+	/** Зачарование книги (в книге магазина оно всегда одно). */
+	private static Optional<Enchantment> bookEnchantment(ItemStack stack) {
+		ItemEnchantments enchantments = stack.get(DataComponents.STORED_ENCHANTMENTS);
+
+		if (enchantments == null || enchantments.isEmpty()) {
+			return Optional.empty();
+		}
+
+		return Optional.of(enchantments.keySet().iterator().next().value());
+	}
+
+	/**
+	 * Порядок предметов как в креативном инвентаре: обходим ванильные вкладки по очереди и
+	 * запоминаем, какой предмет где стоял. Служебные вкладки («Поиск», «Инвентарь», «Хотбар»)
+	 * пропускаем — они перечисляют те же предметы, только в другом порядке.
+	 *
+	 * <p>Важно: сами вкладки наполняет только клиент (окно креативного инвентаря). На сервере
+	 * они пустые, поэтому при первой же сборке заказываем перестройку вкладок, если реестры мира
+	 * уже известны. Без этого все предметы получили бы «нет порядка» и список стал бы алфавитным.
+	 */
+	private static int creativeOrder(Item item) {
+		if (CREATIVE_ORDER == null) {
+			Map<Item, Integer> order = scanCreativeTabs();
+
+			if (order.isEmpty() && registries != null) {
+				CreativeModeTabs.tryRebuildTabContents(FeatureFlags.VANILLA_SET, true, registries);
+				order = scanCreativeTabs();
 			}
 
 			CREATIVE_ORDER = order;
 		}
 
-		return CREATIVE_ORDER.getOrDefault(stack.getItem(), Integer.MAX_VALUE);
+		return CREATIVE_ORDER.getOrDefault(item, Integer.MAX_VALUE);
 	}
 
-	/** Дополнительный ключ для предметов, у которых порядок одинаков (книги, зелья, стрелы). */
-	private static String details(ItemStack stack) {
-		return stack.getHoverName().getString() + "\u0000" + stack.getComponents();
+	/** Обход ванильных вкладок креатива по порядку: предмет → его место в списке. */
+	private static Map<Item, Integer> scanCreativeTabs() {
+		Map<Item, Integer> order = new HashMap<>();
+		int index = 0;
+
+		for (CreativeModeTab tab : BuiltInRegistries.CREATIVE_MODE_TAB) {
+			if (tab.getType() != CreativeModeTab.Type.CATEGORY) {
+				continue;
+			}
+
+			for (ItemStack display : tab.getDisplayItems()) {
+				if (!order.containsKey(display.getItem())) {
+					order.put(display.getItem(), index);
+				}
+
+				index++;
+			}
+		}
+
+		return order;
 	}
 
 	/** Сколько страниц в разделе (минимум одна, чтобы окно не было пустым). */
