@@ -4,6 +4,8 @@ import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
+import com.chr0m4ik.marketplace.economy.TraderQuest;
+import com.chr0m4ik.marketplace.economy.TraderQuests;
 import com.chr0m4ik.marketplace.economy.TraderService;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.chr0m4ik.marketplace.market.MarketService;
@@ -130,6 +132,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	public static final int TRADER_SLOT_CANCEL = 45;
 	public static final int TRADER_SLOT_INFO = 47;
 	public static final int TRADER_SLOT_TRADE = 49;
+	/** Кнопка «Задания торговца» — заказы на сдачу предметов. */
+	public static final int TRADER_SLOT_QUESTS = 51;
+
+	/** Окно заданий: до трёх заказов в среднем ряду и выход снизу. */
+	public static final int[] QUEST_SLOTS = {10, 13, 16};
+	public static final int QUESTS_SLOT_EXIT = 22;
 
 	/** Кнопки окна рынка. */
 	public static final int MARKET_SLOT_EXIT = 45;
@@ -497,6 +505,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			this.setButton(TRADER_SLOT_CANCEL, Items.BARRIER, "marketplace.gui.button.cancel");
 			this.setButton(TRADER_SLOT_INFO, Items.PAPER, "marketplace.gui.button.total");
 			this.setButton(TRADER_SLOT_TRADE, Items.EMERALD, "marketplace.gui.button.trade");
+			this.setButton(TRADER_SLOT_QUESTS, Items.BOOK, "marketplace.gui.button.quests");
 			return;
 		}
 
@@ -559,6 +568,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		if (this.kind == WindowKind.BUY_ITEM) {
 			this.setButton(BUY_ITEM_BACK, Items.BARRIER, "marketplace.gui.button.back");
 			this.updateShopButtons();
+			return;
+		}
+
+		if (this.kind == WindowKind.QUESTS) {
+			this.fillQuests();
+			this.setButton(QUESTS_SLOT_EXIT, Items.BARRIER, "marketplace.gui.button.back");
 			return;
 		}
 
@@ -760,6 +775,9 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				MarketplaceMenus.open(serverPlayer, WindowKind.MAIN);
 			} else if (slotId == TRADER_SLOT_TRADE) {
 				this.tradeToTrader(serverPlayer);
+			} else if (slotId == TRADER_SLOT_QUESTS) {
+				// Заказы торговца: отдельное окно, где видно, что и сколько нужно принести.
+				MarketplaceMenus.open(serverPlayer, WindowKind.QUESTS);
 			}
 
 			// Кнопка «итоговая цена» ничего не делает — она только показывает подсказку.
@@ -867,6 +885,21 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 						MarketService.setShop(serverPlayer.getUUID(),
 								MarketService.shop(serverPlayer.getUUID()).withCategory(index));
 						MarketplaceMenus.open(serverPlayer, WindowKind.BUY_LIST);
+					}
+				}
+			}
+
+			return;
+		}
+
+		if (this.kind == WindowKind.QUESTS) {
+			if (slotId == QUESTS_SLOT_EXIT) {
+				MarketplaceMenus.open(serverPlayer, WindowKind.TRADER);
+			} else {
+				for (int index = 0; index < QUEST_SLOTS.length; index++) {
+					if (QUEST_SLOTS[index] == slotId) {
+						this.deliverQuest(serverPlayer, index);
+						break;
 					}
 				}
 			}
@@ -998,6 +1031,89 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		if (sale.limitReached()) {
 			sendLimitMessage(player);
 		}
+	}
+
+	/**
+	 * Раскладывает заказы торговца по слотам окна заданий. Считается только на сервере: заказы
+	 * лежат в сейве мира, клиент их не видит. Готовые иконки уходят клиенту обычной синхронизацией
+	 * содержимого слотов.
+	 */
+	private void fillQuests() {
+		if (this.serverPlayer == null) {
+			return;
+		}
+
+		MinecraftServer server = this.serverPlayer.level().getServer();
+
+		if (server == null) {
+			return;
+		}
+
+		List<TraderQuest> quests = TraderQuests.forPlayer(server, this.serverPlayer.getUUID());
+
+		for (int index = 0; index < QUEST_SLOTS.length; index++) {
+			ItemStack icon = index < quests.size() ? questIcon(quests.get(index)) : ItemStack.EMPTY;
+			this.setButtonStack(QUEST_SLOTS[index], icon);
+		}
+	}
+
+	/** Иконка заказа: сам предмет, сколько нужно и сколько за него заплатят. */
+	private static ItemStack questIcon(TraderQuest quest) {
+		ItemStack icon = quest.icon();
+
+		if (icon.isEmpty()) {
+			return ItemStack.EMPTY;
+		}
+
+		List<Component> lore = new ArrayList<>();
+		lore.add(plain(Component.translatable("marketplace.gui.quests.need",
+				Component.literal(String.valueOf(quest.count()))).withStyle(ChatFormatting.GRAY)));
+
+		if (quest.done()) {
+			lore.add(plain(Component.translatable("marketplace.gui.quests.done")
+					.withStyle(ChatFormatting.GREEN)));
+		} else {
+			lore.add(plain(Component.translatable("marketplace.gui.quests.reward",
+					money(TraderQuests.rewardOf(quest))).withStyle(ChatFormatting.GOLD)));
+			lore.add(plain(Component.translatable("marketplace.gui.quests.hint")
+					.withStyle(ChatFormatting.DARK_GRAY)));
+		}
+
+		icon.set(DataComponents.LORE, new ItemLore(lore));
+		return icon;
+	}
+
+	/** Сдача заказа: предметы забираются из инвентаря, деньги начисляются. */
+	private void deliverQuest(ServerPlayer player, int index) {
+		MinecraftServer server = player.level().getServer();
+
+		if (server == null) {
+			return;
+		}
+
+		TraderQuests.Delivery delivery = TraderQuests.deliver(server, player, index);
+		TraderQuest quest = delivery.quest();
+
+		switch (delivery.status()) {
+			case DELIVERED -> {
+				MarketSounds.traderSold(player);
+				player.sendSystemMessage(Component.translatable("marketplace.gui.quests.delivered",
+						quest.icon().getHoverName(),
+						Component.literal(String.valueOf(quest.count())),
+						money(delivery.paid())).withStyle(ChatFormatting.GREEN));
+			}
+			case NOT_ENOUGH -> player.sendSystemMessage(Component.translatable("marketplace.gui.quests.notEnough",
+					quest.icon().getHoverName(),
+					Component.literal(String.valueOf(delivery.missing()))).withStyle(ChatFormatting.RED));
+			case ALREADY_DONE -> player.sendSystemMessage(Component.translatable("marketplace.gui.quests.already")
+					.withStyle(ChatFormatting.GRAY));
+			case BROKEN -> player.sendSystemMessage(Component.translatable("marketplace.gui.quests.empty")
+					.withStyle(ChatFormatting.GRAY));
+		}
+
+		// Окно не переоткрываем: обновляем иконки на месте, чтобы мышка не прыгала.
+		this.fillQuests();
+		this.broadcastChanges();
 	}
 
 	/** Выбрали товар в списке: запоминаем предмет и открываем окно покупки. */

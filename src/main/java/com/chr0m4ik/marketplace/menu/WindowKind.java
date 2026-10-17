@@ -32,7 +32,9 @@ public enum WindowKind {
 	/** Покупка: список товаров раздела (9×5 + системная строка). */
 	BUY_LIST("marketplace.gui.buy.list.title", 6, 139, 222, 45, true),
 	/** Покупка: окно выбора количества и подтверждения. */
-	BUY_ITEM("marketplace.gui.buy.item.title", 3, 84, 167, 0, false);
+	BUY_ITEM("marketplace.gui.buy.item.title", 3, 84, 167, 0, false),
+	/** Задания торговца: до трёх заказов и кнопка «назад». */
+	QUESTS("marketplace.gui.quests.title", 3, 84, 167, 0, false);
 
 	/** Ширина всех ванильных окон-контейнеров. */
 	public static final int IMAGE_WIDTH = 176;

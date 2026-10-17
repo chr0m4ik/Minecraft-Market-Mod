@@ -43,6 +43,7 @@ public class MarketplaceClient implements ClientModInitializer {
 		MenuScreens.register(MarketplaceMenus.BUY, MarketplaceScreen::new);
 		MenuScreens.register(MarketplaceMenus.BUY_LIST, MarketplaceScreen::new);
 		MenuScreens.register(MarketplaceMenus.BUY_ITEM, MarketplaceScreen::new);
+		MenuScreens.register(MarketplaceMenus.QUESTS, MarketplaceScreen::new);
 
 		// Плашка с деньгами поверх игры (правый верхний угол).
 		HudElementRegistry.addLast(MarketplaceMod.id("money"), new MoneyHudElement());

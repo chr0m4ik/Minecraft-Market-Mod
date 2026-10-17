@@ -17,7 +17,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -62,6 +64,13 @@ public class MarketplaceState extends SavedData {
 	private static final String STAGING_KEY = "staging";
 	private static final String STAGING_ITEM_KEY = "item";
 	private static final String MARKUP_KEY = "markup";
+	/** Ключи заказов торговца: номер игрового дня и сами заказы (по три штуки на игрока). */
+	private static final String QUESTS_KEY = "quests";
+	private static final String QUEST_DAY_KEY = "day";
+	private static final String QUEST_ITEM_KEY = "item";
+	private static final String QUEST_COUNT_KEY = "count";
+	private static final String QUEST_BONUS_KEY = "bonus";
+	private static final String QUEST_DONE_KEY = "done";
 	/** Ключи крупных ивентов: активное время мира, идущий ивент и запланированный. */
 	private static final String EVENT_TIME_KEY = "event_active_time";
 	private static final String EVENT_ACTIVE_KEY = "event_active";
@@ -91,6 +100,10 @@ public class MarketplaceState extends SavedData {
 	private final Map<UUID, Map<Integer, ItemStack>> staging = new HashMap<>();
 	/** Игрок → выбранная наценка для новых ордеров. */
 	private final Map<UUID, Double> markup = new HashMap<>();
+	/** Игрок → заказы торговца на текущий игровой день. */
+	private final Map<UUID, List<TraderQuest>> quests = new HashMap<>();
+	/** Игрок → игровой день, на который выданы заказы. */
+	private final Map<UUID, Long> questDay = new HashMap<>();
 
 	/**
 	 * Активное время мира: тики, когда в игре был хотя бы один игрок. Ивенты считают время по нему,
@@ -347,6 +360,28 @@ public class MarketplaceState extends SavedData {
 		setDirty();
 	}
 
+	// --- Заказы торговца ---
+
+	/** Заказы игрока на текущий игровой день (пусто — заказов ещё не выдавали). */
+	public List<TraderQuest> quests(UUID playerId) {
+		return quests.getOrDefault(playerId, List.of());
+	}
+
+	public void setQuests(UUID playerId, List<TraderQuest> list) {
+		quests.put(playerId, List.copyOf(list));
+		setDirty();
+	}
+
+	/** Игровой день, на который выданы заказы ({@link Long#MIN_VALUE} — не выдавали ни разу). */
+	public long questDay(UUID playerId) {
+		return questDay.getOrDefault(playerId, Long.MIN_VALUE);
+	}
+
+	public void setQuestDay(UUID playerId, long day) {
+		questDay.put(playerId, day);
+		setDirty();
+	}
+
 	// --- Крупные ивенты ---
 
 	/** Активное время мира в тиках: копится, только пока в игре есть игроки. */
@@ -591,6 +626,38 @@ public class MarketplaceState extends SavedData {
 			playerId.ifPresent(id -> state.markup.put(id, storedMarkup.getDoubleOr(key, 1.0)));
 		}
 
+		// Заказы торговца: у каждого игрока свой номер игрового дня и до трёх заказов.
+		CompoundTag storedQuests = tag.getCompoundOrEmpty(QUESTS_KEY);
+
+		for (String playerKey : storedQuests.keySet()) {
+			Optional<UUID> playerId = parseUuid(playerKey);
+
+			if (playerId.isEmpty()) {
+				MarketplaceMod.LOGGER.warn("В сейве некорректный UUID игрока в заказах, запись пропущена: {}",
+						playerKey);
+				continue;
+			}
+
+			CompoundTag playerQuests = storedQuests.getCompoundOrEmpty(playerKey);
+			state.questDay.put(playerId.get(), playerQuests.getLongOr(QUEST_DAY_KEY, Long.MIN_VALUE));
+			List<TraderQuest> list = new ArrayList<>();
+
+			for (int index = 0; index < TraderQuests.COUNT; index++) {
+				String itemId = playerQuests.getStringOr(QUEST_ITEM_KEY + index, "");
+
+				if (itemId.isEmpty()) {
+					continue;
+				}
+
+				list.add(new TraderQuest(itemId,
+						playerQuests.getIntOr(QUEST_COUNT_KEY + index, 0),
+						playerQuests.getDoubleOr(QUEST_BONUS_KEY + index, 0.0),
+						playerQuests.getBooleanOr(QUEST_DONE_KEY + index, false)));
+			}
+
+			state.quests.put(playerId.get(), list);
+		}
+
 		// Крупные ивенты. Старые сейвы этих ключей не знают — тогда ивентов просто нет,
 		// а счётчик активного времени начинается с нуля: следующий ивент выпадет в свой день.
 		state.activeTicks = tag.getLongOr(EVENT_TIME_KEY, 0L);
@@ -744,6 +811,26 @@ public class MarketplaceState extends SavedData {
 		CompoundTag storedMarkup = new CompoundTag();
 		state.markup.forEach((playerId, value) -> storedMarkup.putDouble(playerId.toString(), value));
 		tag.put(MARKUP_KEY, storedMarkup);
+
+		// Заказы торговца: номер игрового дня и сами заказы (ключи вида item0, count0 и так далее).
+		CompoundTag storedQuests = new CompoundTag();
+
+		state.quests.forEach((playerId, list) -> {
+			CompoundTag playerTag = new CompoundTag();
+			playerTag.putLong(QUEST_DAY_KEY, state.questDay.getOrDefault(playerId, Long.MIN_VALUE));
+
+			for (int index = 0; index < list.size(); index++) {
+				TraderQuest quest = list.get(index);
+				playerTag.putString(QUEST_ITEM_KEY + index, quest.itemId());
+				playerTag.putInt(QUEST_COUNT_KEY + index, quest.count());
+				playerTag.putDouble(QUEST_BONUS_KEY + index, quest.bonus());
+				playerTag.putBoolean(QUEST_DONE_KEY + index, quest.done());
+			}
+
+			storedQuests.put(playerId.toString(), playerTag);
+		});
+
+		tag.put(QUESTS_KEY, storedQuests);
 
 		// Крупные ивенты: активное время, идущий ивент с остатком, запланированный со слухом.
 		tag.putLong(EVENT_TIME_KEY, state.activeTicks);

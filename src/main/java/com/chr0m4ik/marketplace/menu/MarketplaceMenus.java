@@ -29,6 +29,8 @@ public final class MarketplaceMenus {
 	public static final MenuType<MarketplaceMenu> BUY = register(WindowKind.BUY, "buy");
 	public static final MenuType<MarketplaceMenu> BUY_LIST = register(WindowKind.BUY_LIST, "buy_list");
 	public static final MenuType<MarketplaceMenu> BUY_ITEM = register(WindowKind.BUY_ITEM, "buy_item");
+	/** Задания торговца (заказы на сдачу предметов). */
+	public static final MenuType<MarketplaceMenu> QUESTS = register(WindowKind.QUESTS, "quests");
 
 	private MarketplaceMenus() {
 		// Класс только со статическими методами.
