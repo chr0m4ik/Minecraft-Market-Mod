@@ -1,6 +1,7 @@
 # Сборка и кеши Gradle / Loom
 .gradle/
 build/
+build-*.log
 
 # Папка запуска игры (генерируется автоматически)
 run/
@@ -10,19 +11,22 @@ run/
 logs/
 *.bak*
 
-# Память агента (не коммитим)
+# Настройки IDE
+.vscode/
+.idea/
+*.iml
+bin/
+
+# Служебные файлы разработки (не часть мода)
+docs/
+AGENTS.md
 lastest.md
 .dsh/
 
-# Отчёты генератора прайса (пересоздаются командой node tools/generate-prices.js)
+# Отчёты генератора прайса (пересоздаются: node tools/generate-prices.js)
 tools/leftovers.txt
 tools/craft-cheats.txt
 
-# Мусор IDE
-*.iml
-.idea/
-bin/
-
-# Временные артефакты исследований и декомпиляции (исходники игры, распакованные jar-ы)
+# Временные артефакты исследований и декомпиляции
 .research/
 .tmp_*/
