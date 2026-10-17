@@ -11,9 +11,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 
 /** Случайный телепорт по обычному миру в радиусе 5000 блоков от точки 0,0. */
 public final class RandomTeleport {
@@ -21,10 +19,6 @@ public final class RandomTeleport {
 	private static final int RADIUS = 5000;
 
 	private static final int ATTEMPTS = 24;
-
-	private static final long COOLDOWN_MS = 30_000L;
-
-	private static final Map<UUID, Long> LAST_USE = new ConcurrentHashMap<>();
 
 	private RandomTeleport() {
 	}
@@ -36,13 +30,7 @@ public final class RandomTeleport {
 			return 0;
 		}
 
-		long now = System.currentTimeMillis();
-		long last = LAST_USE.getOrDefault(player.getUUID(), 0L);
-
-		if (now - last < COOLDOWN_MS) {
-			long left = (COOLDOWN_MS - (now - last) + 999L) / 1000L;
-			player.sendSystemMessage(Component.translatable("marketplace.rtp.cooldown",
-					Component.literal(String.valueOf(left))).withStyle(ChatFormatting.GRAY));
+		if (TeleportGuard.blocked(player)) {
 			return 0;
 		}
 
@@ -61,11 +49,11 @@ public final class RandomTeleport {
 				continue;
 			}
 
-			LAST_USE.put(player.getUUID(), now);
+			TeleportGuard.mark(player);
 			player.stopRiding();
 			player.closeContainer();
 			player.teleportTo(level, feet.getX() + 0.5, feet.getY(), feet.getZ() + 0.5,
-					java.util.Set.of(), player.getYRot(), 0.0F, true);
+					Set.of(), player.getYRot(), 0.0F, true);
 			player.setDeltaMovement(Vec3.ZERO);
 			player.resetFallDistance();
 

@@ -1,6 +1,7 @@
 package com.chr0m4ik.marketplace.command;
 
 import com.chr0m4ik.marketplace.economy.EconomyConfig;
+import com.chr0m4ik.marketplace.economy.HomePoint;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
@@ -23,6 +24,7 @@ import com.chr0m4ik.marketplace.market.VirtualEnderChest;
 import com.chr0m4ik.marketplace.market.SpecialCatalog;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import com.chr0m4ik.marketplace.price.PriceDrift;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
@@ -45,6 +47,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionCheck;
 import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.Set;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.util.Prediction;
 
@@ -58,7 +64,7 @@ import java.util.UUID;
 
 public final class MarketplaceCommands {
 	private MarketplaceCommands() {
-		// Класс только со статическими методами.
+		// РљР»Р°СЃСЃ С‚РѕР»СЊРєРѕ СЃРѕ СЃС‚Р°С‚РёС‡РµСЃРєРёРјРё РјРµС‚РѕРґР°РјРё.
 	}
 
 	private static final String ARG_PLAYER = "player";
@@ -71,6 +77,7 @@ public final class MarketplaceCommands {
 	private static final String ARG_NAME = "name";
 	private static final String ARG_PRICE = "price";
 	private static final String ARG_SLOT = "slot";
+	private static final String ARG_ENABLED = "enabled";
 
 	
 	private static final int SHOP_SHOWN = 20;
@@ -194,7 +201,7 @@ public final class MarketplaceCommands {
 
 			dispatcher.register(auction);
 
-			// Прямые окна: торговец и сразу его задания.
+			// РџСЂСЏРјС‹Рµ РѕРєРЅР°: С‚РѕСЂРіРѕРІРµС† Рё СЃСЂР°Р·Сѓ РµРіРѕ Р·Р°РґР°РЅРёСЏ.
 			dispatcher.register(Commands.literal("trader")
 					.executes(MarketplaceCommands::openTrader));
 			dispatcher.register(Commands.literal("quest")
@@ -219,6 +226,19 @@ public final class MarketplaceCommands {
 
 			dispatcher.register(Commands.literal("rtp")
 					.executes(MarketplaceCommands::randomTeleport));
+
+			dispatcher.register(Commands.literal("sethome")
+					.executes(MarketplaceCommands::setHome));
+
+			dispatcher.register(Commands.literal("home")
+					.executes(MarketplaceCommands::goHome));
+
+			dispatcher.register(Commands.literal("pull")
+					.then(Commands.literal("requests")
+							.then(Commands.argument(ARG_ENABLED, BoolArgumentType.bool())
+									.executes(MarketplaceCommands::pullRequests)))
+					.then(Commands.argument(ARG_PLAYER, EntityArgument.player())
+							.executes(MarketplaceCommands::pullTo)));
 		});
 	}
 
@@ -256,6 +276,96 @@ public final class MarketplaceCommands {
 
 	private static int randomTeleport(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		return RandomTeleport.teleport(context.getSource().getPlayerOrException());
+	}
+
+	private static int setHome(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		CommandSourceStack source = context.getSource();
+		ServerPlayer player = source.getPlayerOrException();
+
+		if (player.level().dimension() != Level.OVERWORLD) {
+			source.sendFailure(Component.translatable("marketplace.home.wrongDimension"));
+			return 0;
+		}
+
+		MarketplaceEconomy.state(source.getServer()).setHome(player.getUUID(),
+				new HomePoint(player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot()));
+		player.sendSystemMessage(Component.translatable("marketplace.home.set", Component.literal(
+				Math.round(player.getX()) + " " + Math.round(player.getY()) + " " + Math.round(player.getZ())))
+				.withStyle(ChatFormatting.GREEN));
+		return 1;
+	}
+
+	private static int goHome(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		CommandSourceStack source = context.getSource();
+		ServerPlayer player = source.getPlayerOrException();
+
+		if (player.level().dimension() != Level.OVERWORLD) {
+			source.sendFailure(Component.translatable("marketplace.home.wrongDimension"));
+			return 0;
+		}
+
+		HomePoint home = MarketplaceEconomy.state(source.getServer()).home(player.getUUID());
+
+		if (home == null) {
+			source.sendFailure(Component.translatable("marketplace.home.none"));
+			return 0;
+		}
+
+		if (TeleportGuard.blocked(player)) {
+			return 0;
+		}
+
+		player.stopRiding();
+		player.closeContainer();
+		player.teleportTo(player.level(), home.x(), home.y(), home.z(), Set.of(), home.yaw(), home.pitch(), true);
+		player.setDeltaMovement(Vec3.ZERO);
+		player.resetFallDistance();
+		TeleportGuard.mark(player);
+		player.sendSystemMessage(Component.translatable("marketplace.home.teleported")
+				.withStyle(ChatFormatting.GREEN));
+		return 1;
+	}
+
+	private static int pullTo(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		CommandSourceStack source = context.getSource();
+		ServerPlayer sender = source.getPlayerOrException();
+		ServerPlayer target = EntityArgument.getPlayer(context, ARG_PLAYER);
+
+		if (target == sender) {
+			source.sendFailure(Component.translatable("marketplace.pull.self"));
+			return 0;
+		}
+
+		if (!MarketplaceEconomy.state(source.getServer()).pullEnabled(target.getUUID())) {
+			source.sendFailure(Component.translatable("marketplace.pull.disabled", target.getDisplayName()));
+			return 0;
+		}
+
+		if (TeleportGuard.blocked(sender)) {
+			return 0;
+		}
+
+		sender.stopRiding();
+		sender.closeContainer();
+		sender.teleportTo(target.level(), target.getX(), target.getY(), target.getZ(), Set.of(),
+				sender.getYRot(), sender.getXRot(), true);
+		sender.setDeltaMovement(Vec3.ZERO);
+		sender.resetFallDistance();
+		TeleportGuard.mark(sender);
+		sender.sendSystemMessage(Component.translatable("marketplace.pull.done", target.getDisplayName())
+				.withStyle(ChatFormatting.GREEN));
+		target.sendSystemMessage(Component.translatable("marketplace.pull.arrived", sender.getDisplayName())
+				.withStyle(ChatFormatting.GRAY));
+		return 1;
+	}
+
+	private static int pullRequests(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		ServerPlayer player = context.getSource().getPlayerOrException();
+		boolean enabled = BoolArgumentType.getBool(context, ARG_ENABLED);
+		MarketplaceEconomy.state(context.getSource().getServer()).setPullEnabled(player.getUUID(), enabled);
+		player.sendSystemMessage(Component.translatable(enabled ? "marketplace.pull.on" : "marketplace.pull.off")
+				.withStyle(enabled ? ChatFormatting.GREEN : ChatFormatting.GRAY));
+		return 1;
 	}
 
 	
@@ -701,7 +811,7 @@ public final class MarketplaceCommands {
 		UrgentQuest quest = current.get();
 		source.sendSuccess(() -> Component.translatable("marketplace.command.urgent.active",
 				quest.icon().getHoverName(),
-				Component.literal(quest.count() + " (" + quest.stacks() + " стаков)"),
+				Component.literal(quest.count() + " (" + quest.stacks() + " СЃС‚Р°РєРѕРІ)"),
 				Component.literal(MoneyFormat.format(quest.reward())),
 				MarketEvents.duration(quest.remaining())).withStyle(ChatFormatting.GOLD), false);
 
@@ -726,7 +836,7 @@ public final class MarketplaceCommands {
 		UrgentQuest quest = started.get();
 		source.sendSuccess(() -> Component.translatable("marketplace.command.urgent.started",
 				quest.icon().getHoverName(),
-				Component.literal(quest.count() + " (" + quest.stacks() + " стаков)"),
+				Component.literal(quest.count() + " (" + quest.stacks() + " СЃС‚Р°РєРѕРІ)"),
 				Component.literal(MoneyFormat.format(quest.reward())),
 				MarketEvents.duration(quest.remaining())).withStyle(ChatFormatting.GOLD), true);
 

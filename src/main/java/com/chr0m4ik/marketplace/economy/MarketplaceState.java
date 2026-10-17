@@ -53,6 +53,10 @@ public class MarketplaceState extends SavedData {
 
 	private static final String ORDER_PAYOUT_KEY = "payout";
 	private static final String BOUGHT_SLOTS_KEY = "bought_slots";
+
+	private static final String HOMES_KEY = "homes";
+
+	private static final String PULL_KEY = "pull";
 	private static final String PENDING_SALES_KEY = "pending_sales";
 	private static final String PENDING_COUNT_KEY = "count";
 	private static final String PENDING_TOTAL_KEY = "total";
@@ -109,6 +113,10 @@ public class MarketplaceState extends SavedData {
 	private final Map<UUID, Map<Integer, MarketOrder>> orders = new HashMap<>();
 
 	private final Map<UUID, Integer> boughtSlots = new HashMap<>();
+
+	private final Map<UUID, HomePoint> homes = new HashMap<>();
+
+	private final Map<UUID, Boolean> pullEnabled = new HashMap<>();
 
 	private final Map<UUID, double[]> pendingSales = new HashMap<>();
 
@@ -302,6 +310,24 @@ public class MarketplaceState extends SavedData {
 
 	public void setBoughtSlots(UUID playerId, int count) {
 		boughtSlots.put(playerId, count);
+		setDirty();
+	}
+
+	public HomePoint home(UUID playerId) {
+		return homes.get(playerId);
+	}
+
+	public void setHome(UUID playerId, HomePoint home) {
+		homes.put(playerId, home);
+		setDirty();
+	}
+
+	public boolean pullEnabled(UUID playerId) {
+		return pullEnabled.getOrDefault(playerId, true);
+	}
+
+	public void setPullEnabled(UUID playerId, boolean enabled) {
+		pullEnabled.put(playerId, enabled);
 		setDirty();
 	}
 
@@ -613,6 +639,28 @@ public class MarketplaceState extends SavedData {
 			playerId.ifPresent(id -> state.boughtSlots.put(id, Math.max(0, storedSlots.getIntOr(key, 0))));
 		}
 
+		CompoundTag storedHomes = tag.getCompoundOrEmpty(HOMES_KEY);
+
+		for (String key : storedHomes.keySet()) {
+			Optional<UUID> playerId = parseUuid(key);
+
+			if (playerId.isEmpty()) {
+				continue;
+			}
+
+			CompoundTag home = storedHomes.getCompoundOrEmpty(key);
+			state.homes.put(playerId.get(), new HomePoint(home.getDoubleOr("x", 0.0),
+					home.getDoubleOr("y", 0.0), home.getDoubleOr("z", 0.0),
+					(float) home.getDoubleOr("yaw", 0.0), (float) home.getDoubleOr("pitch", 0.0)));
+		}
+
+		CompoundTag storedPull = tag.getCompoundOrEmpty(PULL_KEY);
+
+		for (String key : storedPull.keySet()) {
+			Optional<UUID> playerId = parseUuid(key);
+			playerId.ifPresent(id -> state.pullEnabled.put(id, storedPull.getBooleanOr(key, true)));
+		}
+
 		CompoundTag storedPending = tag.getCompoundOrEmpty(PENDING_SALES_KEY);
 
 		for (String key : storedPending.keySet()) {
@@ -875,6 +923,24 @@ public class MarketplaceState extends SavedData {
 		CompoundTag storedSlots = new CompoundTag();
 		state.boughtSlots.forEach((playerId, count) -> storedSlots.putInt(playerId.toString(), count));
 		tag.put(BOUGHT_SLOTS_KEY, storedSlots);
+
+		CompoundTag storedHomes = new CompoundTag();
+
+		state.homes.forEach((playerId, home) -> {
+			CompoundTag entry = new CompoundTag();
+			entry.putDouble("x", home.x());
+			entry.putDouble("y", home.y());
+			entry.putDouble("z", home.z());
+			entry.putDouble("yaw", home.yaw());
+			entry.putDouble("pitch", home.pitch());
+			storedHomes.put(playerId.toString(), entry);
+		});
+
+		tag.put(HOMES_KEY, storedHomes);
+
+		CompoundTag storedPull = new CompoundTag();
+		state.pullEnabled.forEach((playerId, enabled) -> storedPull.putBoolean(playerId.toString(), enabled));
+		tag.put(PULL_KEY, storedPull);
 
 		CompoundTag storedPending = new CompoundTag();
 

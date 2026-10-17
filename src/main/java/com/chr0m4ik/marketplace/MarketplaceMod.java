@@ -1,6 +1,7 @@
 package com.chr0m4ik.marketplace;
 
 import com.chr0m4ik.marketplace.command.MarketplaceCommands;
+import com.chr0m4ik.marketplace.command.TeleportGuard;
 import com.chr0m4ik.marketplace.collector.CollectorHandler;
 import com.chr0m4ik.marketplace.collector.CollectorItem;
 import com.chr0m4ik.marketplace.economy.EconomyConfig;
@@ -43,6 +44,7 @@ public class MarketplaceMod implements ModInitializer {
 		// LOGGER.info("Loading Minecraft Marketplace Mod");
 
 		MarketplaceCommands.register();
+		TeleportGuard.register();
 		MarketplaceMenus.initialize();
 		MarketplaceNetworking.registerServer();
 
