@@ -11,6 +11,7 @@ import com.chr0m4ik.marketplace.event.MarketEvent;
 import com.chr0m4ik.marketplace.event.MarketEvents;
 import com.chr0m4ik.marketplace.market.CustomKits;
 import com.chr0m4ik.marketplace.market.KitCatalog;
+import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.VirtualEnderChest;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.SpecialCatalog;
@@ -54,6 +55,11 @@ public final class MarketplaceTooltips {
 
 	private static void addPrice(ItemStack stack, Item.TooltipContext context, TooltipFlag flag, List<Component> lines) {
 		if (stack.isEmpty()) {
+			return;
+		}
+
+		// Лот торговой площадки: цена, продавец и состояние уже в описании, которое собрал сервер.
+		if (!MarketService.listingId(stack).isEmpty()) {
 			return;
 		}
 
@@ -195,15 +201,23 @@ public final class MarketplaceTooltips {
 
 		addBasePriceLines(lines, stack);
 
+		// Лот, который ждёт живого покупателя: рынок его не купит, поэтому про наценку не говорим.
+		boolean waiting = menu.isCellOrder(cell) && menu.isCellWaiting(cell);
+
+		if (waiting) {
+			lines.add(Component.translatable("marketplace.tooltip.market.waiting")
+					.withStyle(ChatFormatting.GOLD));
+		}
+
 		// Если предмет выставлен с наценкой — показываем и обычную цену, и итоговую.
 		double markup = menu.getCellMarkup(cell);
 
-		if (markup > 1.001) {
+		if (!waiting && markup > 1.001) {
 			lines.add(Component.translatable("marketplace.tooltip.market.markedUp", markup(markup),
 					money(ItemPrices.priceOf(stack) * markup)).withStyle(ChatFormatting.GOLD));
 		}
 
-		if (menu.isCellOrder(cell)) {
+		if (menu.isCellOrder(cell) && !waiting) {
 			// Выплата по ордеру зафиксирована при выставлении: если цена с тех пор ушла
 			// (микро-дрейф или ивент), говорим об этом прямо, чтобы сумма не выглядела ошибкой.
 			double fixed = menu.getCellPayout(cell);

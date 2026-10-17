@@ -260,6 +260,15 @@ public final class ItemPrices {
 		return loaded && prices.containsKey(item) && !notBuyable.contains(item);
 	}
 
+	/**
+	 * Предмет в чёрном списке: его нельзя продавать (бедрок, барьер, командные блоки и прочее,
+	 * чего не получить в выживании). Проверяется в том числе при выставлении лоа на площадке.
+	 */
+	public static boolean isBlacklisted(Item item) {
+		ensureLoaded();
+		return notBuyable.contains(item);
+	}
+
 	/** Загружен ли прайс (если нет — цены считаются неизвестными). */
 	public static boolean isLoaded() {
 		ensureLoaded();

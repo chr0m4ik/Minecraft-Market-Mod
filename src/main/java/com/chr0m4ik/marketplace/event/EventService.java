@@ -448,6 +448,7 @@ public final class EventService {
 		List<ShopCatalog.Category> pool = Arrays.stream(ShopCatalog.Category.values())
 				.filter(category -> category != ShopCatalog.Category.KITS
 						&& category != ShopCatalog.Category.CUSTOM_KITS
+						&& category != ShopCatalog.Category.AUCTION
 						&& category != ShopCatalog.Category.SPECIAL)
 				.toList();
 

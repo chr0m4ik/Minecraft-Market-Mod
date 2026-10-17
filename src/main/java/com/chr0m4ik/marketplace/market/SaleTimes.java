@@ -210,6 +210,63 @@ public final class SaleTimes {
 		return Math.max(MIN_TICKS, Math.min(MAX_TICKS, ticks));
 	}
 
+	/**
+	 * Сколько тиков будет продаваться лот с ценой, заданной игроком ({@code /ah sell}).
+	 *
+	 * <p>Время считается от отношения «цена лота / базовая цена стака»: чем дороже игрок
+	 * оценил предмет относительно базы, тем дольше виртуальный рынок его покупает; дешевле
+	 * базы — быстрее. Функция замедления та же, что у наценок рынка ({@link #markupSlowdownFor}),
+	 * поэтому лот с ценой ×1,5 от базы и ордер с наценкой ×1,5 продаются одинаково долго.
+	 *
+	 * <p>Если у предмета нет базовой цены (например, выданный модом предмет без прайса),
+	 * возвращается потолок: такие лоты виртуальный рынок не покупает.
+	 */
+	public static long ticksForPrice(ItemStack stack, double price, RandomSource random) {
+		// basePriceOf — цена одной штуки, поэтому для лота берём цену всего стака.
+		double base = ItemPrices.basePriceOf(stack) * stack.getCount();
+
+		if (base <= 0.0) {
+			return MAX_TICKS;
+		}
+
+		double ratio = price / base;
+		double secondsForStack = secondsOf(stack);
+		double slowdown = markupSlowdownFor(ratio);
+		double factor = randomFactor(ItemPrices.priceOf(stack), random);
+		long ticks = Math.round(secondsForStack * slowdown * factor * 20.0);
+		return Math.max(MIN_TICKS, Math.min(MAX_TICKS, ticks));
+	}
+
+	/**
+	 * Замедление по отношению «цена / базовая цена». В точках из {@code economy.json}
+	 * ({@code market_markups} и {@code markup_slowdowns}) совпадает с {@link #markupSlowdown},
+	 * между ними — линейная интерполяция; ниже первой наценки замедление меньше единицы
+	 * (дешёвый лот продаётся быстрее обычного).
+	 */
+	public static double markupSlowdownFor(double ratio) {
+		double[] markups = EconomyConfig.marketMarkups();
+		double[] slowdowns = EconomyConfig.markupSlowdowns();
+		int pairs = Math.min(markups.length, slowdowns.length);
+
+		if (pairs == 0) {
+			return 1.0;
+		}
+
+		if (ratio <= markups[0]) {
+			return Math.max(0.1, ratio);
+		}
+
+		for (int index = 1; index < pairs; index++) {
+			if (ratio <= markups[index]) {
+				double span = markups[index] - markups[index - 1];
+				double part = span <= 0.0 ? 0.0 : (ratio - markups[index - 1]) / span;
+				return slowdowns[index - 1] + part * (slowdowns[index] - slowdowns[index - 1]);
+			}
+		}
+
+		return slowdowns[pairs - 1];
+	}
+
 	/** Загрузились ли времена из файла. */
 	public static boolean isLoaded() {
 		ensureLoaded();

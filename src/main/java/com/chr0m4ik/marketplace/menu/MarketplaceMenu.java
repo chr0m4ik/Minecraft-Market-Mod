@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -113,6 +114,9 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 	/** В ячейке лежит подтверждённый ордер. */
 	private static final int CELL_ORDER = 1;
+
+	/** В ячейке лот, который ждёт живого покупателя: рынок его не купит. */
+	private static final int CELL_ORDER_WAITING = 2;
 
 	/** Подтверждённого ордера в ячейке нет. */
 	private static final int CELL_FREE = 0;
@@ -301,7 +305,17 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
-		ShopCatalog.setCustomKits(CustomKits.all(MarketplaceEconomy.state(server)));
+		MarketplaceState state = MarketplaceEconomy.state(server);
+		ShopCatalog.setCustomKits(CustomKits.all(state));
+
+		// Лоты площадки меняются каждую секунду, поэтому каталог получает их свежий снимок.
+		List<ItemStack> lots = new ArrayList<>();
+
+		for (MarketService.Listing listing : MarketService.allListings(state)) {
+			lots.add(MarketService.listingIcon(listing.order(), listing.sellerId(), listing.slot()));
+		}
+
+		ShopCatalog.setAuctionIcons(lots);
 		ShopCatalog.refresh(server.registryAccess());
 	}
 
@@ -390,7 +404,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 					&& MarketplaceEconomy.state(server).order(this.serverPlayer.getUUID(), cell) != null;
 		}
 
-		return this.data.get(CELL_DATA_START + cell) == CELL_ORDER;
+		int cellData = this.data.get(CELL_DATA_START + cell);
+		return cellData == CELL_ORDER || cellData == CELL_ORDER_WAITING;
 	}
 
 	/** Сохраняет то, что игрок разложил по ячейкам, в сейв (кроме подтверждённых ордеров). */
@@ -1014,7 +1029,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 		for (Map.Entry<Integer, ItemStack> entry : Map.copyOf(staged).entrySet()) {
 			if (MarketService.placeOrder(state, playerId, entry.getKey(), entry.getValue(), markup, now,
-					server.overworld().getRandom()) != null) {
+					server.overworld().getRandom(), player.getScoreboardName()) != null) {
 				created++;
 			} else {
 				// Ячейка оказалась занята или закрыта — предмет возвращаем в инвентарь,
@@ -1273,8 +1288,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	}
 
 	/** Выбрали товар в списке: запоминаем предмет и открываем окно покупки. */
-	private void selectShopItem(Player player, int cell) {
-		if (!(player instanceof ServerPlayer serverPlayer)) {
+	private void selectShopItem(Player player, int cell) {		if (!(player instanceof ServerPlayer serverPlayer)) {
 			return;
 		}
 
@@ -1331,6 +1345,35 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		MarketService.ShopState shop = MarketService.shop(player.getUUID());
+		MarketplaceState world = MarketplaceEconomy.state(server);
+
+		// Лот торговой площадки: у него своя цена и свои сообщения (свой лот, уже продан, нет денег).
+		Optional<MarketService.Listing> listing = MarketService.listing(world, shop.selected());
+
+		if (listing.isPresent()) {
+			MarketService.BuyResult result = MarketService.buyListing(server, player, shop.selected(),
+					shop.drop());
+			double price = result.order() == null ? 0.0 : result.order().payout();
+
+			switch (result.status()) {
+				case BOUGHT -> {
+					player.sendSystemMessage(Component.translatable("marketplace.gui.auction.bought",
+							shop.selected().getHoverName(),
+							money(player.isCreative() ? 0.0 : result.paid())).withStyle(ChatFormatting.GREEN));
+					MarketSounds.shopBought(player, false);
+				}
+				case MISSING -> player.sendSystemMessage(Component.translatable("marketplace.gui.auction.missing")
+						.withStyle(ChatFormatting.RED));
+				case OWN_LOT -> player.sendSystemMessage(Component.translatable("marketplace.gui.auction.own")
+						.withStyle(ChatFormatting.RED));
+				case NO_MONEY -> player.sendSystemMessage(Component.translatable("marketplace.gui.buy.noMoney",
+						money(price)).withStyle(ChatFormatting.RED));
+			}
+
+			this.updateData();
+			this.broadcastChanges();
+			return;
+		}
 
 		// Пока идёт срочный заказ, его предмет нельзя купить: иначе «купил — сдал заказ» даёт деньги.
 		if (UrgentQuests.isShoppingBlocked(server, shop.selected().getItem())) {
@@ -1356,10 +1399,6 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.broadcastChanges();
 	}
 
-	/** Выбрали товар в списке: запоминаем предмет и открываем окно покупки. */
-	private void selectShopItemPlaceholder() {
-		// Заглушка не нужна: метод selectShopItem(Player, int) объявлен ниже.
-	}
 	private static void sendLimitMessage(ServerPlayer player) {
 		player.sendSystemMessage(Component.translatable("marketplace.gui.trader.limit")
 				.withStyle(ChatFormatting.RED));
@@ -1597,13 +1636,34 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		for (int i = 0; i < MarketService.SLOTS; i++) {
 			MarketOrder order = state.order(playerId, i);
 			ItemStack staged = state.staging(playerId).get(i);
-			this.data.set(CELL_DATA_START + i, order != null ? CELL_ORDER : CELL_FREE);
+			this.data.set(CELL_DATA_START + i, order == null ? CELL_FREE
+					: (order.waitingForBuyer() ? CELL_ORDER_WAITING : CELL_ORDER));
 			this.data.set(CELL_MARKUP_START + i,
 					order != null ? (int) Math.round(order.markup() * 100.0)
 							: (staged == null ? 0 : (int) Math.round(state.markup(playerId) * 100.0)));
 			// Выплата по ордеру зафиксирована при выставлении: подсказка показывает именно её.
 			setMoney(CELL_PAYOUT_START + i * MONEY_CELLS, order != null ? order.payout() : 0.0);
 		}
+	}
+
+	/** Лот в этой ячейке ждёт живого покупателя (виртуальный рынок его не купит). */
+	public boolean isCellWaiting(int cell) {
+		if (cell < 0 || cell >= MarketService.SLOTS) {
+			return false;
+		}
+
+		if (this.serverPlayer != null) {
+			MinecraftServer server = this.serverPlayer.level().getServer();
+
+			if (server == null) {
+				return false;
+			}
+
+			MarketOrder order = MarketplaceEconomy.state(server).order(this.serverPlayer.getUUID(), cell);
+			return order != null && order.waitingForBuyer();
+		}
+
+		return this.data.get(CELL_DATA_START + cell) == CELL_ORDER_WAITING;
 	}
 
 	/** С какой наценкой выставлен предмет в этой ячейке (0 — ячейка пуста). */

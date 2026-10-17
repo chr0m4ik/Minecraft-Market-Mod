@@ -4,6 +4,7 @@ import com.chr0m4ik.marketplace.MarketplaceMod;
 import com.chr0m4ik.marketplace.event.MarketEvent;
 import com.chr0m4ik.marketplace.market.CustomKit;
 import com.chr0m4ik.marketplace.market.MarketOrder;
+import com.chr0m4ik.marketplace.price.ItemPrices;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DynamicOps;
 import net.minecraft.core.HolderLookup;
@@ -56,6 +57,10 @@ public class MarketplaceState extends SavedData {
 	private static final String ORDER_ITEM_KEY = "item";
 	private static final String ORDER_MARKUP_KEY = "markup";
 	private static final String ORDER_READY_KEY = "ready";
+	/** Цена лота (сколько за него платят) и признак «продаёт виртуальный рынок». */
+	private static final String ORDER_PRICE_KEY = "price";
+	private static final String ORDER_AUTO_KEY = "auto";
+	private static final String ORDER_SELLER_KEY = "seller";
 	/**
 	 * Зафиксированная при выставлении выплата ордера. В старых сейвах ключа нет — тогда
 	 * выплата считается по-старому от текущей цены, чтобы сейвы читались без миграции.
@@ -656,11 +661,27 @@ public class MarketplaceState extends SavedData {
 					continue;
 				}
 
-				parsed.put(slot, new MarketOrder(item.get(),
-						entry.getDoubleOr(ORDER_MARKUP_KEY, 1.0), entry.getLongOr(ORDER_READY_KEY, 0L),
-						entry.contains(ORDER_PAYOUT_KEY)
-								? entry.getDoubleOr(ORDER_PAYOUT_KEY, MarketOrder.LEGACY_PAYOUT)
-								: MarketOrder.LEGACY_PAYOUT));
+				double markup = entry.getDoubleOr(ORDER_MARKUP_KEY, 1.0);
+				// Цена лота: в старых сейвах её нет — берём прежнюю выплату, иначе считаем от наценки.
+				double price = entry.getDoubleOr(ORDER_PRICE_KEY, 0.0);
+
+				if (price <= 0.0) {
+					price = entry.getDoubleOr(ORDER_PAYOUT_KEY, 0.0);
+				}
+
+				if (price <= 0.0) {
+					price = MoneyFormat.round(ItemPrices.priceOf(item.get()) * markup);
+				}
+
+				boolean auto = entry.getBooleanOr(ORDER_AUTO_KEY, true);
+				long readyAt = entry.getLongOr(ORDER_READY_KEY, 0L);
+
+				if (!auto) {
+					readyAt = Long.MAX_VALUE;
+				}
+
+				parsed.put(slot, new MarketOrder(item.get(), price, markup, readyAt, auto,
+						entry.getStringOr(ORDER_SELLER_KEY, "")));
 			}
 
 			state.orders.put(playerId.get(), parsed);
@@ -928,13 +949,11 @@ public class MarketplaceState extends SavedData {
 						() -> MarketplaceMod.LOGGER.error(
 								"Не удалось сохранить предмет ордера игрока {} (ячейка {})", playerId, slot));
 
+				entry.putDouble(ORDER_PRICE_KEY, order.price());
 				entry.putDouble(ORDER_MARKUP_KEY, order.markup());
 				entry.putLong(ORDER_READY_KEY, order.readyAt());
-
-				// Выплата, зафиксированная при выставлении: ивенты и дрейф её не меняют.
-				if (order.hasFixedPayout()) {
-					entry.putDouble(ORDER_PAYOUT_KEY, order.fixedPayout());
-				}
+				entry.putBoolean(ORDER_AUTO_KEY, order.auto());
+				entry.putString(ORDER_SELLER_KEY, order.seller());
 
 				playerTag.put(String.valueOf(slot), entry);
 			});

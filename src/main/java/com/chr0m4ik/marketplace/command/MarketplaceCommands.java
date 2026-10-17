@@ -15,6 +15,9 @@ import com.chr0m4ik.marketplace.menu.WindowKind;
 import com.chr0m4ik.marketplace.market.CustomKit;
 import com.chr0m4ik.marketplace.market.CustomKits;
 import com.chr0m4ik.marketplace.market.KitCatalog;
+import com.chr0m4ik.marketplace.economy.GameTime;
+import com.chr0m4ik.marketplace.market.MarketOrder;
+import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
 import com.chr0m4ik.marketplace.market.VirtualEnderChest;
 import com.chr0m4ik.marketplace.market.SpecialCatalog;
@@ -37,13 +40,17 @@ import net.minecraft.commands.arguments.item.ItemArgument;
 import net.minecraft.commands.arguments.item.ItemInput;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionCheck;
 import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.util.Prediction;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.UUID;
@@ -81,6 +88,8 @@ public final class MarketplaceCommands {
 	private static final String ARG_TICK = "tick";
 	private static final String ARG_SECTION = "section";
 	private static final String ARG_NAME = "name";
+	private static final String ARG_PRICE = "price";
+	private static final String ARG_SLOT = "slot";
 
 	/** Сколько товаров раздела показывать в команде (списки бывают на сотни предметов). */
 	private static final int SHOP_SHOWN = 20;
@@ -187,6 +196,24 @@ public final class MarketplaceCommands {
 			dispatcher.register(Commands.literal("enderchest")
 					.executes(MarketplaceCommands::openVirtualEnderChest));
 
+			// Торговая площадка: лот из правой руки с ценой игрока и управление своими лотами.
+			LiteralArgumentBuilder<CommandSourceStack> auction = Commands.literal("ah")
+					.then(Commands.literal("sell")
+							.then(Commands.argument(ARG_PRICE, DoubleArgumentType.doubleArg(
+											MarketService.MIN_LIST_PRICE, MarketService.MAX_LIST_PRICE))
+									.executes(MarketplaceCommands::ahSell)
+									.then(Commands.argument(ARG_COUNT, IntegerArgumentType.integer(1, 64))
+											.executes(MarketplaceCommands::ahSellCount))))
+					.then(Commands.literal("list")
+							.executes(MarketplaceCommands::ahList))
+					.then(Commands.literal("cancel")
+							.then(Commands.literal("all")
+									.executes(MarketplaceCommands::ahCancelAll))
+							.then(Commands.argument(ARG_SLOT, IntegerArgumentType.integer(1, MarketService.SLOTS))
+									.executes(MarketplaceCommands::ahCancelSlot)));
+
+			dispatcher.register(auction);
+
 			dispatcher.register(Commands.literal("market")
 					.executes(MarketplaceCommands::openMainMenu)
 					.then(Commands.literal("help")
@@ -234,6 +261,10 @@ public final class MarketplaceCommands {
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.urgent")
 				.withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.kit")
+				.withStyle(ChatFormatting.GRAY), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.help.ah")
+				.withStyle(ChatFormatting.GRAY), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.help.ec")
 				.withStyle(ChatFormatting.GRAY), false);
 
 		return 1;
@@ -312,8 +343,17 @@ public final class MarketplaceCommands {
 		}
 
 		ShopCatalog.Category category = found.get();
-		// Свои сеты лежат в сейве мира — каталогу их нужно отдать перед сборкой списка.
-		ShopCatalog.setCustomKits(CustomKits.all(MarketplaceEconomy.state(source.getServer())));
+		// Свои сеты и лоты площадки лежат в сейве мира — каталогу их нужно отдать перед сборкой.
+		MarketplaceState world = MarketplaceEconomy.state(source.getServer());
+		ShopCatalog.setCustomKits(CustomKits.all(world));
+
+		List<ItemStack> lots = new ArrayList<>();
+
+		for (MarketService.Listing listing : MarketService.allListings(world)) {
+			lots.add(MarketService.listingIcon(listing.order(), listing.sellerId(), listing.slot()));
+		}
+
+		ShopCatalog.setAuctionIcons(lots);
 		ShopCatalog.refresh(source.registryAccess());
 		List<ItemStack> items = ShopCatalog.items(category);
 
@@ -323,13 +363,17 @@ public final class MarketplaceCommands {
 
 		for (int index = 0; index < items.size() && index < SHOP_SHOWN; index++) {
 			ItemStack stack = items.get(index);
-			// У наборов (готовых и своих) цена не шлякерная, а своя — показываем именно её.
+			// У наборов (готовых и своих) и у лотов площадки цена не шлякерная и не базовая — своя.
+			Optional<MarketService.Listing> listing = MarketService.listing(
+					MarketplaceEconomy.state(source.getServer()), stack);
 			Optional<KitCatalog.Kit> kit = KitCatalog.kitOf(stack);
 			Optional<CustomKit> custom = CustomKits.kitOf(MarketplaceEconomy.state(source.getServer()), stack);
 			OptionalDouble special = SpecialCatalog.priceOf(stack);
 			double price;
 
-			if (custom.isPresent()) {
+			if (listing.isPresent()) {
+				price = listing.get().order().payout();
+			} else if (custom.isPresent()) {
 				price = CustomKits.priceOf(custom.get());
 			} else if (kit.isPresent()) {
 				price = KitCatalog.priceOf(kit.get());
@@ -343,7 +387,7 @@ public final class MarketplaceCommands {
 
 			source.sendSuccess(() -> Component.translatable("marketplace.command.shop.item",
 					Component.literal(number + ". "), stack.getHoverName(), money(price))
-					.withStyle(special.isPresent() || custom.isPresent()
+					.withStyle(special.isPresent() || custom.isPresent() || listing.isPresent()
 							? ChatFormatting.LIGHT_PURPLE : ChatFormatting.GRAY), false);
 		}
 
@@ -769,6 +813,154 @@ public final class MarketplaceCommands {
 		}
 
 		return 1;
+	}
+
+	/** {@code /ah sell <цена>} — выставить весь стак из правой руки. */
+	private static int ahSell(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		return ahSell(context, -1);
+	}
+
+	/** {@code /ah sell <цена> <количество>} — выставить часть стака. */
+	private static int ahSellCount(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		return ahSell(context, IntegerArgumentType.getInteger(context, ARG_COUNT));
+	}
+
+	/**
+	 * Выставляет лот на торговую площадку. Предметы забираются из руки только после того, как лот
+	 * записан в сейв, — при ошибке (нет ячейки, плохая цена) они остаются у игрока.
+	 */
+	private static int ahSell(CommandContext<CommandSourceStack> context, int requested)
+			throws CommandSyntaxException {
+		CommandSourceStack source = context.getSource();
+		ServerPlayer player = source.getPlayerOrException();
+		MinecraftServer server = source.getServer();
+		double price = DoubleArgumentType.getDouble(context, ARG_PRICE);
+		ItemStack hand = player.getMainHandItem();
+		int count = requested < 0 ? hand.getCount() : requested;
+		ItemStack lot = hand.isEmpty() ? ItemStack.EMPTY : hand.copyWithCount(Math.min(count, hand.getCount()));
+
+		MarketService.ListResult result = MarketService.listForPrice(MarketplaceEconomy.state(server),
+				player.getUUID(), hand, count, price, GameTime.now(server), server.overworld().getRandom(),
+				player.getScoreboardName());
+
+		if (result.status() != MarketService.ListStatus.LISTED) {
+			source.sendFailure(Component.translatable(switch (result.status()) {
+				case NO_SLOT -> "marketplace.command.ah.noSlot";
+				case BAD_PRICE -> "marketplace.command.ah.badPrice";
+				case BAD_COUNT -> "marketplace.command.ah.badCount";
+				case FORBIDDEN -> "marketplace.command.ah.forbidden";
+				default -> "marketplace.command.ah.noItem";
+			}));
+			return 0;
+		}
+
+		hand.shrink(count);
+		MarketOrder order = result.order();
+		int slot = result.slot() + 1;
+
+		source.sendSuccess(() -> Component.translatable("marketplace.command.ah.listed",
+				Component.literal(String.valueOf(lot.getCount())), lot.getHoverName(),
+				Component.literal(MoneyFormat.format(order.payout())),
+				Component.literal(String.valueOf(slot))).withStyle(ChatFormatting.GREEN), false);
+
+		if (order.waitingForBuyer()) {
+			// Честно предупреждаем: такую цену рынок сам не заплатит, нужен живой покупатель.
+			source.sendSuccess(() -> Component.translatable("marketplace.command.ah.waiting")
+					.withStyle(ChatFormatting.GRAY), false);
+		}
+
+		return 1;
+	}
+
+	/** {@code /ah list} — свои лоты: ячейка, предмет, цена и сколько ждать. */
+	private static int ahList(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		CommandSourceStack source = context.getSource();
+		ServerPlayer player = source.getPlayerOrException();
+		MinecraftServer server = source.getServer();
+		Map<Integer, MarketOrder> orders = MarketplaceEconomy.state(server).orders(player.getUUID());
+
+		if (orders.isEmpty()) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.ah.list.empty")
+					.withStyle(ChatFormatting.GRAY), false);
+			return 0;
+		}
+
+		source.sendSuccess(() -> Component.translatable("marketplace.command.ah.list.header",
+				Component.literal(String.valueOf(orders.size()))).withStyle(ChatFormatting.GOLD), false);
+		long now = GameTime.now(server);
+
+		for (int slot : orders.keySet().stream().sorted().toList()) {
+			MarketOrder order = orders.get(slot);
+			int number = slot + 1;
+
+			source.sendSuccess(() -> Component.translatable("marketplace.command.ah.list.line",
+					Component.literal(String.valueOf(number)),
+					Component.literal(String.valueOf(order.stack().getCount())),
+					order.stack().getHoverName(),
+					Component.literal(MoneyFormat.format(order.payout())),
+					order.waitingForBuyer()
+							? Component.translatable("marketplace.command.ah.list.waiting")
+							: MarketEvents.duration(order.ticksLeft(now))).withStyle(ChatFormatting.GRAY), false);
+		}
+
+		return orders.size();
+	}
+
+	/** {@code /ah cancel <ячейка>} — снять свой лот, предметы вернутся в инвентарь. */
+	private static int ahCancelSlot(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		CommandSourceStack source = context.getSource();
+		ServerPlayer player = source.getPlayerOrException();
+		int slot = IntegerArgumentType.getInteger(context, ARG_SLOT) - 1;
+		MarketOrder order = MarketService.cancelListing(MarketplaceEconomy.state(source.getServer()),
+				player.getUUID(), slot);
+
+		if (order == null) {
+			source.sendFailure(Component.translatable("marketplace.command.ah.cancel.missing",
+					Component.literal(String.valueOf(slot + 1))));
+			return 0;
+		}
+
+		giveBack(player, order);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.ah.cancel.done",
+				order.stack().getHoverName(),
+				Component.literal(String.valueOf(order.stack().getCount()))).withStyle(ChatFormatting.YELLOW),
+				false);
+
+		return 1;
+	}
+
+	/** {@code /ah cancel all} — снять все свои лоты. */
+	private static int ahCancelAll(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		CommandSourceStack source = context.getSource();
+		ServerPlayer player = source.getPlayerOrException();
+		MarketplaceState state = MarketplaceEconomy.state(source.getServer());
+		List<Integer> slots = new ArrayList<>(state.orders(player.getUUID()).keySet());
+		int cancelled = 0;
+
+		for (int slot : slots) {
+			MarketOrder order = MarketService.cancelListing(state, player.getUUID(), slot);
+
+			if (order != null) {
+				giveBack(player, order);
+				cancelled++;
+			}
+		}
+
+		if (cancelled == 0) {
+			source.sendFailure(Component.translatable("marketplace.command.ah.list.empty"));
+			return 0;
+		}
+
+		int total = cancelled;
+		source.sendSuccess(() -> Component.translatable("marketplace.command.ah.cancel.all",
+				Component.literal(String.valueOf(total))).withStyle(ChatFormatting.YELLOW), false);
+
+		return cancelled;
+	}
+
+	/** Возвращает предметы снятого лота в инвентарь игрока. */
+	private static void giveBack(ServerPlayer player, MarketOrder order) {
+		player.getInventory().placeItemBackInInventory(order.stack().copy(), Prediction.SERVER_ONLY);
 	}
 
 	/** Отклонение цены ивентом: зелёным рост, красным падение. */

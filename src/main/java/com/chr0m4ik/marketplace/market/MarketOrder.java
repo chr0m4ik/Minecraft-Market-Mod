@@ -1,58 +1,50 @@
 package com.chr0m4ik.marketplace.market;
 
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
-import com.chr0m4ik.marketplace.price.ItemPrices;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Один ордер на рынке: что продаём, с какой наценкой, когда продажа закончится и сколько за него
- * заплатят.
+ * Лот на рынке: что продаём, за сколько, когда его купит виртуальный рынок и кто продавец.
  *
- * <p>Ордер живёт в сейве мира, поэтому продажа идёт и когда игрок вышел из игры.
+ * <p>Лот живёт в сейве мира, поэтому продажа идёт и когда игрок вышел.
  *
- * <p><b>Цена выплаты фиксируется в момент выставления</b> (решение заказчика): {@link #fixedPayout}
- * считается один раз в {@link MarketService#placeOrder} и дальше не меняется. Иначе микро-дрейф
- * и крупные ивенты меняли бы выплату уже висящего ордера — игрок выставлял бы товар за одну сумму,
- * а получал другую. Старые сейвы, где этого поля ещё нет, читаются по-старому: выплата считается
- * от текущей цены (см. {@link #payout()} и {@link #LEGACY_PAYOUT}).
+ * <p><b>Цена — главное поле.</b> Раньше выплата считалась из наценки ×1…×2, теперь игрок может
+ * задать любую цену командой {@code /ah sell} (решение заказчика). Цена фиксируется при
+ * выставлении: ни микро-дрейф, ни крупные ивенты её потом не меняют — покупатель видит ровно то,
+ * что заплатит.
  *
- * @param stack       что продаётся (целый стак);
- * @param markup      наценка: x1…x2;
- * @param readyAt     игровое время (в тиках), когда продажа завершится;
- * @param fixedPayout сколько заплатят за ордер (зафиксировано при выставлении);
- *                    {@link #LEGACY_PAYOUT} — в сейве поля не было, считаем по-старому.
+ * <p><b>Кто покупает.</b> Если цена не выше потолка виртуального рынка
+ * ({@code max(market_markups)} от базовой), лот в конце концов купит рынок — как и раньше.
+ * Если дороже, {@code auto = false}: такой лот стоит и ждёт живого покупателя (категория
+ * «Торговая площадка»), иначе можно было бы выставить грязь за миллиард и получить деньги
+ * из воздуха.
+ *
+ * @param stack   что продаётся (целый стак — или его часть, если так указал продавец);
+ * @param price   сколько платят за лот целиком (фиксируется при выставлении);
+ * @param markup  цена / базовая цена — только для показа («×1,35»);
+ * @param readyAt игровое время, когда виртуальный рынок купит лот; {@link Long#MAX_VALUE} — никогда;
+ * @param auto    покупает ли лот виртуальный рынок (иначе ждёт игрока);
+ * @param seller  ник продавца — показывается покупателю в «Торговой площадке».
  */
-public record MarketOrder(ItemStack stack, double markup, long readyAt, double fixedPayout) {
-	/** Признак старого сейва: зафиксированной выплаты в ордере нет. */
-	public static final double LEGACY_PAYOUT = -1.0;
-
-	/** Ордер из старого сейва: выплата ещё не зафиксирована, считается как раньше. */
-	public MarketOrder(ItemStack stack, double markup, long readyAt) {
-		this(stack, markup, readyAt, LEGACY_PAYOUT);
-	}
-
-	/** Сколько дадут за ордер: зафиксированная при выставлении сумма (или старая формула для старых сейвов). */
+public record MarketOrder(ItemStack stack, double price, double markup, long readyAt, boolean auto, String seller) {
+	/** Сколько дадут за лот: продавец получает ровно свою цену, комиссии нет. */
 	public double payout() {
-		if (this.fixedPayout >= 0.0) {
-			return MoneyFormat.round(this.fixedPayout);
-		}
-
-		return MoneyFormat.round(ItemPrices.priceOf(this.stack) * this.markup);
+		return MoneyFormat.round(this.price);
 	}
 
-	/** Зафиксирована ли выплата (в старых сейвах — нет). */
-	public boolean hasFixedPayout() {
-		return this.fixedPayout >= 0.0;
-	}
-
-	/** Сколько тиков осталось ждать. */
-	public long ticksLeft(long now) {
-		return Math.max(0L, this.readyAt - now);
-	}
-
-	/** Готов ли ордер к продаже. */
+	/** Готов ли лот к продаже виртуальному рынку. */
 	public boolean isReady(long now) {
-		return now >= this.readyAt;
+		return this.auto && now >= this.readyAt;
+	}
+
+	/** Лот ждёт живого покупателя (виртуальный рынок его не купит). */
+	public boolean waitingForBuyer() {
+		return !this.auto;
+	}
+
+	/** Сколько тиков осталось до покупки рынком (0 — уже готов или ждёт игрока). */
+	public long ticksLeft(long now) {
+		return this.auto ? Math.max(0L, this.readyAt - now) : 0L;
 	}
 
 	public boolean isEmpty() {

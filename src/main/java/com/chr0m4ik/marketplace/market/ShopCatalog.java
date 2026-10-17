@@ -48,6 +48,8 @@ public final class ShopCatalog {
 		// «Свои сеты»: наборы, которые создали сами игроки (см. CustomKits). Иконка — ракушка
 		// шлякера, чтобы раздел не путался с готовыми наборами.
 		CUSTOM_KITS("marketplace.gui.category.customKits", () -> Items.SHULKER_SHELL),
+		// «Торговая площадка»: лоты всех игроков мира (см. MarketService). Иконка — блок изумруда.
+		AUCTION("marketplace.gui.category.auction", () -> Items.EMERALD_BLOCK),
 		// «Особые предметы»: книги своих зачарований со своей ценой (см. SpecialCatalog).
 		// Иконка — золотое яблоко: «особый предмет» и при этом не совпадает с иконками
 		// других разделов (у «Книг зачарований» — книга, у «Инструментов» — кирка).
@@ -120,6 +122,12 @@ public final class ShopCatalog {
 	 */
 	private static List<CustomKit> customKits = List.of();
 
+	/**
+	 * Лоты «Торговой площадки» — тоже снимок с сервера: они меняются каждую секунду, поэтому
+	 * для этого раздела кэш не используется вообще (см. {@link #setAuctionIcons}).
+	 */
+	private static List<ItemStack> auctionIcons = List.of();
+
 	/** Порядок предметов из креативного инвентаря (строится один раз). */
 	private static Map<Item, Integer> CREATIVE_ORDER;
 
@@ -152,6 +160,14 @@ public final class ShopCatalog {
 		customKits = List.copyOf(kits);
 	}
 
+	/**
+	 * Отдаём каталогу снимок лотов торговой площадки. Лоты меняются постоянно, поэтому раздел
+	 * «Торговая площадка» никогда не кэшируется — список собирается на каждое открытие страницы.
+	 */
+	public static void setAuctionIcons(List<ItemStack> icons) {
+		auctionIcons = List.copyOf(icons);
+	}
+
 	/** Отдаём каталогу реестры мира (вызывается серверной частью окна). */
 	public static void setRegistries(HolderLookup.Provider value) {
 		if (registries != value) {
@@ -174,9 +190,10 @@ public final class ShopCatalog {
 		ENCHANTMENT_ORDER = null;
 	}
 
-	/** Товары раздела. Список строится один раз. */
+	/** Товары раздела. Список строится один раз — кроме «Торговой площадки» (лоты меняются). */
 	public static List<ItemStack> items(Category category) {
-		List<ItemStack> cached = CACHE.get(category);
+		boolean live = category == Category.AUCTION;
+		List<ItemStack> cached = live ? null : CACHE.get(category);
 
 		if (cached != null) {
 			return cached;
@@ -194,6 +211,13 @@ public final class ShopCatalog {
 				// Свои сеты игроков: порядок — как их создавали, поэтому сортировка ниже не нужна.
 				for (CustomKit kit : customKits) {
 					stacks.add(CustomKits.iconOf(kit));
+				}
+			}
+			case AUCTION -> {
+				// Лоты всех игроков: снимок уже отсортирован сервером (дешёвые сверху),
+				// поэтому ни сортировка, ни кэш здесь не нужны — лоты меняются каждую секунду.
+				for (ItemStack icon : auctionIcons) {
+					stacks.add(icon.copy());
 				}
 			}
 			case SPECIAL -> {
@@ -227,8 +251,8 @@ public final class ShopCatalog {
 			}
 		}
 
-		// Свои сеты не сортируем: их порядок — порядок создания, так игроку понятнее.
-		if (category != Category.CUSTOM_KITS) {
+		// Свои сеты и лоты площадки не сортируем: порядок задан созданием или ценой.
+		if (category != Category.CUSTOM_KITS && category != Category.AUCTION) {
 			stacks.sort(Comparator.comparing(stack -> sortKey(category, stack), SORT_KEY_ORDER));
 		}
 
@@ -236,7 +260,7 @@ public final class ShopCatalog {
 
 		// Пустой раздел «Особые предметы» без реестров мира не запоминаем: как только реестры
 		// появятся, список соберётся заново — иначе ошибка закрепилась бы до перезапуска игры.
-		if (category != Category.SPECIAL || registries != null) {
+		if (!live && (category != Category.SPECIAL || registries != null)) {
 			CACHE.put(category, result);
 		}
 
