@@ -1,6 +1,8 @@
 package com.chr0m4ik.marketplace;
 
 import com.chr0m4ik.marketplace.command.MarketplaceCommands;
+import com.chr0m4ik.marketplace.collector.CollectorHandler;
+import com.chr0m4ik.marketplace.collector.CollectorItem;
 import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
@@ -45,6 +47,8 @@ public class MarketplaceMod implements ModInitializer {
 		MarketplaceNetworking.registerServer();
 
 		TurboFurnace.register();
+		CollectorItem.register();
+		CollectorHandler.register();
 
 		EconomyConfig.ensureLoaded();
 		ItemPrices.ensureLoaded();

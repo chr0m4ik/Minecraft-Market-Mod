@@ -1,6 +1,7 @@
 package com.chr0m4ik.marketplace.market;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
+import com.chr0m4ik.marketplace.collector.CollectorItem;
 import com.chr0m4ik.marketplace.turbo.TurboFurnace;
 import com.chr0m4ik.marketplace.turbo.TurboUpgrade;
 import net.minecraft.ChatFormatting;
@@ -37,6 +38,8 @@ public final class SpecialCatalog {
 
 	private static final String TURBO_FURNACE = "turbo_furnace";
 
+	private static final String COLLECTOR = "collector";
+
 	private record Entry(String path, int level, double price, @Nullable Item item) {
 	}
 
@@ -53,7 +56,8 @@ public final class SpecialCatalog {
 			new Entry(TURBO_FURNACE, 1, 100_000_000.0, TurboFurnace.ITEM),
 			new Entry(TURBO_FURNACE, 2, 250_000_000.0, TurboFurnace.ITEM),
 			new Entry(TURBO_FURNACE, 3, 600_000_000.0, TurboFurnace.ITEM),
-			new Entry(TURBO_FURNACE, 4, 1_400_000_000.0, TurboFurnace.ITEM));
+			new Entry(TURBO_FURNACE, 4, 1_400_000_000.0, TurboFurnace.ITEM),
+			new Entry(COLLECTOR, 0, 8_500_000_000.0, CollectorItem.ITEM));
 
 	private SpecialCatalog() {
 		// Класс только со статическими методами.
@@ -75,8 +79,11 @@ public final class SpecialCatalog {
 
 	private static ItemStack blockItem(Entry entry) {
 		ItemStack stack = new ItemStack(entry.item());
-		TurboUpgrade.setLevel(stack, entry.level());
-		TurboUpgrade.decorate(stack, entry.level());
+
+		if (entry.level() > 0) {
+			TurboUpgrade.setLevel(stack, entry.level());
+			TurboUpgrade.decorate(stack, entry.level());
+		}
 
 		return stack;
 	}
@@ -146,10 +153,13 @@ public final class SpecialCatalog {
 
 		int blockLevel = TurboUpgrade.levelOf(stack);
 
-		if (blockLevel > 0) {
-			return ENTRIES.stream()
-					.filter(entry -> entry.item() != null && stack.is(entry.item()) && entry.level() == blockLevel)
-					.findFirst();
+		Optional<Entry> block = ENTRIES.stream()
+				.filter(entry -> entry.item() != null && stack.is(entry.item())
+						&& (entry.level() == 0 || entry.level() == blockLevel))
+				.findFirst();
+
+		if (block.isPresent()) {
+			return block;
 		}
 
 		if (!stack.is(Items.ENCHANTED_BOOK)) {

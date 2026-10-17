@@ -335,5 +335,16 @@
 	"marketplace.special.turbo_furnace.level.4": "Плавка ×5 быстрее",
 	"marketplace.special.turbo_furnace.hint": "Обычная печь: топливо, рецепты, воронки, опыт, редстоун, книга рецептов. Уровень выше — соединение двух одинаковых печек в наковальне.",
 	"marketplace.gui.category.special": "Особые предметы",
-	"marketplace.tooltip.buy.special": "Особый предмет: %s (цена фиксированная)"
+	"marketplace.tooltip.buy.special": "Особый предмет: %s (цена фиксированная)",
+	"item.marketplace.collector": "Собиратель",
+	"marketplace.item.collector.hint": "ПКМ по спавнеру — забрать его вместе с мобом. Одноразовый.",
+	"marketplace.pay.sent": "Переведено игроку %s: %s",
+	"marketplace.pay.received": "Игрок %s перевёл вам %s",
+	"marketplace.pay.self": "Нельзя перевести деньги самому себе",
+	"marketplace.pay.notEnough": "Недостаточно денег — на счету %s",
+	"marketplace.pay.amount": "Сумма должна быть больше нуля",
+	"marketplace.rtp.wrongDimension": "Случайный телепорт работает только в обычном мире",
+	"marketplace.rtp.cooldown": "Подождите %s сек.",
+	"marketplace.rtp.success": "Вы телепортированы: %s",
+	"marketplace.rtp.failed": "Не удалось найти безопасное место — попробуйте ещё раз"
 }

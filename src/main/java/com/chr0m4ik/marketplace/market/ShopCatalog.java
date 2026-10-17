@@ -1,6 +1,7 @@
 package com.chr0m4ik.marketplace.market;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
+import com.chr0m4ik.marketplace.collector.CollectorItem;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
@@ -186,7 +187,7 @@ public final class ShopCatalog {
 
 					// Подписанные книги в магазине не нужны вовсе.
 					if (ItemPrices.isBuyable(item) && item != Items.WRITTEN_BOOK && item != Items.WRITABLE_BOOK
-							&& categoryOf(item) == category) {
+							&& item != CollectorItem.ITEM && categoryOf(item) == category) {
 						stacks.add(new ItemStack(item));
 					}
 				}

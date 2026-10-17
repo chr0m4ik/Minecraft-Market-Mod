@@ -143,6 +143,7 @@
 		"minecraft:zombie_nautilus_spawn_egg": 1,
 		"minecraft:zombie_spawn_egg": 1,
 		"minecraft:zombie_villager_spawn_egg": 1,
-		"minecraft:zombified_piglin_spawn_egg": 1
+		"minecraft:zombified_piglin_spawn_egg": 1,
+		"marketplace:collector": 1
 	}
 }

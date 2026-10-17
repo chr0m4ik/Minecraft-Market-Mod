@@ -1657,7 +1657,8 @@
 		"minecraft:zombie_nautilus_spawn_egg": 8000000000,
 		"minecraft:zombie_spawn_egg": 3000000000,
 		"minecraft:zombie_villager_spawn_egg": 3000000000,
-		"minecraft:zombified_piglin_spawn_egg": 8000000000
+		"minecraft:zombified_piglin_spawn_egg": 8000000000,
+		"marketplace:collector": 8500000000
 	},
 	"notBuyable": [
 		"minecraft:air",

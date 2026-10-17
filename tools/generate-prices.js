@@ -128,6 +128,7 @@ const BASE = {
 	'minecraft:totem_of_undying': 100000000, 'minecraft:nether_star': 2000000000,
 	'minecraft:dragon_egg': 5000000000, 'minecraft:spawner': 10000000000,
 	'minecraft:trial_spawner': 2000000000, 'minecraft:vault': 2000000000, 'minecraft:end_portal_frame': 10000000,
+	'marketplace:collector': 8500000000,
 	'minecraft:budding_amethyst': 1, 'minecraft:reinforced_deepslate': 1, 'minecraft:petrified_oak_slab': 1,
 
 	// --- редкие ископаемые: 1000–50000$ ---
@@ -600,6 +601,13 @@ for (const item of [...items].sort()) {
 		if (BASE[item] === undefined) leftovers.push(item);
 	}
 	sorted[item] = round(price);
+}
+
+// Предметы мода: в ванильных данных их нет, цену берём прямо из BASE.
+for (const [item, price] of Object.entries(BASE)) {
+	if (!item.startsWith('minecraft:')) {
+		sorted[item] = round(price);
+	}
 }
 
 // Проверяем списки: id, которых нет в игре, в файл не попадают (иначе мод будет ругаться).

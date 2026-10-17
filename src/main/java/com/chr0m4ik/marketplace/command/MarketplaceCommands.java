@@ -211,7 +211,51 @@ public final class MarketplaceCommands {
 					.then(event)
 					.then(urgent)
 					.then(kit));
+
+			dispatcher.register(Commands.literal("pay")
+					.then(Commands.argument(ARG_AMOUNT, DoubleArgumentType.doubleArg(0.01))
+							.then(Commands.argument(ARG_PLAYER, EntityArgument.player())
+									.executes(MarketplaceCommands::pay))));
+
+			dispatcher.register(Commands.literal("rtp")
+					.executes(MarketplaceCommands::randomTeleport));
 		});
+	}
+
+	private static int pay(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		CommandSourceStack source = context.getSource();
+		ServerPlayer sender = source.getPlayerOrException();
+		ServerPlayer target = EntityArgument.getPlayer(context, ARG_PLAYER);
+		MinecraftServer server = source.getServer();
+		double amount = MoneyFormat.round(DoubleArgumentType.getDouble(context, ARG_AMOUNT));
+
+		if (target == sender) {
+			source.sendFailure(Component.translatable("marketplace.pay.self"));
+			return 0;
+		}
+
+		if (amount <= 0.0) {
+			source.sendFailure(Component.translatable("marketplace.pay.amount"));
+			return 0;
+		}
+
+		if (!MarketplaceEconomy.trySpend(server, sender.getUUID(), amount)) {
+			source.sendFailure(Component.translatable("marketplace.pay.notEnough",
+					Component.literal(MoneyFormat.format(MarketplaceEconomy.getBalance(server, sender.getUUID())))));
+			return 0;
+		}
+
+		MarketplaceEconomy.addBalance(server, target.getUUID(), amount);
+		sender.sendSystemMessage(Component.translatable("marketplace.pay.sent", target.getDisplayName(),
+				Component.literal(MoneyFormat.format(amount))).withStyle(ChatFormatting.GREEN));
+		target.sendSystemMessage(Component.translatable("marketplace.pay.received", sender.getDisplayName(),
+				Component.literal(MoneyFormat.format(amount))).withStyle(ChatFormatting.GREEN));
+
+		return 1;
+	}
+
+	private static int randomTeleport(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		return RandomTeleport.teleport(context.getSource().getPlayerOrException());
 	}
 
 	
@@ -471,8 +515,15 @@ public final class MarketplaceCommands {
 		source.sendSuccess(() -> title.withStyle(ChatFormatting.GOLD), false);
 
 		if (ItemPrices.isBuyable(item)) {
-			source.sendSuccess(() -> Component.translatable("marketplace.command.price.buy",
-					money(total * EconomyConfig.buyMultiplier())), false);
+			var special = SpecialCatalog.priceOf(new ItemStack(item));
+
+			if (special.isPresent()) {
+				source.sendSuccess(() -> Component.translatable("marketplace.tooltip.buy.special",
+						money(special.getAsDouble())), false);
+			} else {
+				source.sendSuccess(() -> Component.translatable("marketplace.command.price.buy",
+						money(total * EconomyConfig.buyMultiplier())), false);
+			}
 		} else {
 			source.sendSuccess(() -> Component.translatable("marketplace.command.price.cannotBuy")
 					.withStyle(ChatFormatting.GRAY), false);

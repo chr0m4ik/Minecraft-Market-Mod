@@ -1656,5 +1656,6 @@
 	"minecraft:zombie_nautilus_spawn_egg": 5849.4,
 	"minecraft:zombie_spawn_egg": 4149.75,
 	"minecraft:zombie_villager_spawn_egg": 4149.75,
-	"minecraft:zombified_piglin_spawn_egg": 5849.4
+	"minecraft:zombified_piglin_spawn_egg": 5849.4,
+	"marketplace:collector": 5974.84
 }

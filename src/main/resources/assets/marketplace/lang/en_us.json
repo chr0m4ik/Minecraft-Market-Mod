@@ -336,5 +336,16 @@
 	"marketplace.special.turbo_furnace.level.4": "Smelts ×5 faster",
 	"marketplace.special.turbo_furnace.hint": "A normal furnace: fuel, recipes, hoppers, experience, redstone, recipe book. A higher level comes from combining two furnaces of the same level in an anvil.",
 	"marketplace.gui.category.special": "Special items",
-	"marketplace.tooltip.buy.special": "Special item: %s (fixed price)"
+	"marketplace.tooltip.buy.special": "Special item: %s (fixed price)",
+	"item.marketplace.collector": "Collector",
+	"marketplace.item.collector.hint": "Right-click a spawner to pick it up with the mob inside. Single use.",
+	"marketplace.pay.sent": "Sent to %s: %s",
+	"marketplace.pay.received": "%s sent you %s",
+	"marketplace.pay.self": "You cannot send money to yourself",
+	"marketplace.pay.notEnough": "Not enough money — balance %s",
+	"marketplace.pay.amount": "The amount must be greater than zero",
+	"marketplace.rtp.wrongDimension": "Random teleport works only in the overworld",
+	"marketplace.rtp.cooldown": "Wait %s s",
+	"marketplace.rtp.success": "Teleported to: %s",
+	"marketplace.rtp.failed": "Could not find a safe spot — try again"
 }
