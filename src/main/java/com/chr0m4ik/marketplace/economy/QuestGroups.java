@@ -326,7 +326,7 @@ public final class QuestGroups {
             double bonus = round2(group.bonusMin()
                     + random.nextDouble() * (group.bonusMax() - group.bonusMin()));
 
-            result.add(new TraderQuest(BuiltInRegistries.ITEM.getKey(item).toString(), amount, bonus, false));
+            result.add(new TraderQuest(BuiltInRegistries.ITEM.getKey(item).toString(), amount, bonus));
         }
 
         return List.copyOf(result);

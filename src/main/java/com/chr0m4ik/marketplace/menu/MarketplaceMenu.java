@@ -1146,10 +1146,21 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		lore.add(plain(Component.translatable("marketplace.gui.quests.need",
 				Component.literal(String.valueOf(quest.count()))).withStyle(ChatFormatting.GRAY)));
 
-		if (quest.done()) {
+		if (quest.complete()) {
 			lore.add(plain(Component.translatable("marketplace.gui.quests.done")
 					.withStyle(ChatFormatting.GREEN)));
+			// Выполненный заказ светится как зачарованный: сразу видно, что сдавать больше нечего.
+			icon.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
 		} else {
+			if (quest.delivered() > 0) {
+				// Частичная сдача: прогресс виден в подсказке, деньги придут только за весь заказ.
+				lore.add(plain(Component.translatable("marketplace.gui.quests.progress",
+						Component.literal(String.valueOf(quest.delivered())),
+						Component.literal(String.valueOf(quest.count()))).withStyle(ChatFormatting.YELLOW)));
+				lore.add(plain(Component.translatable("marketplace.gui.quests.risk")
+						.withStyle(ChatFormatting.DARK_RED)));
+			}
+
 			lore.add(plain(Component.translatable("marketplace.gui.quests.reward",
 					money(TraderQuests.rewardOf(quest))).withStyle(ChatFormatting.GOLD)));
 			lore.add(plain(Component.translatable("marketplace.gui.quests.hint")
@@ -1178,6 +1189,15 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 						quest.icon().getHoverName(),
 						Component.literal(String.valueOf(quest.count())),
 						money(delivery.paid())).withStyle(ChatFormatting.GREEN));
+			}
+			case PARTIAL -> {
+				// Частичная сдача: прогресс сохранён, награда ждёт полного заказа.
+				player.sendSystemMessage(Component.translatable("marketplace.gui.quests.partial",
+						quest.icon().getHoverName(),
+						Component.literal(String.valueOf(delivery.taken())),
+						Component.literal(String.valueOf(delivery.missing()))).withStyle(ChatFormatting.YELLOW));
+				player.sendSystemMessage(Component.translatable("marketplace.gui.quests.partialHint",
+						money(TraderQuests.rewardOf(quest))).withStyle(ChatFormatting.GRAY));
 			}
 			case NOT_ENOUGH -> player.sendSystemMessage(Component.translatable("marketplace.gui.quests.notEnough",
 					quest.icon().getHoverName(),

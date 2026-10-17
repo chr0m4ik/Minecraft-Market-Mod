@@ -81,6 +81,8 @@ public class MarketplaceState extends SavedData {
 	private static final String QUEST_COUNT_KEY = "count";
 	private static final String QUEST_BONUS_KEY = "bonus";
 	private static final String QUEST_DONE_KEY = "done";
+	/** Сколько предметов заказа уже сдано (можно сдавать частями). */
+	private static final String QUEST_DELIVERED_KEY = "delivered";
 	/** Ключи срочного заказа: текущий заказ и игровой день последнего запуска. */
 	private static final String URGENT_KEY = "urgent";
 	private static final String URGENT_ITEM_KEY = "item";
@@ -770,7 +772,8 @@ public class MarketplaceState extends SavedData {
 				list.add(new TraderQuest(itemId,
 						playerQuests.getIntOr(QUEST_COUNT_KEY + index, 0),
 						playerQuests.getDoubleOr(QUEST_BONUS_KEY + index, 0.0),
-						playerQuests.getBooleanOr(QUEST_DONE_KEY + index, false)));
+						playerQuests.getBooleanOr(QUEST_DONE_KEY + index, false),
+						playerQuests.getIntOr(QUEST_DELIVERED_KEY + index, 0)));
 			}
 
 			state.quests.put(playerId.get(), list);
@@ -1017,6 +1020,7 @@ public class MarketplaceState extends SavedData {
 				playerTag.putInt(QUEST_COUNT_KEY + index, quest.count());
 				playerTag.putDouble(QUEST_BONUS_KEY + index, quest.bonus());
 				playerTag.putBoolean(QUEST_DONE_KEY + index, quest.done());
+				playerTag.putInt(QUEST_DELIVERED_KEY + index, quest.delivered());
 			}
 
 			storedQuests.put(playerId.toString(), playerTag);

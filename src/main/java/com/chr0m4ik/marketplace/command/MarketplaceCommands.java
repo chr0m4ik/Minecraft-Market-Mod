@@ -197,8 +197,13 @@ public final class MarketplaceCommands {
 					.executes(MarketplaceCommands::openVirtualEnderChest));
 
 			// Торговая площадка: лот из правой руки с ценой игрока и управление своими лотами.
+			// Без аргументов — меню рынка, как кнопка I; /ah sell без цены — окно продажи, /ah buy — магазин.
 			LiteralArgumentBuilder<CommandSourceStack> auction = Commands.literal("ah")
+					.executes(MarketplaceCommands::openAuctionMenu)
+					.then(Commands.literal("buy")
+							.executes(MarketplaceCommands::openShop))
 					.then(Commands.literal("sell")
+							.executes(MarketplaceCommands::openMarketSell)
 							.then(Commands.argument(ARG_PRICE, DoubleArgumentType.doubleArg(
 											MarketService.MIN_LIST_PRICE, MarketService.MAX_LIST_PRICE))
 									.executes(MarketplaceCommands::ahSell)
@@ -213,6 +218,12 @@ public final class MarketplaceCommands {
 									.executes(MarketplaceCommands::ahCancelSlot)));
 
 			dispatcher.register(auction);
+
+			// Прямые окна: торговец и сразу его задания.
+			dispatcher.register(Commands.literal("trader")
+					.executes(MarketplaceCommands::openTrader));
+			dispatcher.register(Commands.literal("quest")
+					.executes(MarketplaceCommands::openQuests));
 
 			dispatcher.register(Commands.literal("market")
 					.executes(MarketplaceCommands::openMainMenu)
@@ -230,8 +241,39 @@ public final class MarketplaceCommands {
 
 	/** {@code /market} — открыть главное меню рынка. */
 	private static int openMainMenu(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		return openWindow(context, WindowKind.MAIN);
+	}
+
+	/** {@code /ah} — меню рынка (замена кнопки {@code I}). */
+	private static int openAuctionMenu(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		return openWindow(context, WindowKind.MAIN);
+	}
+
+	/** {@code /ah sell} без цены — окно рынка, где лоты раскладывают мышкой. */
+	private static int openMarketSell(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		return openWindow(context, WindowKind.SELL);
+	}
+
+	/** {@code /ah buy} — магазин (меню разделов). */
+	private static int openShop(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		return openWindow(context, WindowKind.BUY);
+	}
+
+	/** {@code /trader} — окно торговца, который покупает предметы по 75% цены. */
+	private static int openTrader(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		return openWindow(context, WindowKind.TRADER);
+	}
+
+	/** {@code /quest} — сразу окно заданий торговца. */
+	private static int openQuests(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		return openWindow(context, WindowKind.QUESTS);
+	}
+
+	/** Открывает игроку нужное окно мода. */
+	private static int openWindow(CommandContext<CommandSourceStack> context, WindowKind kind)
+			throws CommandSyntaxException {
 		ServerPlayer player = context.getSource().getPlayerOrException();
-		MarketplaceMenus.open(player, WindowKind.MAIN);
+		MarketplaceMenus.open(player, kind);
 		return 1;
 	}
 
@@ -263,6 +305,10 @@ public final class MarketplaceCommands {
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.kit")
 				.withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.ah")
+				.withStyle(ChatFormatting.GRAY), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.help.trader")
+				.withStyle(ChatFormatting.GRAY), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.help.quest")
 				.withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.ec")
 				.withStyle(ChatFormatting.GRAY), false);

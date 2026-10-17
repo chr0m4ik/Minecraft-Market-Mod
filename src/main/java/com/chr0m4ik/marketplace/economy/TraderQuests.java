@@ -35,9 +35,11 @@ public final class TraderQuests {
 
     /** Чем закончилась попытка сдать заказ. */
     public enum Status {
-        /** Предметы забраны, деньги начислены. */
+        /** Сдано всё, предметы забраны, деньги начислены. */
         DELIVERED,
-        /** В инвентаре не хватает предметов. */
+        /** Сдана часть: предметы забраны, прогресс сохранён, деньги пока не начислены. */
+        PARTIAL,
+        /** В инвентаре нет нужных предметов. */
         NOT_ENOUGH,
         /** Этот заказ уже выполнен сегодня. */
         ALREADY_DONE,
@@ -49,11 +51,12 @@ public final class TraderQuests {
      * Результат сдачи заказа.
      *
      * @param status  чем закончилось;
-     * @param quest   заказ (может быть {@code null}, если заказа с таким номером нет);
-     * @param missing сколько предметов не хватает (для {@link Status#NOT_ENOUGH});
-     * @param paid    сколько заплатили (для {@link Status#DELIVERED})
+     * @param quest   заказ в новом состоянии (может быть {@code null}, если заказа с таким номером нет);
+     * @param missing сколько предметов ещё не хватает;
+     * @param paid    сколько заплатили (только для {@link Status#DELIVERED});
+     * @param taken   сколько предметов забрали из инвентаря в этот раз
      */
-    public record Delivery(Status status, TraderQuest quest, int missing, double paid) {
+    public record Delivery(Status status, TraderQuest quest, int missing, double paid, int taken) {
     }
 
     private TraderQuests() {
@@ -94,8 +97,10 @@ public final class TraderQuests {
     }
 
     /**
-     * Сдать заказ: предметы забираются из инвентаря, деньги начисляются.
-     * Заказ помечается выполненным до конца игрового дня.
+     * Сдать заказ. Забирается столько предметов, сколько есть в инвентаре (но не больше остатка):
+     * прогресс сохраняется в самом заказе, а деньги начисляются только когда сдано всё.
+     * Если игровой день сменился, заказы выдаются заново — недосданные предметы пропадают
+     * (так решил заказчик: частичная сдача — это риск игрока).
      */
     public static Delivery deliver(MinecraftServer server, ServerPlayer player, int index) {
         MarketplaceState state = MarketplaceEconomy.state(server);
@@ -103,37 +108,44 @@ public final class TraderQuests {
         List<TraderQuest> quests = forPlayer(server, playerId);
 
         if (index < 0 || index >= quests.size()) {
-            return new Delivery(Status.BROKEN, null, 0, 0.0);
+            return new Delivery(Status.BROKEN, null, 0, 0.0, 0);
         }
 
         TraderQuest quest = quests.get(index);
 
-        if (quest.done()) {
-            return new Delivery(Status.ALREADY_DONE, quest, 0, 0.0);
+        if (quest.complete()) {
+            return new Delivery(Status.ALREADY_DONE, quest, 0, 0.0, 0);
         }
 
         Optional<Item> item = quest.item();
 
         if (item.isEmpty()) {
-            return new Delivery(Status.BROKEN, quest, 0, 0.0);
+            return new Delivery(Status.BROKEN, quest, 0, 0.0, 0);
         }
 
         int have = QuestItems.countIn(player.getInventory(), item.get());
 
-        if (have < quest.count()) {
-            return new Delivery(Status.NOT_ENOUGH, quest, quest.count() - have, 0.0);
+        if (have <= 0) {
+            return new Delivery(Status.NOT_ENOUGH, quest, quest.remaining(), 0.0, 0);
         }
 
-        QuestItems.removeFrom(player.getInventory(), item.get(), quest.count());
+        int taken = Math.min(have, quest.remaining());
+        QuestItems.removeFrom(player.getInventory(), item.get(), taken);
 
-        double paid = rewardOf(quest);
-        MarketplaceEconomy.addBalance(server, playerId, paid);
+        TraderQuest updated = quest.withDelivered(quest.delivered() + taken);
+        List<TraderQuest> list = new ArrayList<>(quests);
 
-        List<TraderQuest> updated = new ArrayList<>(quests);
-        updated.set(index, quest.markDone());
-        state.setQuests(playerId, updated);
+        if (updated.complete()) {
+            double paid = rewardOf(quest);
+            MarketplaceEconomy.addBalance(server, playerId, paid);
+            list.set(index, updated.markDone());
+            state.setQuests(playerId, list);
+            return new Delivery(Status.DELIVERED, updated.markDone(), 0, paid, taken);
+        }
 
-        return new Delivery(Status.DELIVERED, quest, 0, paid);
+        list.set(index, updated);
+        state.setQuests(playerId, list);
+        return new Delivery(Status.PARTIAL, updated, updated.remaining(), 0.0, taken);
     }
 
     /** Заказы одной строкой для лога: «32 × minecraft:dirt (×1.15)». */
