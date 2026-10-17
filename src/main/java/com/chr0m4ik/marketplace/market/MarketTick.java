@@ -14,13 +14,8 @@ import net.minecraft.server.level.ServerPlayer;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Раз в секунду проверяет ордера на рынке: готовые продаёт, начисляет деньги и пишет в чат.
- * Игрок при этом может быть не в игре — деньги всё равно начислятся, а сообщение он увидит
- * при следующем входе (одной строкой-итогом).
- */
 public final class MarketTick {
-	/** Как часто проверяем ордера, в тиках. 20 тиков = 1 секунда. */
+
 	private static final int PERIOD_TICKS = 20;
 
 	private MarketTick() {
@@ -61,13 +56,12 @@ public final class MarketTick {
 				if (online == null) {
 					state.addPendingSale(playerId, total);
 				} else {
-					// Ордер продался при игроке — звук поднятия уровня, один на всю пачку продаж.
+
 					MarketSounds.orderSold(online);
 				}
 			}
 		});
 
-		// Игрок зашёл — рассказываем, что продалось, пока его не было.
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			MarketplaceState state = MarketplaceEconomy.state(server);
 			double[] pending = state.takePendingSales(handler.getPlayer().getUUID());
@@ -79,7 +73,7 @@ public final class MarketTick {
 			handler.getPlayer().sendSystemMessage(Component.translatable("marketplace.gui.market.offline",
 					Component.literal(String.valueOf((int) pending[0])),
 					Component.literal(MoneyFormat.format(pending[1]))).withStyle(ChatFormatting.GOLD));
-			// Деньги за проданное в отсутствие игрока — тихий звук получения.
+
 			MarketSounds.offlineMoney(handler.getPlayer());
 		});
 	}

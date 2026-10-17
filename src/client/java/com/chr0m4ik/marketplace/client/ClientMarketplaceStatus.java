@@ -15,22 +15,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Последнее состояние, полученное с сервера: баланс, стоимость инвентаря и закупки торговца.
- * Нужно плашке на HUD и подсказкам предметов в окне торговца (цены считаются теми же формулами).
- *
- * <p>Здесь же храним зерно мира и игровое время с сервера: по ним считается микро-дрейф цен,
- * поэтому подсказки на клиенте совпадают с тем, что заплатит сервер.
- */
 public final class ClientMarketplaceStatus {
-	/** Пока данных с сервера нет, плашку не показываем. */
+
 	private static boolean hasData;
 
 	private static long balanceCents;
 	private static long inventoryCents;
 	private static TraderPrices traderPrices = TraderPrices.empty();
 
-	/** Зерно мира и игровое время сервера — для микро-дрейфа цен. */
 	private static long worldSeed;
 	private static long gameTime;
 
@@ -47,14 +39,11 @@ public final class ClientMarketplaceStatus {
 		gameTime = time;
 		hasData = true;
 
-		// Дрейф считаем по серверным данным: тогда клиент и сервер дают одно и то же число.
 		PriceDrift.update(worldSeed, gameTime);
 
-		// Ивент тоже берём с сервера и считаем его множитель тем же кодом, что и сервер.
 		applyEvent(event);
 	}
 
-	/** Вызывается при выходе из мира, чтобы не показывать старые числа в меню. */
 	public static void clear() {
 		hasData = false;
 		balanceCents = 0L;
@@ -66,11 +55,6 @@ public final class ClientMarketplaceStatus {
 		EventService.clearCurrent();
 	}
 
-	/**
-	 * Кладёт описание ивента с сервера в {@link EventService} — оттуда его берут и подсказки,
-	 * и любая другая цена на клиенте. Незнакомое название (чужой мод или старый клиент) —
-	 * считаем, что ивента нет, и не ломаем цены.
-	 */
 	private static void applyEvent(MarketplaceStatusPayload.EventData data) {
 		if (!data.active()) {
 			EventService.clearCurrent();
@@ -83,8 +67,8 @@ public final class ClientMarketplaceStatus {
 		if (event.isPresent()) {
 			EventService.applyFromServer(event.get());
 		} else {
-			MarketplaceMod.LOGGER.warn("С сервера пришёл непонятный ивент «{}» — считаю, что ивента нет",
-					data.name());
+			// MarketplaceMod.LOGGER.warn("С сервера пришёл непонятный ивент «{}» — считаю, что ивента нет",
+					// data.name());
 			EventService.clearCurrent();
 		}
 	}
@@ -116,7 +100,6 @@ public final class ClientMarketplaceStatus {
 		return inventoryCents / 100.0;
 	}
 
-	/** Цены торговца: только он зависит от того, что у него покупали. */
 	public static TraderPrices traderPrices() {
 		return traderPrices;
 	}

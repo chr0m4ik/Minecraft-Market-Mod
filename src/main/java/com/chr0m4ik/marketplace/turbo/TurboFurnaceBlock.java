@@ -16,18 +16,6 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * Блок «Турбо печки».
- *
- * <p>Наследуемся от {@code AbstractFurnaceBlock}, а не от ванильной {@code FurnaceBlock}: последняя
- * жёстко привязана к {@code BlockEntityTypes.FURNACE} (в {@code newBlockEntity}, {@code getTicker}
- * и {@code openContainer}), поэтому со своим типом блочной сущности она не подходит.
- *
- * <p>Что уже работает «бесплатно» из {@code AbstractFurnaceBlock}: поворот по взгляду, состояние
- * {@code lit}, редстоун-сигнал для компаратора, выкидывание содержимого при поломке.
- * Частицы и звук горения у {@code AbstractFurnaceBlock} отсутствуют — они в {@code FurnaceBlock},
- * поэтому {@link #animateTick} скопирован оттуда слово в слово.
- */
 public class TurboFurnaceBlock extends AbstractFurnaceBlock {
 	public TurboFurnaceBlock(BlockBehaviour.Properties properties) {
 		super(properties);
@@ -41,15 +29,14 @@ public class TurboFurnaceBlock extends AbstractFurnaceBlock {
 	@Override
 	public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state,
 			BlockEntityType<T> type) {
-		// Тип, который создаёт newBlockEntity, обязан совпадать с ожидаемым здесь: иначе
-		// createFurnaceTicker вернёт null, блочная сущность не будет тикать и печка «не плавит».
+
 		return createFurnaceTicker(level, type, TurboFurnace.BLOCK_ENTITY);
 	}
 
 	@Override
 	protected void openContainer(Level level, BlockPos pos, Player player) {
 		if (level.getBlockEntity(pos) instanceof TurboFurnaceBlockEntity entity) {
-			// Меню — ванильное печное: оно же даёт книгу рецептов и опыт за плавку.
+
 			player.openMenu(entity);
 			player.awardStat(Stats.INTERACT_WITH_FURNACE);
 		}

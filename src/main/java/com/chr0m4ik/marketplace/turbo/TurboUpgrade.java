@@ -15,19 +15,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
-/**
- * Уровень «Турбо печки» на предмете и его подпись.
- *
- * <p>Уровень хранится в компоненте предмета {@code minecraft:custom_data} под ключом
- * {@link #LEVEL_TAG} и в NBT блочной сущности под тем же ключом. Так уровень переживает и
- * поломку блока (своя loot table копирует {@code custom_data} из блочной сущности), и
- * постановку блока обратно.
- */
 public final class TurboUpgrade {
-	/** Ключ уровня: одинаково в NBT блочной сущности и в компоненте предмета. */
+
 	public static final String LEVEL_TAG = "turbo_level";
 
-	/** Ключи названия уровня и его описания в языковых файлах. */
 	private static final String NAME_KEY = "marketplace.special.turbo_furnace.name.";
 	private static final String LEVEL_KEY = "marketplace.special.turbo_furnace.level.";
 	private static final String HINT_KEY = "marketplace.special.turbo_furnace.hint";
@@ -36,81 +27,53 @@ public final class TurboUpgrade {
 		// Класс только со статическими методами.
 	}
 
-	/**
-	 * Уровень печки на предмете.
-	 *
-	 * @return {@code 0}, если это не «Турбо печка»; иначе {@code 1..}{@link TurboFurnace#MAX_LEVEL}.
-	 *         Предмет без компонента (например, выданный командой {@code /give}) считается
-	 *         печкой 1-го уровня.
-	 */
 	public static int levelOf(ItemStack stack) {
 		return stack.is(TurboFurnace.ITEM) ? levelOfComponents(stack.get(DataComponents.CUSTOM_DATA)) : 0;
 	}
 
-	/** Уровень из компонента (или из NBT блочной сущности): пусто и мусор читаются как 1-й уровень. */
 	public static int levelOfComponents(@Nullable CustomData data) {
 		int level = data == null ? 0 : data.copyTag().getIntOr(LEVEL_TAG, 0);
 		return Mth.clamp(level <= 0 ? 1 : level, 1, TurboFurnace.MAX_LEVEL);
 	}
 
-	/** Записывает уровень в компонент предмета. */
 	public static void setLevel(ItemStack stack, int level) {
 		CustomData.update(DataComponents.CUSTOM_DATA, stack,
 				tag -> tag.putInt(LEVEL_TAG, Mth.clamp(level, 1, TurboFurnace.MAX_LEVEL)));
 	}
 
-	/** Компонент с уровнем — его кладём на предмет при поломке блока. */
 	public static CustomData dataOf(int level) {
 		CustomData data = CustomData.EMPTY;
 		return data.update(tag -> tag.putInt(LEVEL_TAG, Mth.clamp(level, 1, TurboFurnace.MAX_LEVEL)));
 	}
 
-	/** Название уровня: «Турбо печка I». */
 	public static MutableComponent nameOf(int level) {
 		return plain(Component.translatable(NAME_KEY + clamp(level)).withStyle(ChatFormatting.AQUA));
 	}
 
-	/** Описание уровня: что за скорость и как получить уровень выше. */
 	public static ItemLore loreOf(int level) {
 		return new ItemLore(List.of(
 				plain(Component.translatable(LEVEL_KEY + clamp(level)).withStyle(ChatFormatting.LIGHT_PURPLE)),
 				plain(Component.translatable(HINT_KEY).withStyle(ChatFormatting.GRAY))));
 	}
 
-	/** Название и описание предмета. */
 	public static void decorate(ItemStack stack, int level) {
 		stack.set(DataComponents.CUSTOM_NAME, nameOf(level));
 		stack.set(DataComponents.LORE, loreOf(level));
 	}
 
-	/**
-	 * Название и описание для loot table-пути: то же самое, что {@link #decorate(ItemStack, int)},
-	 * но в сборщик компонентов блочной сущности ({@code collectImplicitComponents}).
-	 */
 	public static void decorate(DataComponentMap.Builder components, int level) {
 		components.set(DataComponents.CUSTOM_NAME, nameOf(level));
 		components.set(DataComponents.LORE, loreOf(level));
 	}
 
-	/** Читает уровень из компонентов при постановке блока (см. {@code BlockItem}). */
 	public static int levelOfComponents(DataComponentGetter components) {
 		return levelOfComponents(components.get(DataComponents.CUSTOM_DATA));
 	}
 
-	/** Это «Турбо печка» (любого уровня)? */
 	public static boolean isTurbo(ItemStack stack) {
 		return stack.is(TurboFurnace.ITEM);
 	}
 
-	/**
-	 * Уровень результата соединения двух печек в наковальне.
-	 *
-	 * <p>Соединяются только <b>две печки одного уровня</b>: 1+1 → 2, 2+2 → 3, 3+3 → 4.
-	 * Любая другая пара (разные уровни, максимальный уровень, не наша печка) результата не даёт —
-	 * наковальня просто ничего не показывает.
-	 *
-	 * @return {@code 0}, если соединения нет; иначе уровень результата ({@code 2..4})
-	 */
 	public static int resultLevel(ItemStack left, ItemStack right) {
 		int first = levelOf(left);
 		int second = levelOf(right);
@@ -122,10 +85,6 @@ public final class TurboUpgrade {
 		return first + 1;
 	}
 
-	/**
-	 * Сколько уровней опыта стоит соединение — как согласовано с заказчиком:
-	 * 1+1 → 2 за 25 уровней, 2+2 → 3 за 50, 3+3 → 4 за 100.
-	 */
 	public static int levelCost(int newLevel) {
 		return switch (newLevel) {
 			case 2 -> 25;
@@ -135,7 +94,6 @@ public final class TurboUpgrade {
 		};
 	}
 
-	/** Результат соединения: одна печка уровнем выше, со своим названием и описанием. */
 	public static ItemStack upgraded(ItemStack base, int level) {
 		ItemStack result = base.copyWithCount(1);
 		setLevel(result, level);
@@ -147,7 +105,6 @@ public final class TurboUpgrade {
 		return Mth.clamp(level, 1, TurboFurnace.MAX_LEVEL);
 	}
 
-	/** Убирает курсив: игра делает изменённые названия курсивом. */
 	private static MutableComponent plain(MutableComponent text) {
 		return text.withStyle(Style.EMPTY.withItalic(false));
 	}

@@ -10,14 +10,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ARGB;
 
-/**
- * Плашка с деньгами на HUD: у правого края, по центру экрана.
- *
- * <p>Две строки: сколько денег на счету и сколько стоит всё, что лежит в инвентаре
- * (по цене продажи за 1x). Данные присылает сервер — см. {@code MarketplaceStatusSync}.
- *
- * <p>Фон — как у чата: чёрный с прозрачностью из настроек игрока, без своих текстур.
- */
 public class MoneyHudElement implements HudElement {
 	private static final int PADDING = 4;
 	private static final int MARGIN = 4;
@@ -44,7 +36,6 @@ public class MoneyHudElement implements HudElement {
 		int x = graphics.guiWidth() - width - MARGIN;
 		int y = (graphics.guiHeight() - height) / 2;
 
-		// Фон как у чата: тот же цвет и та же настройка прозрачности.
 		float opacity = client.options.textBackgroundOpacity().get().floatValue();
 		graphics.fill(x, y, x + width, y + height, ARGB.black(opacity));
 

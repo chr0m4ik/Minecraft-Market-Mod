@@ -26,69 +26,21 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * Пул предметов для заданий торговца и настройки срочного заказа.
- *
- * <p>Файл {@code data/marketplace/quests.json} лежит в ресурсах мода и читается прямо из jar-а,
- * как прайс и настройки экономики, поэтому правится без пересборки.
- *
- * <p><b>Группы.</b> Предметы разбиты на группы («доски», «брёвна», «камень и земля», «еда»,
- * «растения», «руда», «самоцветы»). У каждой группы свои {@code count_min…count_max} (сколько
- * единиц просить) и {@code bonus_min…bonus_max} (во сколько раз выше базовой цены платят за
- * единицу) — так редкие предметы просят меньше, но платят за них щедрее. {@code weight} задаёт,
- * как часто группа попадается в дневные заказы (самоцветы — редко).
- *
- * <p><b>Теги разрешаются лениво.</b> На загрузке мода компоненты предметов ещё не привязаны,
- * а теги предметов читаются только вместе с данными мира. Поэтому из файла сразу читаются только
- * id и настройки, а содержимое групп (теги {@code #minecraft:planks} и подобные) собирается при
- * первом обращении — уже во время игры.
- *
- * <p><b>Надбавка не может дотянуть до цены магазина.</b> Покупка в магазине стоит
- * {@code buy_multiplier} (2.2) базовой цены, поэтому надбавка заказа ограничена сверху
- * ({@value #MAX_BONUS}): иначе «купил в магазине — сдал в заказ» приносило бы деньги.
- */
 public final class QuestGroups {
-    /** Путь к настройкам заданий внутри мода. */
+
     private static final String FILE_PATH = "/data/marketplace/quests.json";
 
-    /** Сколько обычных заказов выдаётся игроку на игровой день. */
     public static final int PER_DAY = 7;
 
-    /** Предел надбавки за единицу: ниже цены покупки в магазине (2.2), иначе заказы печатают деньги. */
     private static final double MAX_BONUS = 2.0;
 
-    /** Пределы, за которые мод не выпускает настройки (при выходе — ERROR в лог). */
     private static final int MAX_COUNT = 4096;
     private static final int MAX_SECONDS = 3600;
 
-    /**
-     * Одна группа предметов из файла.
-     *
-     * @param id       имя группы (для логов и правок файла);
-     * @param weight   вес при выборе группы в дневных заказах;
-     * @param countMin минимальное количество единиц в заказе;
-     * @param countMax максимальное количество единиц в заказе;
-     * @param bonusMin минимальная надбавка за единицу;
-     * @param bonusMax максимальная надбавка за единицу;
-     * @param tags     теги предметов, которые входят в группу;
-     * @param items    явно перечисленные предметы группы
-     */
     private record Group(String id, int weight, int countMin, int countMax, double bonusMin, double bonusMax,
             List<TagKey<Item>> tags, List<Item> items) {
     }
 
-    /**
-     * Настройки срочного заказа.
-     *
-     * @param daysBetween      через сколько игровых дней повторяется событие;
-     * @param secondsMin       минимальная длительность в секундах активного времени;
-     * @param secondsMax       максимальная длительность в секундах активного времени;
-     * @param stacksMin        сколько стаков минимум просят;
-     * @param stacksMax        сколько стаков максимум просят;
-     * @param maxItemPrice     цена одной единицы, выше которой предмет не выпадает;
-     * @param rewardMultiplier во сколько раз больше базовой цены платят за весь заказ;
-     * @param maxReward        потолок награды за один срочный заказ
-     */
     public record UrgentSettings(int daysBetween, int secondsMin, int secondsMax, int stacksMin, int stacksMax,
             double maxItemPrice, double rewardMultiplier, double maxReward) {
     }
@@ -98,7 +50,7 @@ public final class QuestGroups {
 
     private static List<Group> groups = List.of();
     private static UrgentSettings urgent = DEFAULT_URGENT;
-    /** Кэш «группа → её предметы»: теги разрешаются уже во время игры, один раз на группу. */
+
     private static final Map<String, List<Item>> POOLS = new HashMap<>();
     private static boolean loadAttempted;
     private static boolean loaded;
@@ -107,13 +59,11 @@ public final class QuestGroups {
         // Класс только со статическими методами.
     }
 
-    /** Настройки срочного заказа. */
     public static UrgentSettings urgent() {
         ensureLoaded();
         return urgent;
     }
 
-    /** Читает файл заданий. Вызывается при загрузке мода и лениво — при первом обращении. */
     public static synchronized void ensureLoaded() {
         if (loadAttempted) {
             return;
@@ -140,18 +90,17 @@ public final class QuestGroups {
                 urgent = readUrgent(root.getAsJsonObject("urgent"));
                 loaded = true;
 
-                MarketplaceMod.LOGGER.info("Задания торговца загружены: групп {}, заказов в день {}, срочный —"
-                                + " раз в {} дн., {}–{} с, {}–{} стаков, награда ×{} (не больше {})",
-                        groups.size(), PER_DAY, urgent.daysBetween(), urgent.secondsMin(), urgent.secondsMax(),
-                        urgent.stacksMin(), urgent.stacksMax(), urgent.rewardMultiplier(), urgent.maxReward());
+                // MarketplaceMod.LOGGER.info("Задания торговца загружены: групп {}, заказов в день {}, срочный —"
+                                // + " раз в {} дн., {}–{} с, {}–{} стаков, награда ×{} (не больше {})",
+                        // groups.size(), PER_DAY, urgent.daysBetween(), urgent.secondsMin(), urgent.secondsMax(),
+                        // urgent.stacksMin(), urgent.stacksMax(), urgent.rewardMultiplier(), urgent.maxReward());
             }
         } catch (IOException | RuntimeException exception) {
-            // Не прячем проблему: пишем ошибку и оставляем заказы пустыми.
+
             MarketplaceMod.LOGGER.error("Не удалось прочитать файл заданий {}", FILE_PATH, exception);
         }
     }
 
-    /** Читает группы: id предметов и настройки. Теги разрешаются позже, при первом заказе. */
     private static List<Group> readGroups(JsonArray array) {
         List<Group> result = new ArrayList<>();
 
@@ -206,7 +155,6 @@ public final class QuestGroups {
         return result;
     }
 
-    /** Теги группы: записи вида {@code "#minecraft:planks"}. */
     private static List<TagKey<Item>> readTags(JsonObject object, String groupId) {
         List<TagKey<Item>> tags = new ArrayList<>();
 
@@ -218,23 +166,22 @@ public final class QuestGroups {
             String value = element.getAsString();
 
             if (!value.startsWith("#")) {
-                MarketplaceMod.LOGGER.warn("Задания: в группе «{}» тег записан без «#», пропускаю: {}",
-                        groupId, value);
+                // MarketplaceMod.LOGGER.warn("Задания: в группе «{}» тег записан без «#», пропускаю: {}",
+                        // groupId, value);
                 continue;
             }
 
             try {
                 tags.add(TagKey.create(Registries.ITEM, Identifier.parse(value.substring(1))));
             } catch (RuntimeException exception) {
-                MarketplaceMod.LOGGER.warn("Задания: в группе «{}» некорректный тег, пропускаю: {}",
-                        groupId, value);
+                // MarketplaceMod.LOGGER.warn("Задания: в группе «{}» некорректный тег, пропускаю: {}",
+                        // groupId, value);
             }
         }
 
         return tags;
     }
 
-    /** Явно перечисленные предметы группы: сразу проверяем, что они есть и их можно купить. */
     private static List<Item> readItems(JsonObject object, String groupId) {
         List<Item> items = new ArrayList<>();
 
@@ -247,8 +194,8 @@ public final class QuestGroups {
             Optional<Item> item = BuiltInRegistries.ITEM.getOptional(Identifier.parse(id));
 
             if (item.isEmpty() || !ItemPrices.isBuyable(item.get())) {
-                MarketplaceMod.LOGGER.warn("Задания: в группе «{}» неизвестный или недоступный предмет,"
-                        + " пропускаю: {}", groupId, id);
+                // MarketplaceMod.LOGGER.warn("Задания: в группе «{}» неизвестный или недоступный предмет,"
+                        // + " пропускаю: {}", groupId, id);
                 continue;
             }
 
@@ -258,10 +205,9 @@ public final class QuestGroups {
         return items;
     }
 
-    /** Настройки срочного заказа из файла (с проверками). */
     private static UrgentSettings readUrgent(JsonObject object) {
         if (object == null) {
-            MarketplaceMod.LOGGER.warn("В файле заданий нет блока «urgent» — беру значения по умолчанию");
+            // MarketplaceMod.LOGGER.warn("В файле заданий нет блока «urgent» — беру значения по умолчанию");
             return DEFAULT_URGENT;
         }
 
@@ -287,10 +233,6 @@ public final class QuestGroups {
                 maxItemPrice, multiplier, maxReward);
     }
 
-    /**
-     * Новые дневные заказы: {@code count} штук, предметы не повторяются.
-     * Количество и надбавка берутся из диапазонов группы.
-     */
     public static List<TraderQuest> rollDaily(RandomSource random, int count) {
         ensureLoaded();
 
@@ -332,10 +274,6 @@ public final class QuestGroups {
         return List.copyOf(result);
     }
 
-    /**
-     * Предметы группы: явные id плюс всё, что входит в её теги. Считается один раз — при первом
-     * заказе, когда теги предметов уже загружены вместе с данными мира.
-     */
     private static List<Item> poolOf(Group group) {
         return POOLS.computeIfAbsent(group.id(), id -> {
             Set<Item> pool = new HashSet<>(group.items());
@@ -343,7 +281,7 @@ public final class QuestGroups {
             if (!group.tags().isEmpty()) {
                 for (Item item : ItemPrices.buyableItems()) {
                     for (TagKey<Item> tag : group.tags()) {
-                        // Проверяем тег через держатель предмета: ItemStack здесь ещё не нужен.
+
                         if (item.builtInRegistryHolder().is(tag)) {
                             pool.add(item);
                             break;
@@ -357,12 +295,11 @@ public final class QuestGroups {
                 return List.of();
             }
 
-            MarketplaceMod.LOGGER.info("Задания: группа «{}» — предметов {}", id, pool.size());
+            // MarketplaceMod.LOGGER.info("Задания: группа «{}» — предметов {}", id, pool.size());
             return List.copyOf(pool);
         });
     }
 
-    /** Случайная группа по весам. */
     private static Group pickGroup(RandomSource random) {
         int total = 0;
 
@@ -391,7 +328,7 @@ public final class QuestGroups {
         JsonElement element = object.get(key);
 
         if (element == null || !element.isJsonPrimitive() || !element.getAsJsonPrimitive().isNumber()) {
-            MarketplaceMod.LOGGER.warn("Задания: в «{}» нет числа «{}» — беру {}", where, key, fallback);
+            // MarketplaceMod.LOGGER.warn("Задания: в «{}» нет числа «{}» — беру {}", where, key, fallback);
             return fallback;
         }
 
@@ -402,7 +339,7 @@ public final class QuestGroups {
         JsonElement element = object.get(key);
 
         if (element == null || !element.isJsonPrimitive() || !element.getAsJsonPrimitive().isNumber()) {
-            MarketplaceMod.LOGGER.warn("Задания: в «{}» нет числа «{}» — беру {}", where, key, fallback);
+            // MarketplaceMod.LOGGER.warn("Задания: в «{}» нет числа «{}» — беру {}", where, key, fallback);
             return fallback;
         }
 
@@ -421,9 +358,4 @@ public final class QuestGroups {
         return String.format(java.util.Locale.ROOT, "%.2f", value);
     }
 
-    /** Прочитались ли настройки заданий. */
-    public static boolean isLoaded() {
-        ensureLoaded();
-        return loaded;
-    }
 }

@@ -32,18 +32,6 @@ import net.minecraft.world.item.TooltipFlag;
 import java.util.List;
 import java.util.OptionalDouble;
 
-/**
- * Дописывает в подсказки предметов их цену.
- *
- * <p>Правила:
- * <ul>
- *     <li>везде, кроме окна торговца, цена обычная (базовая). Динамика цен — особенность только
- *     торговца, на рынок и покупку она не влияет;</li>
- *     <li>в окне торговца показывается его цена: 75% от базовой с его надбавками и уценками
- *     (см. {@link TraderPrices});</li>
- *     <li>у кнопок цены нет, а у кнопки «итоговая цена» подсказка показывает сводку по товару.</li>
- * </ul>
- */
 public final class MarketplaceTooltips {
 	private MarketplaceTooltips() {
 		// Класс только со статическими методами.
@@ -58,7 +46,6 @@ public final class MarketplaceTooltips {
 			return;
 		}
 
-		// Лот торговой площадки: цена, продавец и состояние уже в описании, которое собрал сервер.
 		if (!MarketService.listingId(stack).isEmpty()) {
 			return;
 		}
@@ -69,13 +56,12 @@ public final class MarketplaceTooltips {
 			MarketplaceMenu menu = marketplace.getMenu();
 
 			if (marketplace.isHoveringButton()) {
-				// Предмет по центру окна покупки лежит в слоте-кнопке, поэтому цену показываем здесь.
+
 				if (menu.getKind() == WindowKind.BUY_ITEM) {
 					addBuyLines(lines, marketplace, menu, stack);
 					return;
 				}
 
-				// У кнопок своя подсказка: у бумаги — сводка, у остальных её просто нет.
 				if (menu.getKind() == WindowKind.TRADER && stack.is(Items.PAPER)) {
 					addTraderSummary(lines, menu);
 				} else if (menu.getKind() == WindowKind.SELL && stack.is(Items.PAPER)) {
@@ -84,7 +70,7 @@ public final class MarketplaceTooltips {
 					lines.add(Component.translatable("marketplace.tooltip.slot.price",
 							money(menu.getNextSlotPrice())).withStyle(ChatFormatting.GOLD));
 				} else if (menu.getKind() == WindowKind.ENDER_CHEST && stack.is(Items.PAPER)) {
-					// Справка о покупке: что покупается и сколько стоит.
+
 					lines.add(Component.translatable("marketplace.tooltip.ender.desc")
 							.withStyle(ChatFormatting.GRAY));
 					lines.add(Component.translatable("marketplace.tooltip.ender.price",
@@ -111,35 +97,24 @@ public final class MarketplaceTooltips {
 			}
 		}
 
-		// Иконка своего сета (его создал игрок): цена и содержимое уже в описании, которое
-		// собрал сервер, — шлякерную цену сверху дописывать нельзя.
 		if (!CustomKits.nameOf(stack).isEmpty()) {
 			return;
 		}
 
-		// Иконка набора — шлякер, но цена у неё не шлякерная: см. KitCatalog.priceOf.
 		if (addKitPrice(lines, stack)) {
 			return;
 		}
 
-		// У «особого предмета» цена своя (см. SpecialCatalog): показываем её и обычную —
 		// по обычной платят рынок и торговец.
 		addSpecialPrice(lines, stack);
 		addBasePriceLines(lines, stack);
 	}
 
-	/**
-	 * Цена набора для иконки из магазина: покупается набор, а не шлякер, и множитель покупки
-	 * магазина к наборам не применяется.
-	 *
-	 * @return {@code false}, если это не предмет набора
-	 */
 	private static boolean addKitPrice(List<Component> lines, ItemStack stack) {
 		if (KitCatalog.kitId(stack).isEmpty()) {
 			return false;
 		}
 
-		// Зачарования и зелья набора берутся из реестров мира: без них цена была бы меньше.
 		ClientLevel level = Minecraft.getInstance().level;
 
 		if (level == null) {
@@ -155,16 +130,8 @@ public final class MarketplaceTooltips {
 		}).orElse(false);
 	}
 
-	/**
-	 * Цена «особого предмета» (книги своего зачарования): она задана явно и множитель покупки
-	 * к ней не применяется — см. {@link SpecialCatalog}. У «Турбо печки» своя ветка: её цена
-	 * зависит от уровня и приходит обычной базовой ценой.
-	 *
-	 * @return {@code false}, если это не особый предмет
-	 */
 	private static boolean addSpecialPrice(List<Component> lines, ItemStack stack) {
-		// У «Турбо печки» цена зависит от уровня и уже показана как обычная базовая: вторая такая
-		// же строка только путала бы (ItemPrices берёт цену из той же таблицы SpecialCatalog).
+
 		if (SpecialCatalog.isLevelledBlock(stack)) {
 			return false;
 		}
@@ -180,7 +147,6 @@ public final class MarketplaceTooltips {
 		return true;
 	}
 
-	/** Подсказка для ячейки рынка: обычная цена, наценка и как забрать предмет. */
 	private static void addMarketCellLines(List<Component> lines, MarketplaceScreen screen,
 			MarketplaceMenu menu, ItemStack stack) {
 		int cell = screen.getHoveredSlotIndex();
@@ -191,8 +157,7 @@ public final class MarketplaceTooltips {
 		}
 
 		if (menu.isCellOrder(cell)) {
-			// Подтверждённый ордер: он лежит в сейве мира и продаётся сам, забрать —
-			// только в режиме-мишени и только shift-кликом (Shift + ПКМ или Shift + ЛКМ).
+
 			lines.add(Component.translatable("marketplace.tooltip.market.order")
 					.withStyle(ChatFormatting.AQUA));
 		} else if (!stack.isEmpty()) {
@@ -201,7 +166,6 @@ public final class MarketplaceTooltips {
 
 		addBasePriceLines(lines, stack);
 
-		// Лот, который ждёт живого покупателя: рынок его не купит, поэтому про наценку не говорим.
 		boolean waiting = menu.isCellOrder(cell) && menu.isCellWaiting(cell);
 
 		if (waiting) {
@@ -209,7 +173,6 @@ public final class MarketplaceTooltips {
 					.withStyle(ChatFormatting.GOLD));
 		}
 
-		// Если предмет выставлен с наценкой — показываем и обычную цену, и итоговую.
 		double markup = menu.getCellMarkup(cell);
 
 		if (!waiting && markup > 1.001) {
@@ -218,8 +181,7 @@ public final class MarketplaceTooltips {
 		}
 
 		if (menu.isCellOrder(cell) && !waiting) {
-			// Выплата по ордеру зафиксирована при выставлении: если цена с тех пор ушла
-			// (микро-дрейф или ивент), говорим об этом прямо, чтобы сумма не выглядела ошибкой.
+
 			double fixed = menu.getCellPayout(cell);
 
 			if (Math.abs(fixed - ItemPrices.priceOf(stack) * markup) > 0.005) {
@@ -229,9 +191,7 @@ public final class MarketplaceTooltips {
 		}
 
 		if (menu.isCellOrder(cell)) {
-			// Подтверждённый ордер: он лежит в сейве мира и продаётся сам. Забрать его можно
-			// только в режиме-мишени и только shift-кликом. Состояние режима приходит с сервера
-			// данными окна, поэтому подсказка говорит правду, а не догадывается.
+
 			lines.add(Component.translatable(menu.isTargetMode()
 					? "marketplace.tooltip.market.cancel.on" : "marketplace.tooltip.market.cancel.off")
 					.withStyle(menu.isTargetMode() ? ChatFormatting.GOLD : ChatFormatting.DARK_GRAY));
@@ -240,7 +200,6 @@ public final class MarketplaceTooltips {
 		}
 	}
 
-	/** Обычная цена: так платят рынок и покупка. */
 	private static void addBasePriceLines(List<Component> lines, ItemStack stack) {
 		double unit = ItemPrices.priceOf(stack.copyWithCount(1));
 
@@ -259,12 +218,6 @@ public final class MarketplaceTooltips {
 		addEventLines(lines, stack);
 	}
 
-	/**
-	 * Строка про крупный ивент: видно, что предмет под ивентом и на сколько процентов.
-	 * Множитель берётся тем же кодом, что и на сервере ({@link EventService}), поэтому строка
-	 * не расходится с тем, что игрок заплатит. Показывается везде: в инвентаре, магазине,
-	 * у торговца и на рынке.
-	 */
 	private static void addEventLines(List<Component> lines, ItemStack stack) {
 		MarketEvent event = EventService.current().orElse(null);
 
@@ -283,7 +236,6 @@ public final class MarketplaceTooltips {
 				.withStyle(ChatFormatting.LIGHT_PURPLE));
 	}
 
-	/** Цена торговца: его надбавки, уценки и доля 75%. */
 	private static void addTraderPriceLines(List<Component> lines, ItemStack stack) {
 		TraderPrices trader = ClientMarketplaceStatus.traderPrices();
 		double unit = trader.payout(stack.copyWithCount(1));
@@ -318,7 +270,6 @@ public final class MarketplaceTooltips {
 		addEventLines(lines, stack);
 	}
 
-	/** Подсказка кнопки «итоговая цена»: сколько товара, обычная цена и сколько дадут на руки. */
 	private static void addTraderSummary(List<Component> lines, MarketplaceMenu menu) {
 		TraderService.Offer offer = TraderService.evaluate(ClientMarketplaceStatus.traderPrices(),
 				menu.getTradeContainer(), menu.tradeSlotCount());
@@ -331,19 +282,12 @@ public final class MarketplaceTooltips {
 				money(MoneyFormat.round(offer.payout()))).withStyle(ChatFormatting.GREEN));
 	}
 
-	/**
-	 * Подсказка в окне покупки: цена за один стак и за всё выбранное количество.
-	 *
-	 * @return {@code false}, если курсор не на предмете по центру — тогда цена показывается
-	 *         как обычно (это случай предметов в инвентаре игрока)
-	 */
 	private static boolean addBuyLines(List<Component> lines, MarketplaceScreen screen,
 			MarketplaceMenu menu, ItemStack stack) {
 		if (screen.getHoveredSlotIndex() != MarketplaceMenu.BUY_ITEM_PREVIEW || stack.isEmpty()) {
 			return false;
 		}
 
-		// У набора своя цена: количество и множитель покупки к нему не применяются.
 		if (addKitPrice(lines, stack)) {
 			return true;
 		}
@@ -352,7 +296,6 @@ public final class MarketplaceTooltips {
 		int index = Math.max(0, Math.min(menu.getShopQuantityIndex(), MarketService.QUANTITIES.length - 1));
 		int count = MarketService.QUANTITIES[index];
 
-		// У «особого предмета» цена тоже своя — показываем её без множителя покупки.
 		OptionalDouble special = SpecialCatalog.priceOf(stack);
 
 		if (special.isPresent()) {
@@ -372,7 +315,6 @@ public final class MarketplaceTooltips {
 		return true;
 	}
 
-	/** Подсказка кнопки-справки на рынке: сколько дадут за ордера и за неподтверждённые предметы. */
 	private static void addMarketSummary(List<Component> lines, MarketplaceMenu menu) {
 		lines.add(Component.translatable("marketplace.tooltip.market.orders",
 				money(menu.getOrdersPayout()), count(menu.getOrdersCount())).withStyle(ChatFormatting.GOLD));
@@ -400,7 +342,7 @@ public final class MarketplaceTooltips {
 	}
 
 	private static Component percent(double fraction) {
-		// Знак «%» в строке формата удваиваем — иначе он считается началом подстановки.
+
 		return Component.literal(String.format("+%.1f%%", fraction * 100.0));
 	}
 }

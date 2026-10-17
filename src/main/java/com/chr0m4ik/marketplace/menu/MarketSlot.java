@@ -5,10 +5,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
-/**
- * Ячейка рынка: обычный слот, но если ячейку ещё не купили — в неё нельзя ничего положить
- * и из неё нельзя ничего взять (там лежит красная панель).
- */
 public class MarketSlot extends Slot {
 	private final MarketplaceMenu menu;
 

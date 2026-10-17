@@ -18,18 +18,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Дневные лимиты торговца: сколько стаков каждого предмета он готов купить за игровой день.
- *
- * <p>Файл {@code data/marketplace/trader_limits.json} создаётся генератором прайса.
- * Почти все предметы имеют общий лимит ({@link #defaultLimit()}), а для редких указаны
- * меньшие значения: чем дороже предмет, тем он реже. Нестакающиеся предметы (оружие, броня,
- * тотемы) считаются как один стак за штуку.
- */
 public final class TraderLimits {
 	private static final String FILE_PATH = "/data/marketplace/trader_limits.json";
 	private static final Codec<Map<String, Double>> LIMITS_CODEC = Codec.unboundedMap(Codec.STRING, Codec.DOUBLE);
-	/** Если файл не прочитался — торговец будет брать по столько стаков. */
+
 	private static final double FALLBACK_LIMIT = 30.0;
 
 	private static Map<Item, Double> limits = Map.of();
@@ -41,7 +33,6 @@ public final class TraderLimits {
 		// Класс только со статическими методами.
 	}
 
-	/** Читает лимиты из ресурсов мода при первом обращении. */
 	public static synchronized void ensureLoaded() {
 		if (loadAttempted) {
 			return;
@@ -70,10 +61,10 @@ public final class TraderLimits {
 			limits = Map.copyOf(loadedLimits);
 			loaded = true;
 
-			MarketplaceMod.LOGGER.info("Лимиты торговца загружены: общий {} стаков, особых случаев {}",
-					defaultLimit, limits.size());
+			// MarketplaceMod.LOGGER.info("Лимиты торговца загружены: общий {} стаков, особых случаев {}",
+					// defaultLimit, limits.size());
 		} catch (IOException | RuntimeException exception) {
-			// Не прячем проблему: пишем понятную ошибку и остаёмся на общем лимите.
+
 			MarketplaceMod.LOGGER.error("Не удалось прочитать файл лимитов {}", FILE_PATH, exception);
 		}
 	}
@@ -82,33 +73,25 @@ public final class TraderLimits {
 		Optional<Item> item = BuiltInRegistries.ITEM.getOptional(Identifier.parse(id));
 
 		if (item.isEmpty()) {
-			MarketplaceMod.LOGGER.warn("В лимитах есть неизвестный предмет, запись пропущена: {}", id);
+			// MarketplaceMod.LOGGER.warn("В лимитах есть неизвестный предмет, запись пропущена: {}", id);
 		}
 
 		return item;
 	}
 
-	/** Сколько стаков предмета торговец берёт за игровой день. */
 	public static double limitOf(Item item) {
 		ensureLoaded();
 		return limits.getOrDefault(item, defaultLimit);
 	}
 
-	/** Общий лимит для предметов, которых нет в списке исключений. */
 	public static double defaultLimit() {
 		ensureLoaded();
 		return defaultLimit;
 	}
 
-	/** Сколько предметов с особым лимитом — для проверок и логов. */
 	public static int size() {
 		ensureLoaded();
 		return limits.size();
 	}
 
-	/** Загрузились ли лимиты из файла. */
-	public static boolean isLoaded() {
-		ensureLoaded();
-		return loaded;
-	}
 }

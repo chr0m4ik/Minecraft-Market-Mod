@@ -4,19 +4,11 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-/**
- * Сколько предметов у игрока в инвентаре и как их забрать — общее для обычных заказов
- * ({@link TraderQuests}) и срочных ({@link UrgentQuests}).
- *
- * <p>Сравниваем по предмету, без учёта компонентов: заказ не требует «именно этот зачарованный
- * меч», но и не даёт доплаты за компоненты — цена считается по базовой.
- */
 final class QuestItems {
     private QuestItems() {
         // Класс только со статическими методами.
     }
 
-    /** Сколько таких предметов лежит в инвентаре (основные слоты и хотбар). */
     static int countIn(Inventory inventory, Item item) {
         int total = 0;
 
@@ -31,7 +23,6 @@ final class QuestItems {
         return total;
     }
 
-    /** Убирает нужное количество предметов. Вызывать только после проверки {@link #countIn}. */
     static void removeFrom(Inventory inventory, Item item, int count) {
         int left = count;
 

@@ -11,14 +11,8 @@ import net.minecraft.world.inventory.MenuType;
 import java.util.EnumMap;
 import java.util.Map;
 
-/**
- * Регистрация окон мода.
- *
- * <p>У каждого вида окна свой {@code MenuType} — по нему игра понимает, какое окно открывать
- * на клиенте. Размеры и заголовки берутся из {@link WindowKind}.
- */
 public final class MarketplaceMenus {
-	/** Вид окна → его тип. Заполняется при загрузке класса. */
+
 	private static final Map<WindowKind, MenuType<MarketplaceMenu>> TYPES = new EnumMap<>(WindowKind.class);
 
 	public static final MenuType<MarketplaceMenu> MAIN = register(WindowKind.MAIN, "main");
@@ -29,9 +23,9 @@ public final class MarketplaceMenus {
 	public static final MenuType<MarketplaceMenu> BUY = register(WindowKind.BUY, "buy");
 	public static final MenuType<MarketplaceMenu> BUY_LIST = register(WindowKind.BUY_LIST, "buy_list");
 	public static final MenuType<MarketplaceMenu> BUY_ITEM = register(WindowKind.BUY_ITEM, "buy_item");
-	/** Задания торговца (заказы на сдачу предметов). */
+
 	public static final MenuType<MarketplaceMenu> QUESTS = register(WindowKind.QUESTS, "quests");
-	/** Покупка виртуального эндер-сундука. */
+
 	public static final MenuType<MarketplaceMenu> ENDER_CHEST = register(WindowKind.ENDER_CHEST, "ender_chest");
 
 	private MarketplaceMenus() {
@@ -48,29 +42,26 @@ public final class MarketplaceMenus {
 		return type;
 	}
 
-	/** Тип окна по его виду. */
 	public static MenuType<MarketplaceMenu> typeOf(WindowKind kind) {
 		MenuType<MarketplaceMenu> type = TYPES.get(kind);
 
 		if (type == null) {
-			// Такое может случиться только при ошибке в коде, поэтому падаем громко.
+
 			throw new IllegalStateException("Вид окна не зарегистрирован: " + kind);
 		}
 
 		return type;
 	}
 
-	/** Открывает игроку нужное окно. */
 	public static void open(ServerPlayer player, WindowKind kind) {
-		// Открытие окна не озвучиваем: заказчик убрал этот звук как лишний.
+
 		player.openMenu(new SimpleMenuProvider(
 				(syncId, inventory, p) -> new MarketplaceMenu(kind, syncId, inventory),
 				kind.title()
 		));
 	}
 
-	/** Вызывается при загрузке мода: сам вызов нужен, чтобы класс загрузился и всё зарегистрировал. */
 	public static void initialize() {
-		MarketplaceMod.LOGGER.info("Marketplace: зарегистрировано окон — {}", TYPES.size());
+		// MarketplaceMod.LOGGER.info("Marketplace: зарегистрировано окон — {}", TYPES.size());
 	}
 }

@@ -25,49 +25,20 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Сколько времени рынок продаёт предмет.
- *
- * <p>Файл {@code data/marketplace/market_times.json} создаётся генератором прайса: там для каждого
- * предмета лежит время продажи **одной штуки** в секундах (стак продаётся пропорционально дольше).
- * Формула: {@code 2 сек × цена^0,35} — земля уходит за пару секунд, элитры за несколько часов.
- *
- * <p>Настоящее время получается случайным: от {@value #MIN_FACTOR} до {@value #MAX_FACTOR} от
- * среднего, причём чем дороже предмет, тем выше шанс, что продажа затянется. Кроме того, наценка
- * замедляет продажу (см. {@link #markupSlowdown}).
- *
- * <p>Время считается вместе с содержимым контейнеров (см. {@link #secondsOf}): шалкер с полным
- * составом продаётся столько же, сколько его состав по отдельности. Это осознанный баланс
- * «прибыль против времени» — см. комментарий в {@link #secondsOf}.
- */
 public final class SaleTimes {
 	private static final String FILE_PATH = "/data/marketplace/market_times.json";
 	private static final Codec<Map<String, Double>> TIMES_CODEC = Codec.unboundedMap(Codec.STRING, Codec.DOUBLE);
 
-	/** Самый быстрый вариант: в 20 раз быстрее среднего. */
 	public static final double MIN_FACTOR = 0.05;
 
-	/** Самый долгий вариант: в 10 раз дольше среднего. */
 	public static final double MAX_FACTOR = 10.0;
 
-	/** Если предмета нет в файле — считаем, что он продаётся минуту. */
 	private static final double FALLBACK_SECONDS = 60.0;
 
-	/** Минимум времени на одну продажу, в тиках (полсекунды). */
 	public static final long MIN_TICKS = 10L;
 
-	/**
-	 * Потолок времени продажи: трое реальных суток. Нужен, потому что для дорогих предметов
-	 * складываются сразу три множителя: время самого предмета **вместе с содержимым**
-	 * (см. {@link #secondsOf}), случайный разброс до ×10 и замедление от наценки до ×10.
-	 *
-	 * <p>Суток не хватало: набор «ПВП про» на x2 продаётся дольше 24 часов, и потолок обрезал
-	 * бы замысел заказчика («прибыль против времени» — см. {@code KitCatalog}). Поэтому потолок
-	 * поднят до 72 часов: даже с потолком один ордер с полным набором на x2 занимает дни.
-	 */
 	public static final long MAX_TICKS = 72L * 60L * 60L * 20L;
 
-	/** Насколько глубоко разворачиваем содержимое контейнеров (защита от зацикливания). */
 	private static final int MAX_CONTENT_DEPTH = 8;
 
 	private static Map<Item, Double> seconds = Map.of();
@@ -78,7 +49,6 @@ public final class SaleTimes {
 		// Класс только со статическими методами.
 	}
 
-	/** Читает времена продажи из ресурсов мода при первом обращении. */
 	public static synchronized void ensureLoaded() {
 		if (loadAttempted) {
 			return;
@@ -103,9 +73,9 @@ public final class SaleTimes {
 			seconds = Map.copyOf(loadedTimes);
 			loaded = true;
 
-			MarketplaceMod.LOGGER.info("Время продажи на рынке загружено: {} предметов", seconds.size());
+			// MarketplaceMod.LOGGER.info("Время продажи на рынке загружено: {} предметов", seconds.size());
 		} catch (IOException | RuntimeException exception) {
-			// Не прячем проблему: пишем понятную ошибку и остаёмся на запасном значении.
+
 			MarketplaceMod.LOGGER.error("Не удалось прочитать файл времени продажи {}", FILE_PATH, exception);
 		}
 	}
@@ -114,25 +84,17 @@ public final class SaleTimes {
 		Optional<Item> item = BuiltInRegistries.ITEM.getOptional(Identifier.parse(id));
 
 		if (item.isEmpty()) {
-			MarketplaceMod.LOGGER.warn("Во времени продажи есть неизвестный предмет, запись пропущена: {}", id);
+			// MarketplaceMod.LOGGER.warn("Во времени продажи есть неизвестный предмет, запись пропущена: {}", id);
 		}
 
 		return item;
 	}
 
-	/** Сколько секунд продаётся одна штука предмета. */
 	public static double secondsPerItem(Item item) {
 		ensureLoaded();
 		return seconds.getOrDefault(item, FALLBACK_SECONDS);
 	}
 
-	/**
-	 * Во сколько раз наценка замедляет продажу (задано заказчиком): x1 — обычно, x1.25 — в 2 раза,
-	 * x1.5 — в 5 раз, x1.75 — в 8 раз, x2 — в 10 раз. Пары «наценка → замедление» лежат в
-	 * {@code data/marketplace/economy.json} ({@code market_markups} и {@code markup_slowdowns}),
-	 * поэтому заказчик может их менять без пересборки. Для наценки между ступенями берётся
-	 * нижняя ступень, для наценки выше самой большой — замедление последней ступени.
-	 */
 	public static double markupSlowdown(double markup) {
 		double[] markups = EconomyConfig.marketMarkups();
 		double[] slowdowns = EconomyConfig.markupSlowdowns();
@@ -155,22 +117,11 @@ public final class SaleTimes {
 		return result;
 	}
 
-	/**
-	 * Случайное отклонение времени. Чем дороже предмет, тем сильнее распределение смещается
-	 * к долгой части диапазона: дешёвый обычно уходит быстро, дорогой — чаще висит долго.
-	 */
 	public static double randomFactor(double price, RandomSource random) {
 		double skew = Math.max(0.35, Math.min(2.0, 2.0 - 0.15 * Math.log10(Math.max(1.0, price))));
 		return MIN_FACTOR + Math.pow(random.nextDouble(), skew) * (MAX_FACTOR - MIN_FACTOR);
 	}
 
-	/**
-	 * Время продажи одной штуки вместе с содержимым контейнеров. Считаем рекурсивно, как
-	 * лимиты торговца ({@code TraderService.limitCost}): время самого предмета плюс время
-	 * каждого предмета внутри. Так шалкер с полным составом продаётся столько же, сколько
-	 * его содержимое по отдельности, — это осознанный баланс «прибыль против времени»:
-	 * наценка x2 к такому ордеру обменивает двойную выплату на дни ожидания.
-	 */
 	public static double secondsOf(ItemStack stack) {
 		return secondsOf(stack, 0);
 	}
@@ -201,7 +152,6 @@ public final class SaleTimes {
 		return total;
 	}
 
-	/** Сколько тиков будет продаваться этот стак при такой наценке. */
 	public static long ticksFor(ItemStack stack, double markup, RandomSource random) {
 		double secondsForStack = secondsOf(stack);
 		double slowdown = markupSlowdown(markup);
@@ -210,19 +160,8 @@ public final class SaleTimes {
 		return Math.max(MIN_TICKS, Math.min(MAX_TICKS, ticks));
 	}
 
-	/**
-	 * Сколько тиков будет продаваться лот с ценой, заданной игроком ({@code /ah sell}).
-	 *
-	 * <p>Время считается от отношения «цена лота / базовая цена стака»: чем дороже игрок
-	 * оценил предмет относительно базы, тем дольше виртуальный рынок его покупает; дешевле
-	 * базы — быстрее. Функция замедления та же, что у наценок рынка ({@link #markupSlowdownFor}),
-	 * поэтому лот с ценой ×1,5 от базы и ордер с наценкой ×1,5 продаются одинаково долго.
-	 *
-	 * <p>Если у предмета нет базовой цены (например, выданный модом предмет без прайса),
-	 * возвращается потолок: такие лоты виртуальный рынок не покупает.
-	 */
 	public static long ticksForPrice(ItemStack stack, double price, RandomSource random) {
-		// basePriceOf — цена одной штуки, поэтому для лота берём цену всего стака.
+
 		double base = ItemPrices.basePriceOf(stack) * stack.getCount();
 
 		if (base <= 0.0) {
@@ -237,12 +176,6 @@ public final class SaleTimes {
 		return Math.max(MIN_TICKS, Math.min(MAX_TICKS, ticks));
 	}
 
-	/**
-	 * Замедление по отношению «цена / базовая цена». В точках из {@code economy.json}
-	 * ({@code market_markups} и {@code markup_slowdowns}) совпадает с {@link #markupSlowdown},
-	 * между ними — линейная интерполяция; ниже первой наценки замедление меньше единицы
-	 * (дешёвый лот продаётся быстрее обычного).
-	 */
 	public static double markupSlowdownFor(double ratio) {
 		double[] markups = EconomyConfig.marketMarkups();
 		double[] slowdowns = EconomyConfig.markupSlowdowns();
@@ -267,9 +200,4 @@ public final class SaleTimes {
 		return slowdowns[pairs - 1];
 	}
 
-	/** Загрузились ли времена из файла. */
-	public static boolean isLoaded() {
-		ensureLoaded();
-		return loaded;
-	}
 }

@@ -15,24 +15,8 @@ import net.minecraft.world.item.ItemStack;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Уведомления о крупных ивентах: чат, title на экране и слухи.
- *
- * <p>Формат согласован с заказчиком:
- * <ul>
- *     <li>в чате название ивента — <b>золотым</b>, строкой ниже <b>фиолетовым</b> — что именно
- *     затронуто (список предметов или название раздела);</li>
- *     <li>на экране — только название ивента, крупно и золотым, как обычный title;</li>
- *     <li>слух приходит заранее и <b>не всегда</b>: «По рынку слух: скоро подорожает редстоун».
- *     Слух говорит про тот же ивент, который потом начнётся: он берётся из его описания,
- *     а не выдумывается отдельно, поэтому не может соврать.</li>
- * </ul>
- *
- * <p>Названия предметов и разделов передаются компонентами, поэтому каждый игрок видит их
- * на своём языке (русский или английский).
- */
 public final class EventMessages {
-	/** Сколько тиков title появляется, висит и исчезает (10 / 70 / 20 — как у ванильных title). */
+
 	private static final int TITLE_FADE_IN = 10;
 	private static final int TITLE_STAY = 70;
 	private static final int TITLE_FADE_OUT = 20;
@@ -41,7 +25,6 @@ public final class EventMessages {
 		// Класс только со статическими методами.
 	}
 
-	/** Ивент начался: чат (золотое название + фиолетовая цель) и title на экране. */
 	public static void announce(MinecraftServer server, MarketEvent event) {
 		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 			player.sendSystemMessage(Component.translatable("marketplace.event.chat.title", event.name().title())
@@ -51,7 +34,6 @@ public final class EventMessages {
 		}
 	}
 
-	/** Ивент закончился — одна серая строка в чат. */
 	public static void announceEnd(MinecraftServer server, MarketEvent event) {
 		for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 			player.sendSystemMessage(Component.translatable("marketplace.event.chat.end", event.name().title())
@@ -59,10 +41,6 @@ public final class EventMessages {
 		}
 	}
 
-	/**
-	 * Слух про запланированный ивент: про один случайный предмет или про раздел целиком.
-	 * Если предмета из старого сейва в игре уже нет, слух просто не приходит.
-	 */
 	public static void rumor(MinecraftServer server, MarketEvent event) {
 		Component line = rumorLine(server, event);
 
@@ -75,7 +53,6 @@ public final class EventMessages {
 		}
 	}
 
-	/** Цель ивента текстом для лога: «раздел Блоки» или список id предметов. */
 	public static String targetText(MarketEvent event) {
 		if (event.isCategory()) {
 			return "раздел " + event.category();
@@ -84,10 +61,6 @@ public final class EventMessages {
 		return String.join(", ", event.itemIds());
 	}
 
-	/**
-	 * Что затронуто ивентом — компонентом: название раздела или список названий предметов.
-	 * Нужно команде {@code /market event list} и подсказкам, чтобы не повторять разбор цели.
-	 */
 	public static Component targetNames(MarketEvent event) {
 		return categoryTitle(event).orElseGet(() -> itemsText(event));
 	}
@@ -104,7 +77,6 @@ public final class EventMessages {
 				.withStyle(ChatFormatting.LIGHT_PURPLE);
 	}
 
-	/** Название затронутых предметов через запятую — каждый на языке игрока. */
 	private static Component itemsText(MarketEvent event) {
 		MutableComponent text = Component.empty();
 		boolean first = true;
@@ -143,7 +115,6 @@ public final class EventMessages {
 			return null;
 		}
 
-		// Слух называет один предмет из списка — этого достаточно, чтобы игрок понял, о чём речь.
 		String id = ids.get(server.overworld().getRandom().nextInt(ids.size()));
 		Optional<Item> item = resolve(id);
 
@@ -155,16 +126,11 @@ public final class EventMessages {
 				new ItemStack(item.get()).getHoverName()).withStyle(ChatFormatting.GRAY);
 	}
 
-	/** Название раздела ивента, если ивент на раздел, — компонентом, чтобы переводилось. */
 	private static Optional<Component> categoryTitle(MarketEvent event) {
 		return event.categoryOrEmpty()
 				.map(category -> (Component) Component.translatable(category.titleKey()));
 	}
 
-	/**
-	 * Предмет по id из сейва. Битую запись молча пропускаем: ивент из-за неё ломать нельзя,
-	 * а игрок просто не увидит этот предмет в списке.
-	 */
 	private static Optional<Item> resolve(String id) {
 		try {
 			return BuiltInRegistries.ITEM.getOptional(Identifier.parse(id));
@@ -173,7 +139,6 @@ public final class EventMessages {
 		}
 	}
 
-	/** Title на экране: только название ивента, крупно и золотым. */
 	private static void showTitle(ServerPlayer player, Component title) {
 		player.connection.send(new ClientboundSetTitlesAnimationPacket(TITLE_FADE_IN, TITLE_STAY,
 				TITLE_FADE_OUT));

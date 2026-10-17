@@ -30,65 +30,44 @@ import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Точка входа мода. Выполняется один раз при загрузке игры (и на клиенте, и на сервере).
- * Здесь регистрируем общие вещи: команды, обработчики событий, загрузку цен и китов.
- */
 public class MarketplaceMod implements ModInitializer {
-	/** Внутренний id мода. Совпадает с id в fabric.mod.json. */
+
 	public static final String MOD_ID = "marketplace";
 
-	/** Логгер. Все сообщения мода пишутся в консоль и в run/logs/latest.log. */
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
 	@Override
 	public void onInitialize() {
-		LOGGER.info("Loading Minecraft Marketplace Mod");
+		// LOGGER.info("Loading Minecraft Marketplace Mod");
 
 		MarketplaceCommands.register();
 		MarketplaceMenus.initialize();
 		MarketplaceNetworking.registerServer();
 
-		// «Турбо печка»: блок, предмет и своя блочная сущность. Регистрация обязана пройти
-		// при инициализации мода — после загрузки модов реестры игры замораживаются.
 		TurboFurnace.register();
 
-		// Читаем прайс, настройки экономики, лимиты и время продажи сразу при загрузке: если файлы
-		// повреждены, это видно в логе, а не при первой сделке. Заодно проверяем, что настройки
-		// не позволяют печатать деньги (купить предмет и продать его же дороже).
 		EconomyConfig.ensureLoaded();
 		ItemPrices.ensureLoaded();
 		TraderLimits.ensureLoaded();
 		SaleTimes.ensureLoaded();
-		// Пул предметов для заданий торговца: читаем при старте, чтобы ошибки в quests.json
-		// (неизвестные id, пустые теги) были видны сразу, а не при первом открытии окна заданий.
+
 		QuestGroups.ensureLoaded();
 
-		// Рынок: ордера продаются со временем, даже если игрок вышел.
 		MarketTick.register();
 
-		// «Жилковый майнер»: инструмент с нашим зачарованием ломает всю жилу руды вокруг блока.
 		VeinMinerHandler.register();
 
-		// «Бур»: инструмент с нашим зачарованием ломает куб вокруг блока — по слою за тик.
 		DrillHandler.register();
 
-		// «Магнит»: дроп сломанных блоков уходит в инвентарь (до 256/1024 предметов за нажатие).
 		MagnetHandler.register();
 
-		// «Плавильня»: дроп добытой руды сразу превращается в результат переплавки (опыт — ванильный).
 		SmelterHandler.register();
 
-		// Крупные экономические ивенты: броски раз в игровой день и отсчёт по активному времени
 		// мира (без игроков ивенты замирают).
 		EventService.register();
 
-		// Срочные заказы торговца: отдельное событие на несколько минут активного времени.
-		// Регистрируется после ивентов, чтобы активное время этого тика уже было посчитано.
 		UrgentQuests.register();
 
-		// Микро-дрейф цен: раз в тик обновляем зерно и игровое время, от которых он считается.
-		// Так цена в любой момент считается без обращения к миру — это дёшево и безопасно.
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			if (server.overworld() == null) {
 				return;
@@ -97,7 +76,6 @@ public class MarketplaceMod implements ModInitializer {
 			PriceDrift.update(server.overworld().getSeed(), GameTime.now(server));
 		});
 
-		// Смерть игрока: теряется часть денег, а не весь кошелёк.
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
 			if (!(entity instanceof ServerPlayer player)) {
 				return;
@@ -111,13 +89,8 @@ public class MarketplaceMod implements ModInitializer {
 			}
 		});
 
-		// Дальше здесь появятся: подписка на события, слоты продажи, киты.
 	}
 
-	/**
-	 * Короткий помощник для создания игровых идентификаторов вида "marketplace:что-то".
-	 * Нужен, чтобы не писать длинную строку каждый раз.
-	 */
 	public static Identifier id(String path) {
 		return Identifier.fromNamespaceAndPath(MOD_ID, path);
 	}

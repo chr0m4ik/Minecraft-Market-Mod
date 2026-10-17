@@ -55,26 +55,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.UUID;
 
-/**
- * Команды мода.
- *
- * <p>Что умеет сейчас:
- * <ul>
- *     <li>{@code /market} — подсказка по командам (позже здесь будет открытие меню);</li>
- *     <li>{@code /market money get [игрок]} — посмотреть баланс;</li>
- *     <li>{@code /market money set <игрок> <сумма>} — установить баланс;</li>
- *     <li>{@code /market money add <игрок> <сумма>} — изменить баланс (отрицательная сумма вычитает);</li>
- *     <li>{@code /market drift <предмет> [тик]} — показать микро-дрейф цены предмета;</li>
- *     <li>{@code /market event list} — что за крупный ивент идёт сейчас и какие названия бывают;</li>
- *     <li>{@code /market event start <id|random>} — запустить ивент вручную (для проверки);</li>
- *     <li>{@code /market event stop} — остановить активный ивент.</li>
- * </ul>
- *
- * <p>Всё, что связано с деньгами, требует прав оператора: в одиночной игре это значит, что
- * при создании мира должны быть включены читы; на сервере — что игрок оператор; из консоли
- * сервера команды доступны всегда. Сама {@code /market} доступна всем — это то же самое,
- * что нажать клавишу {@code I}.
- */
+
 public final class MarketplaceCommands {
 	private MarketplaceCommands() {
 		// Класс только со статическими методами.
@@ -91,16 +72,16 @@ public final class MarketplaceCommands {
 	private static final String ARG_PRICE = "price";
 	private static final String ARG_SLOT = "slot";
 
-	/** Сколько товаров раздела показывать в команде (списки бывают на сотни предметов). */
+	
 	private static final int SHOP_SHOWN = 20;
-	/** Особое «название» для команды: запустить ивент со случайным названием. */
+	
 	private static final String EVENT_RANDOM = "random";
 
-	/** Предмета нет в прайсе — считать нечего. */
+	
 	private static final SimpleCommandExceptionType NO_PRICE =
 			new SimpleCommandExceptionType(Component.translatable("marketplace.command.drift.noPrice"));
 
-	/** Для указанного тика нет данных: сервер ещё не сообщил зерно мира. */
+	
 	private static final SimpleCommandExceptionType NO_SEED =
 			new SimpleCommandExceptionType(Component.translatable("marketplace.command.drift.noSeed"));
 
@@ -122,7 +103,7 @@ public final class MarketplaceCommands {
 									.executes(MarketplaceCommands::addBalance)));
 
 			LiteralArgumentBuilder<CommandSourceStack> money = Commands.literal("money")
-					// Деньгами можно управлять только с правами оператора.
+
 					.requires(Commands.hasPermission(new PermissionCheck.Require(Permissions.COMMANDS_GAMEMASTER)))
 					.executes(MarketplaceCommands::showOwnBalance)
 					.then(moneyGet)
@@ -137,9 +118,7 @@ public final class MarketplaceCommands {
 							.then(Commands.argument(ARG_COUNT, IntegerArgumentType.integer(1, 9999))
 									.executes(MarketplaceCommands::showPriceForCount)));
 
-			// Микро-дрейф: показывает, сколько сейчас стоит предмет на самом деле.
-			// Второй аргумент — игровой тик: без него берётся текущее время, с ним можно
-			// посмотреть цену на любой момент (это же удобно для проверки).
+
 			LiteralArgumentBuilder<CommandSourceStack> drift = Commands.literal("drift")
 					.requires(Commands.hasPermission(new PermissionCheck.Require(Permissions.COMMANDS_GAMEMASTER)))
 					.then(Commands.argument(ARG_ITEM, ItemArgument.item(registryAccess))
@@ -158,14 +137,13 @@ public final class MarketplaceCommands {
 					.then(Commands.literal("stop")
 							.executes(MarketplaceCommands::stopEvent));
 
-			// Что лежит в разделе магазина. Нужно для проверки: список собирает сервер,
-			// а игрок видит его только в окне — командой это видно и из консоли.
+
 			LiteralArgumentBuilder<CommandSourceStack> shop = Commands.literal("shop")
 					.requires(Commands.hasPermission(new PermissionCheck.Require(Permissions.COMMANDS_GAMEMASTER)))
 					.then(Commands.argument(ARG_SECTION, StringArgumentType.word())
 							.executes(MarketplaceCommands::showShopSection));
 
-			// Срочный заказ торговца: посмотреть текущий или запустить/остановить вручную (для проверки).
+
 			LiteralArgumentBuilder<CommandSourceStack> urgent = Commands.literal("urgent")
 					.requires(Commands.hasPermission(new PermissionCheck.Require(Permissions.COMMANDS_GAMEMASTER)))
 					.executes(MarketplaceCommands::urgentStatus)
@@ -176,9 +154,7 @@ public final class MarketplaceCommands {
 					.then(Commands.literal("stop")
 							.executes(MarketplaceCommands::urgentStop));
 
-			// Свои сеты: игрок собирает набор и создаёт его командой (виден всем в магазине).
-			// Название берём как «всё остальное» (greedyString): тогда работают и кириллица,
-			// и пробелы, а флаг true/false разбираем сами в конце строки.
+
 			LiteralArgumentBuilder<CommandSourceStack> kit = Commands.literal("kit")
 					.executes(MarketplaceCommands::listKits)
 					.then(Commands.literal("new")
@@ -190,14 +166,13 @@ public final class MarketplaceCommands {
 					.then(Commands.literal("list")
 							.executes(MarketplaceCommands::listKits));
 
-			// Виртуальный эндер-сундук: две команды-синонима, доступны всем игрокам.
+
 			dispatcher.register(Commands.literal("ec")
 					.executes(MarketplaceCommands::openVirtualEnderChest));
 			dispatcher.register(Commands.literal("enderchest")
 					.executes(MarketplaceCommands::openVirtualEnderChest));
 
-			// Торговая площадка: лот из правой руки с ценой игрока и управление своими лотами.
-			// Без аргументов — меню рынка, как кнопка I; /ah sell без цены — окно продажи, /ah buy — магазин.
+
 			LiteralArgumentBuilder<CommandSourceStack> auction = Commands.literal("ah")
 					.executes(MarketplaceCommands::openAuctionMenu)
 					.then(Commands.literal("buy")
@@ -239,37 +214,37 @@ public final class MarketplaceCommands {
 		});
 	}
 
-	/** {@code /market} — открыть главное меню рынка. */
+	
 	private static int openMainMenu(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		return openWindow(context, WindowKind.MAIN);
 	}
 
-	/** {@code /ah} — меню рынка (замена кнопки {@code I}). */
+	
 	private static int openAuctionMenu(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		return openWindow(context, WindowKind.MAIN);
 	}
 
-	/** {@code /ah sell} без цены — окно рынка, где лоты раскладывают мышкой. */
+	
 	private static int openMarketSell(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		return openWindow(context, WindowKind.SELL);
 	}
 
-	/** {@code /ah buy} — магазин (меню разделов). */
+	
 	private static int openShop(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		return openWindow(context, WindowKind.BUY);
 	}
 
-	/** {@code /trader} — окно торговца, который покупает предметы по 75% цены. */
+	
 	private static int openTrader(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		return openWindow(context, WindowKind.TRADER);
 	}
 
-	/** {@code /quest} — сразу окно заданий торговца. */
+	
 	private static int openQuests(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		return openWindow(context, WindowKind.QUESTS);
 	}
 
-	/** Открывает игроку нужное окно мода. */
+	
 	private static int openWindow(CommandContext<CommandSourceStack> context, WindowKind kind)
 			throws CommandSyntaxException {
 		ServerPlayer player = context.getSource().getPlayerOrException();
@@ -316,7 +291,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market money} без аргументов — показать свой баланс. */
+	
 	private static int showOwnBalance(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
 		ServerPlayer player = source.getPlayerOrException();
@@ -327,7 +302,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market money get <игрок>} — показать баланс другого игрока. */
+	
 	private static int showBalanceOf(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
 		ServerPlayer target = EntityArgument.getPlayer(context, ARG_PLAYER);
@@ -339,7 +314,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market money set <игрок> <сумма>}. */
+	
 	private static int setBalance(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
 		ServerPlayer target = EntityArgument.getPlayer(context, ARG_PLAYER);
@@ -352,7 +327,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market money add <игрок> <сумма>}. */
+	
 	private static int addBalance(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
 		ServerPlayer target = EntityArgument.getPlayer(context, ARG_PLAYER);
@@ -365,18 +340,12 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** Сумма в виде цветного текста — так её видно в сообщении. */
+	
 	private static Component money(double amount) {
 		return Component.literal(MoneyFormat.format(amount)).withStyle(ChatFormatting.GREEN);
 	}
 
-	/**
-	 * {@code /market shop <раздел>} — что лежит в разделе магазина.
-	 *
-	 * <p>Список собирает сервер: у клиента реестров мира нет, и книги своих зачарований там
-	 * не построить (см. {@link ShopCatalog}). Команда берёт реестры у сервера и собирает
-	 * список заново — так видно ровно то, что получит окно магазина.
-	 */
+	
 	private static int showShopSection(CommandContext<CommandSourceStack> context) {
 		CommandSourceStack source = context.getSource();
 		String name = StringArgumentType.getString(context, ARG_SECTION);
@@ -389,7 +358,7 @@ public final class MarketplaceCommands {
 		}
 
 		ShopCatalog.Category category = found.get();
-		// Свои сеты и лоты площадки лежат в сейве мира — каталогу их нужно отдать перед сборкой.
+
 		MarketplaceState world = MarketplaceEconomy.state(source.getServer());
 		ShopCatalog.setCustomKits(CustomKits.all(world));
 
@@ -409,7 +378,7 @@ public final class MarketplaceCommands {
 
 		for (int index = 0; index < items.size() && index < SHOP_SHOWN; index++) {
 			ItemStack stack = items.get(index);
-			// У наборов (готовых и своих) и у лотов площадки цена не шлякерная и не базовая — своя.
+
 			Optional<MarketService.Listing> listing = MarketService.listing(
 					MarketplaceEconomy.state(source.getServer()), stack);
 			Optional<KitCatalog.Kit> kit = KitCatalog.kitOf(stack);
@@ -446,12 +415,12 @@ public final class MarketplaceCommands {
 		return items.size();
 	}
 
-	/** {@code /market price <предмет>} — показать цену одного предмета. */
+	
 	private static int showPrice(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		return sendItemPrice(context, 1);
 	}
 
-	/** {@code /market price <предмет> <количество>} — цена сразу нескольких штук. */
+	
 	private static int showPriceForCount(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		return sendItemPrice(context, IntegerArgumentType.getInteger(context, ARG_COUNT));
 	}
@@ -471,7 +440,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market price hand} — цена всего, что лежит в руке (в правой руке). */
+	
 	private static int showHandPrice(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
 		ServerPlayer player = source.getPlayerOrException();
@@ -497,7 +466,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** Общий вывод цены: заголовок, покупка и продажа. */
+	
 	private static void sendPriceReport(CommandSourceStack source, Item item, MutableComponent title, double total) {
 		source.sendSuccess(() -> title.withStyle(ChatFormatting.GOLD), false);
 
@@ -519,13 +488,7 @@ public final class MarketplaceCommands {
 		}
 	}
 
-	/**
-	 * {@code /market drift <предмет> [тик]} — показать микро-дрейф цены.
-	 *
-	 * <p>Если тик не указан, берётся текущее игровое время. С указанным тиком можно посмотреть
-	 * цену на любой момент — это нужно для проверки, что дрейф не выходит за ±5% и что
-	 * одинаковые входные данные дают одинаковый множитель.
-	 */
+	
 	private static int showDrift(CommandContext<CommandSourceStack> context, long time) throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
 		ItemInput input = ItemArgument.getItem(context, ARG_ITEM);
@@ -533,7 +496,7 @@ public final class MarketplaceCommands {
 		Item item = stack.getItem();
 
 		if (!PriceDrift.isReady()) {
-			// Так бывает, если мир ещё не загрузился: множитель в этот момент равен 1.0.
+
 			throw NO_SEED.create();
 		}
 
@@ -541,7 +504,7 @@ public final class MarketplaceCommands {
 			throw NO_PRICE.create();
 		}
 
-		// Без указания тика берём текущее игровое время, с указанием — заданный момент.
+
 		long seed = PriceDrift.seed();
 		long moment = time == Long.MIN_VALUE ? PriceDrift.time() : time;
 		double multiplier = PriceDrift.multiplierAt(item, moment, seed);
@@ -570,12 +533,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/**
-	 * {@code /market event list} — что идёт сейчас и какие названия бывают.
-	 *
-	 * <p>Показывает и «активное время мира» — тики, которые копятся, только когда в игре есть
-	 * игроки. По нему видно, что без игроков ивент замирает: число не растёт.
-	 */
+	
 	private static int listEvents(CommandContext<CommandSourceStack> context) {
 		CommandSourceStack source = context.getSource();
 		MarketplaceState state = MarketplaceEconomy.state(source.getServer());
@@ -601,7 +559,7 @@ public final class MarketplaceCommands {
 		}
 
 		if (pending != null) {
-			// Запланированный ивент: видно, что день «выпал» и когда ивент начнётся.
+
 			long left = Math.max(0L, state.eventPendingAt() - state.activeTicks());
 			source.sendSuccess(() -> Component.translatable("marketplace.command.event.pending",
 					pending.name().title(), MarketEvents.duration(left))
@@ -624,10 +582,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/**
-	 * {@code /market event start <id|random>} — запустить ивент вручную. Второй ивент поверх
-	 * идущего не создаётся: команда скажет, что сначала нужно остановить текущий.
-	 */
+	
 	private static int startEvent(CommandContext<CommandSourceStack> context) {
 		CommandSourceStack source = context.getSource();
 		String id = StringArgumentType.getString(context, ARG_EVENT);
@@ -664,7 +619,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market event stop} — остановить активный ивент. Остановка объявляется всем в чат. */
+	
 	private static int stopEvent(CommandContext<CommandSourceStack> context) {
 		CommandSourceStack source = context.getSource();
 		Optional<MarketEvent> stopped = EventService.stop(source.getServer());
@@ -681,7 +636,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market urgent} — что за срочный заказ идёт сейчас. */
+	
 	private static int urgentStatus(CommandContext<CommandSourceStack> context) {
 		CommandSourceStack source = context.getSource();
 		Optional<UrgentQuest> current = UrgentQuests.current(source.getServer());
@@ -702,7 +657,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market urgent start} — запустить срочный заказ вручную (для проверки). */
+	
 	private static int urgentStart(CommandContext<CommandSourceStack> context) {
 		CommandSourceStack source = context.getSource();
 		Optional<UrgentQuest> started = UrgentQuests.startNow(source.getServer());
@@ -727,7 +682,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market urgent stop} — досрочно завершить срочный заказ. */
+	
 	private static int urgentStop(CommandContext<CommandSourceStack> context) {
 		CommandSourceStack source = context.getSource();
 		Optional<UrgentQuest> stopped = UrgentQuests.stop(source.getServer(), true);
@@ -746,7 +701,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /market kit new <название> <true|false>} — создать свой сет из текущего снаряжения. */
+	
 	private static int createKit(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
 		ServerPlayer player = source.getPlayerOrException();
@@ -756,7 +711,7 @@ public final class MarketplaceCommands {
 		String name = stripQuotes(space < 0 ? "" : raw.substring(0, space).trim());
 
 		if (!mode.equalsIgnoreCase("true") && !mode.equalsIgnoreCase("false")) {
-			// Флаг обязателен: иначе непонятно, выдавать сет шлякерами или сразу на тело.
+
 			source.sendFailure(Component.translatable("marketplace.command.kit.mode"));
 			return 0;
 		}
@@ -789,7 +744,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** Снимает кавычки, если игрок записал название в кавычках. */
+	
 	private static String stripQuotes(String value) {
 		if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
 			return value.substring(1, value.length() - 1).trim();
@@ -798,7 +753,7 @@ public final class MarketplaceCommands {
 		return value;
 	}
 
-	/** {@code /market kit delete <название>} — удалить свой сет (чужой может только оператор). */
+	
 	private static int deleteKit(CommandContext<CommandSourceStack> context) {
 		CommandSourceStack source = context.getSource();
 		String name = stripQuotes(StringArgumentType.getString(context, ARG_NAME).trim());
@@ -821,7 +776,7 @@ public final class MarketplaceCommands {
 		return status == CustomKits.DeleteStatus.DELETED ? 1 : 0;
 	}
 
-	/** {@code /market kit list} — все свои сеты мира. */
+	
 	private static int listKits(CommandContext<CommandSourceStack> context) {
 		CommandSourceStack source = context.getSource();
 		List<CustomKit> kits = CustomKits.all(MarketplaceEconomy.state(source.getServer()));
@@ -846,35 +801,32 @@ public final class MarketplaceCommands {
 		return kits.size();
 	}
 
-	/** {@code /ec} и {@code /enderchest} — виртуальный эндер-сундук (сначала покупка). */
+	
 	private static int openVirtualEnderChest(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		ServerPlayer player = context.getSource().getPlayerOrException();
 
 		if (VirtualEnderChest.owns(context.getSource().getServer(), player.getUUID())) {
-			// Уже куплено — сразу открываем настоящий эндер-сундук игрока.
+
 			VirtualEnderChest.open(player);
 		} else {
-			// Первый раз — окно покупки; после подтверждения сундук откроется сам.
+
 			MarketplaceMenus.open(player, WindowKind.ENDER_CHEST);
 		}
 
 		return 1;
 	}
 
-	/** {@code /ah sell <цена>} — выставить весь стак из правой руки. */
+	
 	private static int ahSell(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		return ahSell(context, -1);
 	}
 
-	/** {@code /ah sell <цена> <количество>} — выставить часть стака. */
+	
 	private static int ahSellCount(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		return ahSell(context, IntegerArgumentType.getInteger(context, ARG_COUNT));
 	}
 
-	/**
-	 * Выставляет лот на торговую площадку. Предметы забираются из руки только после того, как лот
-	 * записан в сейв, — при ошибке (нет ячейки, плохая цена) они остаются у игрока.
-	 */
+	
 	private static int ahSell(CommandContext<CommandSourceStack> context, int requested)
 			throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
@@ -910,7 +862,7 @@ public final class MarketplaceCommands {
 				Component.literal(String.valueOf(slot))).withStyle(ChatFormatting.GREEN), false);
 
 		if (order.waitingForBuyer()) {
-			// Честно предупреждаем: такую цену рынок сам не заплатит, нужен живой покупатель.
+
 			source.sendSuccess(() -> Component.translatable("marketplace.command.ah.waiting")
 					.withStyle(ChatFormatting.GRAY), false);
 		}
@@ -918,7 +870,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /ah list} — свои лоты: ячейка, предмет, цена и сколько ждать. */
+	
 	private static int ahList(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
 		ServerPlayer player = source.getPlayerOrException();
@@ -952,7 +904,7 @@ public final class MarketplaceCommands {
 		return orders.size();
 	}
 
-	/** {@code /ah cancel <ячейка>} — снять свой лот, предметы вернутся в инвентарь. */
+	
 	private static int ahCancelSlot(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
 		ServerPlayer player = source.getPlayerOrException();
@@ -975,7 +927,7 @@ public final class MarketplaceCommands {
 		return 1;
 	}
 
-	/** {@code /ah cancel all} — снять все свои лоты. */
+	
 	private static int ahCancelAll(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
 		CommandSourceStack source = context.getSource();
 		ServerPlayer player = source.getPlayerOrException();
@@ -1004,28 +956,28 @@ public final class MarketplaceCommands {
 		return cancelled;
 	}
 
-	/** Возвращает предметы снятого лота в инвентарь игрока. */
+	
 	private static void giveBack(ServerPlayer player, MarketOrder order) {
 		player.getInventory().placeItemBackInInventory(order.stack().copy(), Prediction.SERVER_ONLY);
 	}
 
-	/** Отклонение цены ивентом: зелёным рост, красным падение. */
+	
 	private static Component eventPercent(MarketEvent event) {
 		return Component.literal(event.percentText())
 				.withStyle(event.rises() ? ChatFormatting.GREEN : ChatFormatting.RED);
 	}
 
-	/** Число с одним знаком после точки, точка как разделитель — для процентов в командах. */
+	
 	private static String one(double value) {
 		return String.format(java.util.Locale.ROOT, "%.1f", value);
 	}
 
-	/** Отклонение дрейфа в процентах со знаком. */
+	
 	private static Component percent(double fraction) {
 		return Component.literal(String.format("%+.2f%%", fraction * 100.0));
 	}
 
-	/** Амплитуда микро-дрейфа в процентах (берётся из настроек экономики) — для подсказок. */
+	
 	private static Component amplitude() {
 		return Component.literal(String.format("%.1f", PriceDrift.amplitude() * 100.0));
 	}

@@ -10,42 +10,21 @@ import net.minecraft.world.item.alchemy.PotionContents;
 
 import java.util.Map;
 
-/**
- * Цена зелий считается по ингредиентам варки, а не по предмету.
- *
- * <p>Все зелья — это один предмет ({@code minecraft:potion}), поэтому в прайсе у них одна цена.
- * Здесь же цена собирается по цепочке рецептов: бутылочка воды, затем каждый ингредиент по пути
- * (незер-бородавка → ингредиент эффекта → усилители), плюс топливо для варки и наценка.
- *
- * <p>Формула заказчика:
- * {@code (250 (бутылочка) + ингредиенты цепочки + огненный порошок / 8 + порох или дыхание дракона) × 1,2}.
- * Цены ингредиентов берутся из общего прайса ({@link ItemPrices}), поэтому при изменении цены сахара
- * или слезы гаста цена зелья пересчитается сама.
- *
- * <p>Зелье удачи варить нельзя (в 26.3 рецепта нет), в магазине его тоже нет — на всякий случай
- * у него есть запасная цена, чтобы оно никогда не оказалось бесплатным.
- */
 public final class PotionPrices {
-	/** Бутылочка воды — основа любого зелья. */
+
 	private static final double WATER_BOTTLE = 250.0;
 
-	/** Наценка за работу: варка, время, топка. */
 	private static final double MARKUP = 1.2;
 
-	/** Во сколько раз делим цену огненного порошка: одного порошка хватает на несколько варок. */
 	private static final double FUEL_DIVISOR = 8.0;
 
-	/** Цена зелья удачи: рецепта нет, в выживании не получить. */
 	private static final double LUCK = 500_000.0;
 
-	/** Цена зелий дурного знамения по уровням силы (0…4). */
 	private static final double[] OMINOUS = {100_000.0, 150_000.0, 250_000.0, 400_000.0, 600_000.0};
 
-	/** Рецепт: из какого зелья и каким ингредиентом получается это. */
 	private record Recipe(String base, Item ingredient) {
 	}
 
-	/** Таблица варки (данные игры 26.3, рецепты проверены по jar и вики). */
 	private static final Map<String, Recipe> RECIPES = Map.ofEntries(
 			Map.entry("awkward", new Recipe("water", Items.NETHER_WART)),
 			Map.entry("thick", new Recipe("water", Items.GLOWSTONE_DUST)),
@@ -97,10 +76,6 @@ public final class PotionPrices {
 		// Класс только со статическими методами.
 	}
 
-	/**
-	 * Цена зелья в стаке. Для зелья без содержимого («неваримое») берём цену бутылочки воды.
-	 * Зелье удачи в магазине не продаётся, но цену ему всё равно даём.
-	 */
 	public static double priceOf(ItemStack stack) {
 		PotionContents contents = stack.get(DataComponents.POTION_CONTENTS);
 		String path = contents == null ? "water" : idOf(contents);
@@ -112,7 +87,6 @@ public final class PotionPrices {
 		boolean splash = stack.is(Items.SPLASH_POTION);
 		boolean lingering = stack.is(Items.LINGERING_POTION);
 
-		// Чистая бутылочка воды — ровно 250, топливо к ней не применяем.
 		if (path.equals("water") && !splash && !lingering) {
 			return WATER_BOTTLE;
 		}
@@ -130,12 +104,10 @@ public final class PotionPrices {
 		return sum * MARKUP;
 	}
 
-	/** Цена зелья дурного знамения по уровню силы (0…4). */
 	public static double ominousPrice(int level) {
 		return OMINOUS[Math.max(0, Math.min(level, OMINOUS.length - 1))];
 	}
 
-	/** Сумма цен всех ингредиентов цепочки до бутылочки воды. */
 	private static double chain(String path) {
 		Recipe recipe = RECIPES.get(path);
 
@@ -146,19 +118,16 @@ public final class PotionPrices {
 		return chain(recipe.base()) + ItemPrices.priceOf(recipe.ingredient());
 	}
 
-	/** Топливо: огненный порошок, поделённый на несколько варок. */
 	private static double fuel() {
 		return ItemPrices.priceOf(Items.BLAZE_POWDER) / FUEL_DIVISOR;
 	}
 
-	/** Идентификатор зелья в виде пути (например, {@code strong_healing}). */
 	private static String idOf(PotionContents contents) {
 		return contents.potion()
 				.map(holder -> holder.unwrapKey().map(key -> key.identifier().getPath()).orElse("water"))
 				.orElse("water");
 	}
 
-	/** Идентификатор зелья из держателя (используется для подсказок). */
 	public static String idOf(Holder<Potion> potion) {
 		return potion.unwrapKey().map(key -> key.identifier().getPath()).orElse("water");
 	}

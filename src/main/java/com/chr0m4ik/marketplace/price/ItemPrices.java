@@ -33,49 +33,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * Прайс-лист мода: сколько стоит каждый предмет.
- *
- * <p>Цены лежат в файле {@code data/marketplace/prices.json} внутри мода. Файл создаётся
- * генератором {@code tools/generate-prices.js} (см. AGENTS.md) и правится руками.
- *
- * <p>Правила торговли, из-за которых перепродажа не приносит денег (числа лежат в
- * {@code data/marketplace/economy.json}, читает их
- * {@link com.chr0m4ik.marketplace.economy.EconomyConfig}):
- * <ul>
- *     <li>купить у рынка — {@code buy_multiplier} от цены (дорого);</li>
- *     <li>продать на рынке — от {@code price} до {@code price × max(наценки)} в зависимости от наценки;</li>
- *     <li>сдать торговцу — {@code trader_multiplier} от цены.</li>
- * </ul>
- * Покупка дороже самой выгодной продажи даже с учётом микро-дрейфа, поэтому «купить — продать»
- * всегда в убыток. Это же условие проверяется при старте мода.
- *
- * <p>К базовой цене стака добавляется микро-дрейф — фон ±3% ({@link PriceDrift}) — и множитель
- * крупного ивента, если предмет под него попал ({@code event/EventService}). Оба встроены именно
- * здесь, поэтому работают одинаково везде: покупка в магазине, продажа торговцу, рынок, подсказки
- * предметов, HUD и стоимость наборов. Ивент симметричен (опускает или поднимает и покупку, и
- * продажу), поэтому «купить — продать» наживы не даёт: это проверяется при старте мода.
- *
- * <p><b>Что именно «дышит».</b> Множитель дрейфа берётся у предмета самого стака, то есть
- * {@code базовая цена предмета × множитель}. Зачарования дрейфу не подвержены. Содержимое
- * контейнеров считается отдельными предметами ({@link #contentsPrice}), поэтому каждый предмет
- * внутри шлякера, бочки или мешка дрейфует своим собственным множителем — цена контейнера
- * целиком отдельно не дрейфует. Цена зелья собирается по ингредиентам ({@link PotionPrices})
- * и дрейфует как сам предмет-бутылочка.
- *
- * <p><b>Цена зависит не только от id.</b> У зелий, зачарованных книг и «Турбо печки» базовая
- * цена складывается из компонентов предмета, поэтому основной вход — {@link #priceOf(ItemStack)}.
- * У турбо печки четырёх уровней один id, но разные цены (100M / 250M / 600M / 1.4B): их берём
- * из таблицы «особых предметов» — так магазинная цена и цена продажи не могут разойтись.
- */
 public final class ItemPrices {
-	/** Прайс внутри мода. Читаем его прямо из своего jar-файла, поэтому цены одинаковы на клиенте и на сервере. */
+
 	private static final String FILE_PATH = "/data/marketplace/prices.json";
 
-	/** Цена предмета, которого нет в прайсе: продать можно за копейку, купить нельзя. */
 	public static final double UNKNOWN_PRICE = 1.0;
 
-	/** Насколько глубоко разворачиваем содержимое контейнеров (защита от зацикливания). */
 	private static final int MAX_CONTENT_DEPTH = 8;
 
 	private static final Codec<Map<String, Double>> PRICES_CODEC = Codec.unboundedMap(Codec.STRING, Codec.DOUBLE);
@@ -83,7 +46,7 @@ public final class ItemPrices {
 
 	private static Map<Item, Double> prices = Map.of();
 	private static Set<Item> notBuyable = Set.of();
-	/** Пытались ли уже загрузить прайс (чтобы не пробовать повторно при ошибке). */
+
 	private static boolean loadAttempted;
 	private static boolean loaded;
 
@@ -91,10 +54,6 @@ public final class ItemPrices {
 		// Класс только со статическими методами.
 	}
 
-	/**
-	 * Читает прайс-лист из ресурсов мода. Вызывается сама при первом обращении —
-	 * и на сервере, и на клиенте (клиенту цены нужны для подсказок предметов).
-	 */
 	public static synchronized void ensureLoaded() {
 		if (loadAttempted) {
 			return;
@@ -125,35 +84,28 @@ public final class ItemPrices {
 			notBuyable = Set.copyOf(loadedNotBuyable);
 			loaded = true;
 
-			MarketplaceMod.LOGGER.info("Прайс-лист загружен: {} предметов, {} нельзя купить", prices.size(), notBuyable.size());
+			// MarketplaceMod.LOGGER.info("Прайс-лист загружен: {} предметов, {} нельзя купить", prices.size(), notBuyable.size());
 		} catch (IOException | RuntimeException exception) {
-			// Не прячем проблему: пишем понятную ошибку и оставляем прайс пустым.
+
 			MarketplaceMod.LOGGER.error("Не удалось прочитать прайс-лист {}", FILE_PATH, exception);
 		}
 	}
 
-	/** Находит предмет по его id. Неизвестные id пропускаем с предупреждением. */
 	private static Optional<Item> resolveItem(String id) {
 		Optional<Item> item = BuiltInRegistries.ITEM.getOptional(Identifier.parse(id));
 
 		if (item.isEmpty()) {
-			MarketplaceMod.LOGGER.warn("В прайсе есть неизвестный предмет, запись пропущена: {}", id);
+			// MarketplaceMod.LOGGER.warn("В прайсе есть неизвестный предмет, запись пропущена: {}", id);
 		}
 
 		return item;
 	}
 
-	/**
-	 * Базовая цена одной штуки предмета без микро-дрейфа и ивента. Годится только для предметов,
-	 * цена которых не зависит от компонентов; у стака (турбо печка, зелье) берите
-	 * {@link #basePriceOf(ItemStack)}.
-	 */
 	public static double priceOf(Item item) {
 		ensureLoaded();
 		return prices.getOrDefault(item, UNKNOWN_PRICE);
 	}
 
-	/** Базовая цена всего стака, включая зачарования и содержимое контейнеров. */
 	public static double priceOf(ItemStack stack) {
 		return priceOf(stack, 0);
 	}
@@ -164,9 +116,7 @@ public final class ItemPrices {
 		}
 
 		ensureLoaded();
-		// Базовая цена «дышит» (микро-дрейф) и попадает под крупный ивент: оба множителя берутся
-		// у предмета самого стака. Зачарования добавляются ниже без множителей, а содержимое
-		// контейнеров считается своими предметами — у каждого из них собственные множители.
+
 		double price = basePriceOf(stack) * PriceDrift.multiplier(stack.getItem())
 				* EventService.multiplier(stack.getItem()) * stack.getCount();
 
@@ -177,24 +127,17 @@ public final class ItemPrices {
 			price += EnchantmentPrices.valueOnItem(stack, enchantments);
 		}
 
-		// Зачарования внутри книги: книга переносима, её цена считается по-старому.
 		ItemEnchantments stored = stack.get(DataComponents.STORED_ENCHANTMENTS);
 
 		if (stored != null) {
 			price += EnchantmentPrices.valueOf(stored);
 		}
 
-		// Содержимое шалкеров, бочек и мешков тоже стоит денег.
 		price += contentsPrice(stack, depth);
 
 		return price;
 	}
 
-	/**
-	 * Цена одной штуки. У зелий она считается по ингредиентам варки, у зелья дурного знамения —
-	 * по уровню силы, у «Турбо печки» — по уровню из компонента предмета, у всех остальных
-	 * предметов берётся из прайса.
-	 */
 	public static double basePriceOf(ItemStack stack) {
 		if (stack.has(DataComponents.POTION_CONTENTS)) {
 			return PotionPrices.priceOf(stack);
@@ -205,9 +148,6 @@ public final class ItemPrices {
 			return PotionPrices.ominousPrice(amplifier == null ? 0 : amplifier.value());
 		}
 
-		// «Турбо печка»: её базовая цена — это её же магазинная цена (решение заказчика), а она
-		// зависит от уровня в компоненте предмета. В прайсе один id не выразит четыре уровня,
-		// поэтому цены живут в таблице «особых предметов» (см. SpecialCatalog.turboPriceOf).
 		if (TurboUpgrade.isTurbo(stack)) {
 			return SpecialCatalog.turboPriceOf(TurboUpgrade.levelOf(stack)).orElse(UNKNOWN_PRICE);
 		}
@@ -215,17 +155,10 @@ public final class ItemPrices {
 		return prices.getOrDefault(stack.getItem(), UNKNOWN_PRICE);
 	}
 
-	/**
-	 * Базовая цена одной штуки такого же предмета с теми же компонентами, но без дрейфа и ивента.
-	 * Нужна там, где цена стака разбирается на «сам предмет» и «прибавки» (например, надбавка
-	 * торговца за предметы считается по ней, а не по цене id: {@link #priceOf(Item)} у турбо
-	 * печки вернул бы цену предмета вообще, без уровня).
-	 */
 	public static double unitPriceOf(ItemStack stack) {
 		return stack.isEmpty() ? 0.0 : basePriceOf(stack);
 	}
 
-	/** Стоимость того, что лежит внутри предмета (шалкер, мешок). */
 	private static double contentsPrice(ItemStack stack, int depth) {
 		double total = 0.0;
 
@@ -248,38 +181,26 @@ public final class ItemPrices {
 		return total;
 	}
 
-	/** Есть ли предмет в прайсе. */
 	public static boolean isPriced(Item item) {
 		ensureLoaded();
 		return prices.containsKey(item);
 	}
 
-	/** Можно ли купить предмет у рынка. */
 	public static boolean isBuyable(Item item) {
 		ensureLoaded();
 		return loaded && prices.containsKey(item) && !notBuyable.contains(item);
 	}
 
-	/**
-	 * Предмет в чёрном списке: его нельзя продавать (бедрок, барьер, командные блоки и прочее,
-	 * чего не получить в выживании). Проверяется в том числе при выставлении лоа на площадке.
-	 */
 	public static boolean isBlacklisted(Item item) {
 		ensureLoaded();
 		return notBuyable.contains(item);
 	}
 
-	/** Загружен ли прайс (если нет — цены считаются неизвестными). */
 	public static boolean isLoaded() {
 		ensureLoaded();
 		return loaded;
 	}
 
-	/**
-	 * Все предметы, которые есть в прайсе и которые можно купить, в порядке реестра.
-	 * Нужно ивентам: из этого списка выбираются цели ({@code event/EventService}).
-	 * Список собирается по требованию — ивент выбирается редко, кэш тут не нужен.
-	 */
 	public static List<Item> buyableItems() {
 		ensureLoaded();
 		List<Item> result = new ArrayList<>();
@@ -293,7 +214,6 @@ public final class ItemPrices {
 		return List.copyOf(result);
 	}
 
-	/** Сколько предметов в прайсе — для проверок и логов. */
 	public static int size() {
 		ensureLoaded();
 		return prices.size();

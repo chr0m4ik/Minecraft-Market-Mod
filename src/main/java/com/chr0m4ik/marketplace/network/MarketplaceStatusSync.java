@@ -18,16 +18,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Раз в секунду отправляет каждому игроку его состояние: баланс, стоимость инвентаря
- * и закупки торговца (от них зависят его цены). Отправляем только если что-то изменилось —
- * но пока торговец что-то покупал, его цены восстанавливаются, поэтому пакет идёт каждый раз.
- */
 public final class MarketplaceStatusSync {
-	/** Как часто проверяем состояние, в тиках. 20 тиков = 1 секунда. */
+
 	private static final int PERIOD_TICKS = 20;
 
-	/** Последнее отправленное состояние: UUID → [баланс, инвентарь, были ли закупки]. */
 	private static final Map<UUID, long[]> LAST_SENT = new HashMap<>();
 
 	private MarketplaceStatusSync() {
@@ -43,16 +37,15 @@ public final class MarketplaceStatusSync {
 			MarketplaceState state = MarketplaceEconomy.state(server);
 			TraderPrices trader = state.traderSnapshot(GameTime.now(server));
 			List<MarketplaceStatusPayload.SaleEntry> entries = saleEntries(trader);
-			// Зерно и время нужны клиенту, чтобы посчитать тот же микро-дрейф цен, что и сервер.
+
 			long seed = server.overworld().getSeed();
 			long gameTime = GameTime.now(server);
-			// Описание активного ивента: клиент считает по нему тот же множитель, что и сервер.
-			// Номер изменения не зависит от времени, поэтому ивент уходит только когда сменился.
+
 			MarketplaceStatusPayload.EventData event = eventData();
 			long eventRevision = EventService.revision();
 
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-				// Клиент без нашего мода пакет не поймёт — таким ничего не отправляем.
+
 				if (!ServerPlayNetworking.canSend(player, MarketplaceStatusPayload.TYPE)) {
 					continue;
 				}
@@ -81,7 +74,6 @@ public final class MarketplaceStatusSync {
 				LAST_SENT.remove(handler.getPlayer().getUUID()));
 	}
 
-	/** Описание активного ивента для пакета (или «ивента нет»). */
 	private static MarketplaceStatusPayload.EventData eventData() {
 		return EventService.current()
 				.map(event -> new MarketplaceStatusPayload.EventData(event.name().id(), event.category(),
@@ -89,10 +81,6 @@ public final class MarketplaceStatusSync {
 				.orElse(MarketplaceStatusPayload.EventData.NONE);
 	}
 
-	/**
-	 * Сколько дадут за всё, что лежит в инвентаре. Считаем по обычной цене: динамика торговца
-	 * на рынок и покупку не влияет.
-	 */
 	private static double inventoryValue(Inventory inventory) {
 		double total = 0.0;
 

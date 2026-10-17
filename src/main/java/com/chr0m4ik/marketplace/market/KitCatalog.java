@@ -36,64 +36,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Наборы («киты») магазина.
- *
- * <p>Данные лежат в ресурсах мода — {@code /data/marketplace/kits.json}. Каждый набор: id,
- * количество шлякеров (0 — выдать предметами) и список предметов с количеством, зачарованиями
- * и (для зелий) типом зелья.
- *
- * <p>Цена набора: цена содержимого с наценкой {@value #CONTENT_MARKUP} плюс цена тех шлякеров,
- * которые игрок получит (цветных). Множитель покупки магазина к наборам не применяется.
- * Цены предметов берутся из общего прайса, поэтому наборы дорожают и дешевеют вместе с ним.
- *
- * <p>Набор выдаётся шалкером с содержимым. Если шлякеров нет — предметы кладутся в инвентарь,
- * и шалкер в цену не входит. Список {@code inventory} выдаётся игроку прямо в инвентарь
- * (в цену он входит так же, как содержимое шлякеров).
- *
- * <p>Раскладка по ячейкам шлякера задаётся полями предмета {@code shulker} (номер с 1) и
- * {@code slot} (ячейка 0…26). Без них предмет кладётся в первое свободное место. Предмет,
- * которого больше размера стака, занимает несколько ячеек подряд.
- */
 public final class KitCatalog {
 	private static final String FILE_PATH = "/data/marketplace/kits.json";
 
-	/**
-	 * Наценка на содержимое набора (решение заказчика): 1.2. Шлякеры входят в цену по своей
-	 * цене — те цветные, которые игрок реально получит.
-	 *
-	 * <p>Почему так: набор должен стоить дороже того, что из него можно выручить, но с наценкой
-	 * 1.2 рынок на x2 всё ещё даёт прибыль (выплата x2 против наценки 1.2). Заказчик оставил это
-	 * осознанно: прибыль «заморожена» во времени — время продажи шлякера складывается со временем
-	 * всего содержимого, а наценка x2 замедляет продажу в 10 раз (см. {@code SaleTimes}).
-	 */
 	private static final double CONTENT_MARKUP = 1.2;
 
-	/** Ячеек в одном шлякере (9×3). */
 	private static final int CELLS_PER_SHULKER = 27;
 
-	/**
-	 * Метка набора в {@code custom_data} предмета-иконки. По ней магазин находит набор при
-	 * покупке: сверять подсказки нельзя — в них лежит цена, а она меняется вместе с
-	 * микро-дрейфом (из-за этого покупка набора выдавала пустой шлякер).
-	 */
 	private static final String KIT_TAG = "marketplace:kit";
 
-	/** Место не задано: кладём предмет в первое свободное место. */
 	private static final int AUTO = -1;
 
-	/** Предмет набора и его место в шлякере: шлякер с 1, ячейка 0…26 ({@link #AUTO} — любое). */
 	public record KitEntry(ItemStack stack, int shulker, int cell) {
 	}
 
-	/** Один набор: id, что выдать (с раскладкой), что выдать в инвентарь и сколько шлякеров нужно. */
 	public record Kit(String id, List<KitEntry> entries, List<ItemStack> inventory, int shulkers) {
-		/** Ключ перевода названия набора. */
+
 		public String nameKey() {
 			return "marketplace.kit." + this.id;
 		}
 
-		/** Всё, что получит игрок: содержимое шлякеров, а затем выдача в инвентарь. */
 		public List<ItemStack> items() {
 			List<ItemStack> all = new ArrayList<>(this.entries.size() + this.inventory.size());
 
@@ -109,14 +71,12 @@ public final class KitCatalog {
 	private static List<Kit> kits = List.of();
 	private static boolean loadAttempted;
 
-	/** Реестры мира: нужны, чтобы собрать зачарования и зелья. */
 	private static HolderLookup.Provider registries;
 
 	private KitCatalog() {
 		// Класс только со статическими методами.
 	}
 
-	/** Отдаём каталогу реестры мира (вызывается серверной частью окна). */
 	public static void setRegistries(HolderLookup.Provider value) {
 		if (registries != value) {
 			registries = value;
@@ -125,11 +85,6 @@ public final class KitCatalog {
 		}
 	}
 
-	/**
-	 * Реестры для клиента: клиент и сервер в одиночной игре делят статику этого класса, поэтому
-	 * свои реестры ставим только если их ещё нет. Иначе они перебивали бы друг друга, и наборы
-	 * перечитывались бы на каждый кадр (подсказки предметов считаются постоянно).
-	 */
 	public static void setRegistriesIfMissing(HolderLookup.Provider value) {
 		if (registries == null) {
 			registries = value;
@@ -138,13 +93,11 @@ public final class KitCatalog {
 		}
 	}
 
-	/** Все наборы. */
 	public static List<Kit> kits() {
 		ensureLoaded();
 		return kits;
 	}
 
-	/** Свой цвет названия для каждого набора — так они различаются в списке. */
 	private static ChatFormatting colorOf(Kit kit) {
 		return switch (kit.id()) {
 			case "pvp_pro" -> ChatFormatting.AQUA;
@@ -160,7 +113,6 @@ public final class KitCatalog {
 		};
 	}
 
-	/** Шалкер набора. */
 	private static ItemStack shulkerOf(Kit kit) {
 		String color = switch (kit.id()) {
 			case "pvp_pro" -> "light_blue";
@@ -180,12 +132,10 @@ public final class KitCatalog {
 				.orElseGet(() -> new ItemStack(Items.SHULKER_BOX));
 	}
 
-	/** Убирает курсив: игра делает изменённые названия курсивом. */
 	private static MutableComponent plain(MutableComponent text) {
 		return text.withStyle(Style.EMPTY.withItalic(false));
 	}
 
-	/** Иконка набора для магазина: покупается шалкер, поэтому в списке тоже шалкер. */
 	public static ItemStack iconOf(Kit kit) {
 		ItemStack icon = shulkerOf(kit);
 		icon.set(DataComponents.CUSTOM_NAME, Component.translatable(kit.nameKey())
@@ -195,14 +145,12 @@ public final class KitCatalog {
 		return icon;
 	}
 
-	/** Помечает предмет набором: метку игрок не видит, а магазин по ней узнаёт набор. */
 	private static void mark(ItemStack stack, Kit kit) {
 		CompoundTag tag = new CompoundTag();
 		tag.putString(KIT_TAG, kit.id());
 		stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 	}
 
-	/** Id набора, которым помечен предмет. Пустая строка — это не предмет набора. */
 	public static String kitId(ItemStack stack) {
 		CustomData data = stack.get(DataComponents.CUSTOM_DATA);
 
@@ -213,7 +161,6 @@ public final class KitCatalog {
 		return data.copyTag().getStringOr(KIT_TAG, "");
 	}
 
-	/** Строки описания набора: цена, пометка про шлякеры и начало содержимого. */
 	private static List<Component> loreOf(Kit kit) {
 		List<Component> lines = new ArrayList<>();
 		lines.add(plain(Component.translatable("marketplace.kit.price",
@@ -226,7 +173,6 @@ public final class KitCatalog {
 					.withStyle(ChatFormatting.RED)));
 		}
 
-		// Показываем только начало списка: полностью — по Shift.
 		int shown = Math.min(kit.items().size(), 3);
 
 		for (int i = 0; i < shown; i++) {
@@ -245,27 +191,6 @@ public final class KitCatalog {
 		return lines;
 	}
 
-	/** Полный список содержимого (показывается при зажатом Shift). */
-	public static List<Component> fullContents(Kit kit) {
-		List<Component> lines = new ArrayList<>();
-
-		for (ItemStack item : kit.items()) {
-			lines.add(Component.literal(" • ").append(item.getHoverName())
-					.append(Component.literal(" ×" + item.getCount()))
-					.withStyle(net.minecraft.ChatFormatting.GRAY));
-		}
-
-		return lines;
-	}
-
-	/**
-	 * Цена набора: цена содержимого с наценкой {@value #CONTENT_MARKUP} плюс цена тех шлякеров,
-	 * которые игрок получит (цветных). Множитель покупки магазина к наборам не применяется —
-	 * цена уже собрана из цен предметов.
-	 *
-	 * <p>Содержимым считается всё, что игрок получит, кроме шлякеров: и то, что лежит внутри,
-	 * и список {@code inventory} из kits.json.
-	 */
 	public static double priceOf(Kit kit) {
 		double contents = 0.0;
 
@@ -273,32 +198,27 @@ public final class KitCatalog {
 			contents += ItemPrices.priceOf(item);
 		}
 
-		// Считаем именно те шлякеры, которые игрок получит: цветные. Обычный стоит 100M,
-		// а цветной дороже — раньше в цене был обычный, и набор продавался дешевле выдачи.
 		double shulkers = kit.shulkers() > 0 ? kit.shulkers() * ItemPrices.priceOf(shulkerOf(kit)) : 0.0;
 		return contents * CONTENT_MARKUP + shulkers;
 	}
 
-	/** Что выдать игроку: шалкеры с содержимым или предметы (когда шлякеров нет). */
 	public static List<ItemStack> deliver(Kit kit) {
 		if (kit.shulkers() <= 0) {
-			// Набор без шлякеров: предметы выдаются прямо в инвентарь, состав тот же.
-			return List.copyOf(kit.items());
+
+			return copyOf(kit.items());
 		}
 
-		// Что не влезло в шлякеры (ошибка в данных) — отдаём в инвентарь, предметы не теряются.
 		List<ItemStack> overflow = new ArrayList<>();
 		List<List<ItemStack>> boxes = layout(kit, overflow);
 		List<ItemStack> result = new ArrayList<>();
 
 		for (List<ItemStack> inside : boxes) {
 			ItemStack shulker = shulkerOf(kit);
-			// fromItems сохраняет позиции: пустые ячейки остаются пустыми, а предметы попадают
-			// ровно в те ячейки, что указаны в kits.json (поля shulker и slot).
+
 			ItemContainerContents contents = ItemContainerContents.fromItems(inside);
 
 			if (contents == ItemContainerContents.EMPTY) {
-				// Молча выдавать пустой шлякер нельзя: это ошибка в данных набора.
+
 				MarketplaceMod.LOGGER.error("Набор {}: шлякер собрался пустым — проверьте kits.json", kit.id());
 			} else {
 				shulker.set(DataComponents.CONTAINER, contents);
@@ -307,16 +227,21 @@ public final class KitCatalog {
 			result.add(shulker);
 		}
 
-		result.addAll(kit.inventory());
+		result.addAll(copyOf(kit.inventory()));
 		result.addAll(overflow);
 		return List.copyOf(result);
 	}
 
-	/**
-	 * Раскладывает содержимое набора по ячейкам шлякеров.
-	 *
-	 * @param overflow сюда попадут предметы, которым не хватило места (это уже ошибка в данных)
-	 */
+	private static List<ItemStack> copyOf(List<ItemStack> stacks) {
+		List<ItemStack> copies = new ArrayList<>(stacks.size());
+
+		for (ItemStack stack : stacks) {
+			copies.add(stack.copy());
+		}
+
+		return copies;
+	}
+
 	private static List<List<ItemStack>> layout(Kit kit, List<ItemStack> overflow) {
 		List<List<ItemStack>> boxes = new ArrayList<>();
 
@@ -337,20 +262,13 @@ public final class KitCatalog {
 		}
 
 		if (!overflow.isEmpty()) {
-			MarketplaceMod.LOGGER.warn("Набор {}: {} предмет(ов) не влезли в шлякеры и будут выданы в инвентарь",
-					kit.id(), overflow.size());
+			// MarketplaceMod.LOGGER.warn("Набор {}: {} предмет(ов) не влезли в шлякеры и будут выданы в инвентарь",
+					// kit.id(), overflow.size());
 		}
 
 		return boxes;
 	}
 
-	/**
-	 * Кладёт предмет в шлякер. Если место задано — ищем первое свободное начиная с него,
-	 * иначе — первое свободное во всём наборе. Так предмет из нескольких стаков (например,
-	 * 128 кристаллов = две ячейки по 64) занимает следующие свободные ячейки.
-	 *
-	 * @return {@code false}, если свободного места не осталось
-	 */
 	private static boolean place(List<List<ItemStack>> boxes, KitEntry entry) {
 		if (entry.shulker() >= 1 && entry.shulker() <= boxes.size()) {
 			List<ItemStack> box = boxes.get(entry.shulker() - 1);
@@ -375,11 +293,6 @@ public final class KitCatalog {
 		return false;
 	}
 
-	/**
-	 * Найти набор по предмету из магазина. Смотрим метку {@link #KIT_TAG}, а не подсказку:
-	 * цена в подсказке дышит вместе с микро-дрейфом, и сверка целых предметов не срабатывала
-	 * (покупка набора выдавала саму иконку — пустой шлякер).
-	 */
 	public static Optional<Kit> kitOf(ItemStack stack) {
 		String id = kitId(stack);
 
@@ -396,7 +309,6 @@ public final class KitCatalog {
 		return Optional.empty();
 	}
 
-	/** Читает kits.json из ресурсов мода. */
 	public static synchronized void ensureLoaded() {
 		if (loadAttempted) {
 			return;
@@ -419,7 +331,7 @@ public final class KitCatalog {
 					JsonObject object = element.getAsJsonObject();
 					String id = object.get("id").getAsString();
 					int shulkers = object.has("shulkers") ? object.get("shulkers").getAsInt() : 0;
-					// Предметы в шлякерах — с раскладкой, выдача в инвентарь — просто списком.
+
 					List<KitEntry> entries = readEntries(object.getAsJsonArray("items"), shulkers, id);
 					List<ItemStack> inventory = object.has("inventory")
 							? readEntries(object.getAsJsonArray("inventory"), 0, id).stream()
@@ -431,18 +343,14 @@ public final class KitCatalog {
 				}
 
 				kits = List.copyOf(loaded);
-				MarketplaceMod.LOGGER.info("Наборов загружено: {}", kits.size());
+				// MarketplaceMod.LOGGER.info("Наборов загружено: {}", kits.size());
 			}
 		} catch (Exception exception) {
-			// Не прячем проблему: пишем понятную ошибку, раздел останется пустым.
+
 			MarketplaceMod.LOGGER.error("Не удалось прочитать файл наборов {}", FILE_PATH, exception);
 		}
 	}
 
-	/**
-	 * Читает предметы одного списка набора: содержимое шлякеров (с раскладкой) или выдачу
-	 * в инвентарь. Большие количества сразу режутся на нормальные стаки.
-	 */
 	private static List<KitEntry> readEntries(JsonArray array, int shulkers, String kitId) {
 		List<KitEntry> items = new ArrayList<>();
 
@@ -452,7 +360,7 @@ public final class KitCatalog {
 			Optional<Item> item = BuiltInRegistries.ITEM.getOptional(id);
 
 			if (item.isEmpty()) {
-				MarketplaceMod.LOGGER.warn("В наборах неизвестный предмет, запись пропущена: {}", id);
+				// MarketplaceMod.LOGGER.warn("В наборах неизвестный предмет, запись пропущена: {}", id);
 				continue;
 			}
 
@@ -462,24 +370,20 @@ public final class KitCatalog {
 			int shulker = object.has("shulker") ? object.get("shulker").getAsInt() : 0;
 			int cell = object.has("slot") ? object.get("slot").getAsInt() : AUTO;
 
-			// Ячейка без номера шлякера — значит первый шлякер.
 			if (cell != AUTO && shulker < 1) {
 				shulker = 1;
 			}
 
 			if (shulkers > 0 && shulker > shulkers) {
-				MarketplaceMod.LOGGER.warn("Набор {}: у предмета {} указан шлякер {}, а их всего {}",
-						kitId, id, shulker, shulkers);
+				// MarketplaceMod.LOGGER.warn("Набор {}: у предмета {} указан шлякер {}, а их всего {}",
+						// kitId, id, shulker, shulkers);
 			}
 
 			if (cell >= CELLS_PER_SHULKER) {
-				MarketplaceMod.LOGGER.warn("Набор {}: у предмета {} указана ячейка {}, а в шлякере их {}",
-						kitId, id, cell, CELLS_PER_SHULKER);
+				// MarketplaceMod.LOGGER.warn("Набор {}: у предмета {} указана ячейка {}, а в шлякере их {}",
+						// kitId, id, cell, CELLS_PER_SHULKER);
 			}
 
-			// Большие количества режем на нормальные стаки: стак из 128 предметов игра
-			// отправить не может (именно из-за этого вылетал мир при покупке набора).
-			// Все получившиеся стаки идут подряд — в указанную ячейку и следующие за ней.
 			for (int left = total; left > 0; left -= perStack) {
 				ItemStack stack = new ItemStack(entry, Math.min(perStack, left));
 
@@ -501,7 +405,6 @@ public final class KitCatalog {
 		return List.copyOf(items);
 	}
 
-	/** Накладывает зачарования из JSON на предмет. */
 	private static void applyEnchantments(ItemStack stack, JsonObject enchantments) {
 		ItemEnchantments.Mutable mutable = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
 
@@ -512,7 +415,7 @@ public final class KitCatalog {
 					.get(net.minecraft.resources.ResourceKey.create(Registries.ENCHANTMENT, id));
 
 			if (holder.isEmpty()) {
-				MarketplaceMod.LOGGER.warn("В наборах неизвестное зачарование, пропущено: {}", id);
+				// MarketplaceMod.LOGGER.warn("В наборах неизвестное зачарование, пропущено: {}", id);
 				continue;
 			}
 
@@ -524,7 +427,6 @@ public final class KitCatalog {
 		}
 	}
 
-	/** Держатель зелья по id (нужен для подсказок). */
 	public static Optional<Holder<Potion>> potion(String id) {
 		if (registries == null) {
 			return Optional.empty();

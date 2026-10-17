@@ -14,29 +14,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Сделка с торговцем.
- *
- * <p>Торговец платит по своим ценам ({@link TraderPrices}: 75% от базовой плюс его надбавки
- * и уценки) и за один игровой день берёт ограниченное количество каждого предмета
- * (см. {@link TraderLimits}).
- *
- * <p>Содержимое контейнеров считается полностью: если сдать шалкер с 10 стаками земли,
- * то и шалкер, и земля получат свою цену, а дневной лимит уменьшится и на 1 шалкер, и на 10 стаков
- * земли. Поэтому такой шалкер продаётся целиком или не продаётся вовсе — вынуть часть нельзя.
- */
 public final class TraderService {
-	/** Насколько глубоко разворачиваем содержимое контейнеров (защита от зацикливания). */
+
 	private static final int MAX_CONTENT_DEPTH = 8;
 
-	/** Что выставлено на продажу. */
 	public record Offer(int itemCount, double normalValue, double payout) {
 		public boolean isEmpty() {
 			return this.itemCount == 0;
 		}
 	}
 
-	/** Чем закончилась сделка. */
 	public record Sale(int itemCount, double payout, boolean limitReached) {
 		public boolean isEmpty() {
 			return this.itemCount == 0;
@@ -47,7 +34,6 @@ public final class TraderService {
 		// Класс только со статическими методами.
 	}
 
-	/** Считает выставленный товар по текущим ценам торговца, ничего не забирая. */
 	public static Offer evaluate(TraderPrices trader, Container container, int slots) {
 		int count = 0;
 		double normalValue = 0.0;
@@ -68,17 +54,12 @@ public final class TraderService {
 		return new Offer(count, normalValue, payout);
 	}
 
-	/**
-	 * Продаёт торговцу всё, что лежит в контейнере, соблюдая дневной лимит.
-	 * То, что в лимит не влезло, остаётся в контейнере — предметы не пропадают.
-	 */
 	public static Sale sell(MinecraftServer server, ServerPlayer player, Container container, int slots) {
 		MarketplaceState state = MarketplaceEconomy.state(server);
 		UUID playerId = player.getUUID();
 		long now = GameTime.now(server);
 		state.refreshTraderDay(playerId, GameTime.day(server));
 
-		// Цены берём один раз до сделки: внутри одной сделки они не меняются.
 		TraderPrices trader = state.traderSnapshot(now);
 
 		int soldItems = 0;
@@ -104,7 +85,6 @@ public final class TraderService {
 			if (sellCount < stack.getCount()) {
 				limitReached = true;
 
-				// Контейнер с содержимым целиком не влез в лимит — не продаём его частями.
 				if (hasContents) {
 					continue;
 				}
@@ -132,10 +112,6 @@ public final class TraderService {
 		return new Sale(soldItems, payout, limitReached);
 	}
 
-	/**
-	 * Сколько предметов из стака торговец готов взять с учётом дневного лимита.
-	 * Контейнер с содержимым берётся только целиком: вынуть из него часть нельзя.
-	 */
 	private static int allowedCount(MarketplaceState state, UUID playerId, ItemStack stack,
 			Map<Item, Double> cost, boolean hasContents) {
 		if (hasContents) {
@@ -157,11 +133,6 @@ public final class TraderService {
 		return TraderLimits.limitOf(item) - state.soldStacks(playerId, item);
 	}
 
-	/**
-	 * Сколько стаков каждого предмета «стоит» продажа этого стака: сам предмет плюс всё, что лежит
-	 * внутри контейнеров (шалкеров, бочек, мешков). Нестакающиеся предметы считаются как один стак
-	 * за штуку, поэтому шалкер — это 1 стак, а 10 стаков земли внутри него — ещё 10.
-	 */
 	public static Map<Item, Double> limitCost(ItemStack stack) {
 		Map<Item, Double> cost = new HashMap<>();
 		collectLimitCost(stack, cost, 0);
