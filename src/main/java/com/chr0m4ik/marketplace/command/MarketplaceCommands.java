@@ -16,6 +16,7 @@ import com.chr0m4ik.marketplace.market.CustomKit;
 import com.chr0m4ik.marketplace.market.CustomKits;
 import com.chr0m4ik.marketplace.market.KitCatalog;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
+import com.chr0m4ik.marketplace.market.VirtualEnderChest;
 import com.chr0m4ik.marketplace.market.SpecialCatalog;
 import com.chr0m4ik.marketplace.price.ItemPrices;
 import com.chr0m4ik.marketplace.price.PriceDrift;
@@ -179,6 +180,12 @@ public final class MarketplaceCommands {
 									.executes(MarketplaceCommands::deleteKit)))
 					.then(Commands.literal("list")
 							.executes(MarketplaceCommands::listKits));
+
+			// Виртуальный эндер-сундук: две команды-синонима, доступны всем игрокам.
+			dispatcher.register(Commands.literal("ec")
+					.executes(MarketplaceCommands::openVirtualEnderChest));
+			dispatcher.register(Commands.literal("enderchest")
+					.executes(MarketplaceCommands::openVirtualEnderChest));
 
 			dispatcher.register(Commands.literal("market")
 					.executes(MarketplaceCommands::openMainMenu)
@@ -747,6 +754,21 @@ public final class MarketplaceCommands {
 		}
 
 		return kits.size();
+	}
+
+	/** {@code /ec} и {@code /enderchest} — виртуальный эндер-сундук (сначала покупка). */
+	private static int openVirtualEnderChest(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		ServerPlayer player = context.getSource().getPlayerOrException();
+
+		if (VirtualEnderChest.owns(context.getSource().getServer(), player.getUUID())) {
+			// Уже куплено — сразу открываем настоящий эндер-сундук игрока.
+			VirtualEnderChest.open(player);
+		} else {
+			// Первый раз — окно покупки; после подтверждения сундук откроется сам.
+			MarketplaceMenus.open(player, WindowKind.ENDER_CHEST);
+		}
+
+		return 1;
 	}
 
 	/** Отклонение цены ивентом: зелёным рост, красным падение. */

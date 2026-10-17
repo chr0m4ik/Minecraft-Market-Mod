@@ -34,7 +34,9 @@ public enum WindowKind {
 	/** Покупка: окно выбора количества и подтверждения. */
 	BUY_ITEM("marketplace.gui.buy.item.title", 3, 84, 167, 0, false),
 	/** Задания торговца: до трёх заказов и кнопка «назад». */
-	QUESTS("marketplace.gui.quests.title", 3, 84, 167, 0, false);
+	QUESTS("marketplace.gui.quests.title", 3, 84, 167, 0, false),
+	/** Покупка виртуального эндер-сундука: отмена, описание, купить. */
+	ENDER_CHEST("marketplace.gui.ender.title", 3, 84, 167, 0, false);
 
 	/** Ширина всех ванильных окон-контейнеров. */
 	public static final int IMAGE_WIDTH = 176;

@@ -11,6 +11,7 @@ import com.chr0m4ik.marketplace.economy.UrgentQuest;
 import com.chr0m4ik.marketplace.economy.UrgentQuests;
 import com.chr0m4ik.marketplace.event.MarketEvents;
 import com.chr0m4ik.marketplace.market.CustomKits;
+import com.chr0m4ik.marketplace.market.VirtualEnderChest;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
@@ -151,6 +152,11 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	public static final int[] QUEST_SLOTS = {10, 11, 12, 13, 14, 15, 16};
 	public static final int QUESTS_SLOT_BACK = 18;
 	public static final int QUESTS_SLOT_URGENT = 22;
+
+	/** Окно покупки виртуального эндер-сундука: отмена, описание, купить. */
+	public static final int ENDER_SLOT_CANCEL = 10;
+	public static final int ENDER_SLOT_INFO = 13;
+	public static final int ENDER_SLOT_CONFIRM = 16;
 
 	/** Кнопки окна рынка. */
 	public static final int MARKET_SLOT_EXIT = 45;
@@ -599,6 +605,20 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
+		if (this.kind == WindowKind.ENDER_CHEST) {
+			this.setButton(ENDER_SLOT_CANCEL, Items.BARRIER, "marketplace.gui.button.cancel");
+			this.setButton(ENDER_SLOT_INFO, Items.PAPER, "marketplace.gui.button.enderInfo");
+
+			// Кнопка покупки показывает цену прямо в названии — её видно и без наведения.
+			ItemStack buy = new ItemStack(Items.EMERALD);
+			buy.set(DataComponents.CUSTOM_NAME, plain(Component.translatable("marketplace.gui.button.enderBuy",
+					money(VirtualEnderChest.PRICE))));
+			buy.set(DataComponents.LORE, new ItemLore(List.of(
+					plain(Component.translatable("marketplace.gui.ender.hint").withStyle(ChatFormatting.GRAY)))));
+			this.setButtonStack(ENDER_SLOT_CONFIRM, buy);
+			return;
+		}
+
 		if (this.kind == WindowKind.QUESTS) {
 			this.fillQuests();
 			this.setButton(QUESTS_SLOT_BACK, Items.BARRIER, "marketplace.gui.button.back");
@@ -921,6 +941,17 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
+		if (this.kind == WindowKind.ENDER_CHEST) {
+			if (slotId == ENDER_SLOT_CANCEL) {
+				// Покупку не подтвердили — просто закрываем окно, ничего не списывая.
+				serverPlayer.closeContainer();
+			} else if (slotId == ENDER_SLOT_CONFIRM) {
+				this.buyEnderChest(serverPlayer);
+			}
+
+			return;
+		}
+
 		if (this.kind == WindowKind.QUESTS) {
 			if (slotId == QUESTS_SLOT_BACK) {
 				MarketplaceMenus.open(serverPlayer, WindowKind.TRADER);
@@ -1184,6 +1215,34 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				plain(Component.translatable("marketplace.gui.quests.urgent.hint")
 						.withStyle(ChatFormatting.DARK_GRAY)))));
 		this.setButtonStack(QUESTS_SLOT_URGENT, button);
+	}
+
+	/** Покупка виртуального эндер-сундука: списываем цену и сразу открываем сам сундук. */
+	private void buyEnderChest(ServerPlayer player) {
+		MinecraftServer server = player.level().getServer();
+
+		if (server == null) {
+			return;
+		}
+
+		VirtualEnderChest.BuyResult result = VirtualEnderChest.buy(server, player);
+
+		if (!result.bought()) {
+			player.sendSystemMessage(Component.translatable("marketplace.gui.ender.noMoney",
+					money(VirtualEnderChest.PRICE)).withStyle(ChatFormatting.RED));
+			return;
+		}
+
+		if (result.paid() > 0.0) {
+			player.sendSystemMessage(Component.translatable("marketplace.gui.ender.bought",
+					money(result.paid())).withStyle(ChatFormatting.GREEN));
+		} else {
+			// Креатив: денег не списываем, но доступ запоминается.
+			player.sendSystemMessage(Component.translatable("marketplace.gui.ender.boughtFree")
+					.withStyle(ChatFormatting.GREEN));
+		}
+
+		VirtualEnderChest.open(player);
 	}
 
 	/** Сдача срочного заказа: предметы из инвентаря, награда начисляется, событие завершается. */

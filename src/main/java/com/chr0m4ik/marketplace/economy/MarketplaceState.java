@@ -22,6 +22,7 @@ import net.minecraft.world.level.saveddata.SavedDataType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +91,8 @@ public class MarketplaceState extends SavedData {
 	private static final String CUSTOM_KIT_ITEMS_KEY = "items";
 	private static final String CUSTOM_KIT_ITEM_KEY = "item";
 	private static final String CUSTOM_KIT_SOURCE_KEY = "source";
+	/** Ключ купленных виртуальных эндер-сундуков: UUID игрока → признак покупки. */
+	private static final String ENDER_CHEST_KEY = "ender_chest";
 	/** Ключи крупных ивентов: активное время мира, идущий ивент и запланированный. */
 	private static final String EVENT_TIME_KEY = "event_active_time";
 	private static final String EVENT_ACTIVE_KEY = "event_active";
@@ -129,6 +132,8 @@ public class MarketplaceState extends SavedData {
 	private long urgentLastDay = Long.MIN_VALUE;
 	/** Свои сеты игроков: название → сет. Порядок создания сохраняется для списка в магазине. */
 	private final Map<String, CustomKit> customKits = new LinkedHashMap<>();
+	/** Игроки, купившие виртуальный эндер-сундук (доступ к команде /ec). */
+	private final Set<UUID> enderChestOwners = new HashSet<>();
 
 	/**
 	 * Активное время мира: тики, когда в игре был хотя бы один игрок. Ивенты считают время по нему,
@@ -460,6 +465,20 @@ public class MarketplaceState extends SavedData {
 		return removed;
 	}
 
+	// --- Виртуальный эндер-сундук ---
+
+	/** Куплена ли система этому игроку. */
+	public boolean ownsEnderChest(UUID playerId) {
+		return this.enderChestOwners.contains(playerId);
+	}
+
+	/** Запоминает покупку виртуального эндер-сундука. Повторный вызов ничего не меняет. */
+	public void grantEnderChest(UUID playerId) {
+		if (this.enderChestOwners.add(playerId)) {
+			setDirty();
+		}
+	}
+
 	// --- Крупные ивенты ---
 
 	/** Активное время мира в тиках: копится, только пока в игре есть игроки. */
@@ -789,6 +808,15 @@ public class MarketplaceState extends SavedData {
 					kitTag.getBooleanOr(CUSTOM_KIT_SHULKERS_KEY, true), items));
 		}
 
+		// Купленные виртуальные эндер-сундуки: ключ — UUID игрока.
+		CompoundTag storedEnderChests = tag.getCompoundOrEmpty(ENDER_CHEST_KEY);
+
+		for (String key : storedEnderChests.keySet()) {
+			parseUuid(key).ifPresentOrElse(state.enderChestOwners::add,
+					() -> MarketplaceMod.LOGGER.warn(
+							"В сейве некорректный UUID игрока в покупках эндер-сундука, запись пропущена: {}", key));
+		}
+
 		// Крупные ивенты. Старые сейвы этих ключей не знают — тогда ивентов просто нет,
 		// а счётчик активного времени начинается с нуля: следующий ивент выпадет в свой день.
 		state.activeTicks = tag.getLongOr(EVENT_TIME_KEY, 0L);
@@ -1016,6 +1044,11 @@ public class MarketplaceState extends SavedData {
 		});
 
 		tag.put(CUSTOM_KITS_KEY, storedKits);
+
+		// Купленные виртуальные эндер-сундуки: UUID игрока → true.
+		CompoundTag storedEnderChests = new CompoundTag();
+		state.enderChestOwners.forEach(playerId -> storedEnderChests.putBoolean(playerId.toString(), true));
+		tag.put(ENDER_CHEST_KEY, storedEnderChests);
 
 		// Крупные ивенты: активное время, идущий ивент с остатком, запланированный со слухом.
 		tag.putLong(EVENT_TIME_KEY, state.activeTicks);

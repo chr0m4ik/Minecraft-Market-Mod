@@ -11,6 +11,7 @@ import com.chr0m4ik.marketplace.event.MarketEvent;
 import com.chr0m4ik.marketplace.event.MarketEvents;
 import com.chr0m4ik.marketplace.market.CustomKits;
 import com.chr0m4ik.marketplace.market.KitCatalog;
+import com.chr0m4ik.marketplace.market.VirtualEnderChest;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.SpecialCatalog;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenu;
@@ -76,6 +77,14 @@ public final class MarketplaceTooltips {
 				} else if (menu.getKind() == WindowKind.BUY_SLOT && stack.is(Items.PAPER)) {
 					lines.add(Component.translatable("marketplace.tooltip.slot.price",
 							money(menu.getNextSlotPrice())).withStyle(ChatFormatting.GOLD));
+				} else if (menu.getKind() == WindowKind.ENDER_CHEST && stack.is(Items.PAPER)) {
+					// Справка о покупке: что покупается и сколько стоит.
+					lines.add(Component.translatable("marketplace.tooltip.ender.desc")
+							.withStyle(ChatFormatting.GRAY));
+					lines.add(Component.translatable("marketplace.tooltip.ender.price",
+							money(VirtualEnderChest.PRICE)).withStyle(ChatFormatting.GOLD));
+					lines.add(Component.translatable("marketplace.tooltip.ender.hint")
+							.withStyle(ChatFormatting.DARK_GRAY));
 				}
 
 				return;
