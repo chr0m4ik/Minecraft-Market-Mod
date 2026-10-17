@@ -5,6 +5,8 @@ import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.GameTime;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
+import com.chr0m4ik.marketplace.economy.QuestGroups;
+import com.chr0m4ik.marketplace.economy.UrgentQuests;
 import com.chr0m4ik.marketplace.event.EventService;
 import com.chr0m4ik.marketplace.market.MarketTick;
 import com.chr0m4ik.marketplace.market.SaleTimes;
@@ -58,6 +60,9 @@ public class MarketplaceMod implements ModInitializer {
 		ItemPrices.ensureLoaded();
 		TraderLimits.ensureLoaded();
 		SaleTimes.ensureLoaded();
+		// Пул предметов для заданий торговца: читаем при старте, чтобы ошибки в quests.json
+		// (неизвестные id, пустые теги) были видны сразу, а не при первом открытии окна заданий.
+		QuestGroups.ensureLoaded();
 
 		// Рынок: ордера продаются со временем, даже если игрок вышел.
 		MarketTick.register();
@@ -77,6 +82,10 @@ public class MarketplaceMod implements ModInitializer {
 		// Крупные экономические ивенты: броски раз в игровой день и отсчёт по активному времени
 		// мира (без игроков ивенты замирают).
 		EventService.register();
+
+		// Срочные заказы торговца: отдельное событие на несколько минут активного времени.
+		// Регистрируется после ивентов, чтобы активное время этого тика уже было посчитано.
+		UrgentQuests.register();
 
 		// Микро-дрейф цен: раз в тик обновляем зерно и игровое время, от которых он считается.
 		// Так цена в любой момент считается без обращения к миру — это дёшево и безопасно.

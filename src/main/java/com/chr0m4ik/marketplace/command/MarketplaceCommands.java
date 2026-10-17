@@ -4,6 +4,8 @@ import com.chr0m4ik.marketplace.economy.EconomyConfig;
 import com.chr0m4ik.marketplace.economy.MarketplaceEconomy;
 import com.chr0m4ik.marketplace.economy.MarketplaceState;
 import com.chr0m4ik.marketplace.economy.MoneyFormat;
+import com.chr0m4ik.marketplace.economy.UrgentQuest;
+import com.chr0m4ik.marketplace.economy.UrgentQuests;
 import com.chr0m4ik.marketplace.event.EventMessages;
 import com.chr0m4ik.marketplace.event.EventService;
 import com.chr0m4ik.marketplace.event.MarketEvent;
@@ -148,6 +150,17 @@ public final class MarketplaceCommands {
 					.then(Commands.argument(ARG_SECTION, StringArgumentType.word())
 							.executes(MarketplaceCommands::showShopSection));
 
+			// Срочный заказ торговца: посмотреть текущий или запустить/остановить вручную (для проверки).
+			LiteralArgumentBuilder<CommandSourceStack> urgent = Commands.literal("urgent")
+					.requires(Commands.hasPermission(new PermissionCheck.Require(Permissions.COMMANDS_GAMEMASTER)))
+					.executes(MarketplaceCommands::urgentStatus)
+					.then(Commands.literal("status")
+							.executes(MarketplaceCommands::urgentStatus))
+					.then(Commands.literal("start")
+							.executes(MarketplaceCommands::urgentStart))
+					.then(Commands.literal("stop")
+							.executes(MarketplaceCommands::urgentStop));
+
 			dispatcher.register(Commands.literal("market")
 					.executes(MarketplaceCommands::openMainMenu)
 					.then(Commands.literal("help")
@@ -156,7 +169,8 @@ public final class MarketplaceCommands {
 					.then(money)
 					.then(drift)
 					.then(shop)
-					.then(event));
+					.then(event)
+					.then(urgent));
 		});
 	}
 
@@ -189,6 +203,8 @@ public final class MarketplaceCommands {
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.event")
 				.withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.shop")
+				.withStyle(ChatFormatting.GRAY), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.help.urgent")
 				.withStyle(ChatFormatting.GRAY), false);
 
 		return 1;
@@ -525,6 +541,71 @@ public final class MarketplaceCommands {
 
 		source.sendSuccess(() -> Component.translatable("marketplace.command.event.stopped",
 				stopped.get().name().title()).withStyle(ChatFormatting.YELLOW), false);
+
+		return 1;
+	}
+
+	/** {@code /market urgent} — что за срочный заказ идёт сейчас. */
+	private static int urgentStatus(CommandContext<CommandSourceStack> context) {
+		CommandSourceStack source = context.getSource();
+		Optional<UrgentQuest> current = UrgentQuests.current(source.getServer());
+
+		if (current.isEmpty()) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.urgent.none")
+					.withStyle(ChatFormatting.GRAY), false);
+			return 0;
+		}
+
+		UrgentQuest quest = current.get();
+		source.sendSuccess(() -> Component.translatable("marketplace.command.urgent.active",
+				quest.icon().getHoverName(),
+				Component.literal(quest.count() + " (" + quest.stacks() + " стаков)"),
+				Component.literal(MoneyFormat.format(quest.reward())),
+				MarketEvents.duration(quest.remaining())).withStyle(ChatFormatting.GOLD), false);
+
+		return 1;
+	}
+
+	/** {@code /market urgent start} — запустить срочный заказ вручную (для проверки). */
+	private static int urgentStart(CommandContext<CommandSourceStack> context) {
+		CommandSourceStack source = context.getSource();
+		Optional<UrgentQuest> started = UrgentQuests.startNow(source.getServer());
+
+		if (started.isEmpty()) {
+			if (UrgentQuests.current(source.getServer()).isPresent()) {
+				source.sendFailure(Component.translatable("marketplace.command.urgent.already"));
+			} else {
+				source.sendFailure(Component.translatable("marketplace.command.urgent.failed"));
+			}
+
+			return 0;
+		}
+
+		UrgentQuest quest = started.get();
+		source.sendSuccess(() -> Component.translatable("marketplace.command.urgent.started",
+				quest.icon().getHoverName(),
+				Component.literal(quest.count() + " (" + quest.stacks() + " стаков)"),
+				Component.literal(MoneyFormat.format(quest.reward())),
+				MarketEvents.duration(quest.remaining())).withStyle(ChatFormatting.GOLD), true);
+
+		return 1;
+	}
+
+	/** {@code /market urgent stop} — досрочно завершить срочный заказ. */
+	private static int urgentStop(CommandContext<CommandSourceStack> context) {
+		CommandSourceStack source = context.getSource();
+		Optional<UrgentQuest> stopped = UrgentQuests.stop(source.getServer(), true);
+
+		if (stopped.isEmpty()) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.urgent.none")
+					.withStyle(ChatFormatting.GRAY), false);
+			return 0;
+		}
+
+		UrgentQuest quest = stopped.get();
+		source.sendSuccess(() -> Component.translatable("marketplace.command.urgent.stopped",
+				quest.icon().getHoverName(),
+				Component.literal(String.valueOf(quest.count()))).withStyle(ChatFormatting.YELLOW), false);
 
 		return 1;
 	}

@@ -7,6 +7,9 @@ import com.chr0m4ik.marketplace.economy.MoneyFormat;
 import com.chr0m4ik.marketplace.economy.TraderQuest;
 import com.chr0m4ik.marketplace.economy.TraderQuests;
 import com.chr0m4ik.marketplace.economy.TraderService;
+import com.chr0m4ik.marketplace.economy.UrgentQuest;
+import com.chr0m4ik.marketplace.economy.UrgentQuests;
+import com.chr0m4ik.marketplace.event.MarketEvents;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
@@ -123,6 +126,14 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	 */
 	private static final int SHOP_COUNT_DATA = PAGE_DATA + 3;
 
+	/**
+	 * Данные окна заданий: идёт ли срочный заказ и сколько ему осталось секунд. Срочный заказ живёт
+	 * минутами, поэтому подпись кнопки нельзя собрать один раз — она пересобирается при каждом
+	 * обновлении окна (см. {@link #updateUrgentButton}).
+	 */
+	private static final int URGENT_ACTIVE_DATA = HEADER_SIZE + 20;
+	private static final int URGENT_SECONDS_DATA = URGENT_ACTIVE_DATA + 1;
+
 	/** Слоты кнопок главного меню (средний ряд: 10, 13, 16). */
 	public static final int MAIN_SLOT_TRADER = 10;
 	public static final int MAIN_SLOT_SELL = 13;
@@ -135,9 +146,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	/** Кнопка «Задания торговца» — заказы на сдачу предметов. */
 	public static final int TRADER_SLOT_QUESTS = 51;
 
-	/** Окно заданий: до трёх заказов в среднем ряду и выход снизу. */
-	public static final int[] QUEST_SLOTS = {10, 13, 16};
-	public static final int QUESTS_SLOT_EXIT = 22;
+	/** Окно заданий: семь дневных заказов в среднем ряду, снизу — «назад» и срочный заказ. */
+	public static final int[] QUEST_SLOTS = {10, 11, 12, 13, 14, 15, 16};
+	public static final int QUESTS_SLOT_BACK = 18;
+	public static final int QUESTS_SLOT_URGENT = 22;
 
 	/** Кнопки окна рынка. */
 	public static final int MARKET_SLOT_EXIT = 45;
@@ -573,7 +585,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 		if (this.kind == WindowKind.QUESTS) {
 			this.fillQuests();
-			this.setButton(QUESTS_SLOT_EXIT, Items.BARRIER, "marketplace.gui.button.back");
+			this.setButton(QUESTS_SLOT_BACK, Items.BARRIER, "marketplace.gui.button.back");
+			this.updateUrgentButton();
 			return;
 		}
 
@@ -893,8 +906,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		if (this.kind == WindowKind.QUESTS) {
-			if (slotId == QUESTS_SLOT_EXIT) {
+			if (slotId == QUESTS_SLOT_BACK) {
 				MarketplaceMenus.open(serverPlayer, WindowKind.TRADER);
+			} else if (slotId == QUESTS_SLOT_URGENT) {
+				this.deliverUrgent(serverPlayer);
 			} else {
 				for (int index = 0; index < QUEST_SLOTS.length; index++) {
 					if (QUEST_SLOTS[index] == slotId) {
@@ -1116,6 +1131,72 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.broadcastChanges();
 	}
 
+	/**
+	 * Кнопка срочного заказа: изумруд с блеском. Видна только пока заказ идёт — когда время вышло
+	 * (или заказ выполнил другой игрок), кнопка исчезает, а обычные заказы остаются.
+	 */
+	private void updateUrgentButton() {
+		if (this.serverPlayer == null || this.kind != WindowKind.QUESTS) {
+			return;
+		}
+
+		MinecraftServer server = this.serverPlayer.level().getServer();
+
+		if (server == null) {
+			return;
+		}
+
+		UrgentQuest quest = MarketplaceEconomy.state(server).urgentQuest();
+
+		if (quest == null) {
+			this.setButtonStack(QUESTS_SLOT_URGENT, ItemStack.EMPTY);
+			return;
+		}
+
+		ItemStack button = new ItemStack(Items.EMERALD);
+		button.set(DataComponents.CUSTOM_NAME, plain(Component.translatable("marketplace.gui.quests.urgent")));
+		// Блеск «как зачарованный»: сразу видно, что это событие, а не обычная кнопка.
+		button.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
+		button.set(DataComponents.LORE, new ItemLore(List.of(
+				plain(Component.translatable("marketplace.gui.quests.urgent.line",
+						quest.icon().getHoverName(),
+						Component.literal(String.valueOf(quest.count()))).withStyle(ChatFormatting.YELLOW)),
+				plain(Component.translatable("marketplace.gui.quests.urgent.reward",
+						money(MoneyFormat.round(quest.reward()))).withStyle(ChatFormatting.GOLD)),
+				plain(Component.translatable("marketplace.gui.quests.urgent.left",
+						MarketEvents.duration(quest.remaining())).withStyle(ChatFormatting.GRAY)),
+				plain(Component.translatable("marketplace.gui.quests.urgent.hint")
+						.withStyle(ChatFormatting.DARK_GRAY)))));
+		this.setButtonStack(QUESTS_SLOT_URGENT, button);
+	}
+
+	/** Сдача срочного заказа: предметы из инвентаря, награда начисляется, событие завершается. */
+	private void deliverUrgent(ServerPlayer player) {
+		MinecraftServer server = player.level().getServer();
+
+		if (server == null) {
+			return;
+		}
+
+		UrgentQuests.Delivery delivery = UrgentQuests.deliver(server, player);
+		UrgentQuest quest = delivery.quest();
+
+		switch (delivery.status()) {
+			case DELIVERED -> MarketSounds.traderSold(player);
+			case NOT_ENOUGH -> player.sendSystemMessage(Component.translatable("marketplace.urgent.notEnough",
+					quest.icon().getHoverName(),
+					Component.literal(String.valueOf(delivery.missing()))).withStyle(ChatFormatting.RED));
+			case NO_QUEST -> player.sendSystemMessage(Component.translatable("marketplace.urgent.none")
+					.withStyle(ChatFormatting.GRAY));
+			case BROKEN -> player.sendSystemMessage(Component.translatable("marketplace.urgent.broken")
+					.withStyle(ChatFormatting.RED));
+		}
+
+		this.fillQuests();
+		this.updateUrgentButton();
+		this.broadcastChanges();
+	}
+
 	/** Выбрали товар в списке: запоминаем предмет и открываем окно покупки. */
 	private void selectShopItem(Player player, int cell) {
 		if (!(player instanceof ServerPlayer serverPlayer)) {
@@ -1175,6 +1256,14 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		}
 
 		MarketService.ShopState shop = MarketService.shop(player.getUUID());
+
+		// Пока идёт срочный заказ, его предмет нельзя купить: иначе «купил — сдал заказ» даёт деньги.
+		if (UrgentQuests.isShoppingBlocked(server, shop.selected().getItem())) {
+			player.sendSystemMessage(Component.translatable("marketplace.gui.quests.blocked")
+					.withStyle(ChatFormatting.RED));
+			return;
+		}
+
 		double cost = MarketService.costOf(shop);
 
 		if (MarketService.buy(server, player, shop)) {
@@ -1312,6 +1401,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	public void broadcastChanges() {
 		this.updateData();
 		this.ensureShopPage();
+		this.updateUrgentButton();
 		this.saveMarketCells();
 		this.syncMarketCells();
 		super.broadcastChanges();
@@ -1390,6 +1480,15 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			this.data.set(PAGE_DATA, shop.page() + 1);
 			this.data.set(PAGE_DATA + 1, ShopCatalog.pages(category));
 			this.data.set(PAGE_DATA + 2, shop.category());
+			return;
+		}
+
+		if (this.kind == WindowKind.QUESTS) {
+			// Данные для подписи кнопки срочного заказа: идёт ли он и сколько ему осталось.
+			UrgentQuest urgent = state.urgentQuest();
+			this.data.set(URGENT_ACTIVE_DATA, urgent != null ? 1 : 0);
+			this.data.set(URGENT_SECONDS_DATA,
+					urgent == null ? 0 : (int) Math.min(Integer.MAX_VALUE, urgent.remaining() / 20L));
 			return;
 		}
 

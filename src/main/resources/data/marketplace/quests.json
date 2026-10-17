@@ -1,0 +1,153 @@
+{
+	"comment": "Пул предметов для заданий торговца. Группы: weight — как часто группа попадается в дневные заказы; count_min/max — сколько единиц просят; bonus_min/max — во сколько раз выше базовой цены платят за единицу. tags — ванильные теги предметов, items — конкретные id. Правится без пересборки.",
+	"groups": [
+		{
+			"id": "planks",
+			"weight": 22,
+			"count_min": 128,
+			"count_max": 384,
+			"bonus_min": 1.10,
+			"bonus_max": 1.15,
+			"tags": ["#minecraft:planks"],
+			"items": []
+		},
+		{
+			"id": "logs",
+			"weight": 18,
+			"count_min": 96,
+			"count_max": 320,
+			"bonus_min": 1.15,
+			"bonus_max": 1.20,
+			"tags": ["#minecraft:logs"],
+			"items": []
+		},
+		{
+			"id": "earth",
+			"weight": 20,
+			"count_min": 256,
+			"count_max": 512,
+			"bonus_min": 1.10,
+			"bonus_max": 1.20,
+			"tags": [],
+			"items": [
+				"minecraft:stone",
+				"minecraft:cobblestone",
+				"minecraft:deepslate",
+				"minecraft:cobbled_deepslate",
+				"minecraft:granite",
+				"minecraft:diorite",
+				"minecraft:andesite",
+				"minecraft:tuff",
+				"minecraft:calcite",
+				"minecraft:dirt",
+				"minecraft:coarse_dirt",
+				"minecraft:gravel",
+				"minecraft:sand",
+				"minecraft:red_sand",
+				"minecraft:clay",
+				"minecraft:netherrack",
+				"minecraft:basalt",
+				"minecraft:blackstone",
+				"minecraft:moss_block"
+			]
+		},
+		{
+			"id": "food",
+			"weight": 14,
+			"count_min": 64,
+			"count_max": 256,
+			"bonus_min": 1.20,
+			"bonus_max": 1.35,
+			"tags": [],
+			"items": [
+				"minecraft:bread",
+				"minecraft:apple",
+				"minecraft:carrot",
+				"minecraft:potato",
+				"minecraft:baked_potato",
+				"minecraft:beetroot",
+				"minecraft:cooked_beef",
+				"minecraft:cooked_porkchop",
+				"minecraft:cooked_chicken",
+				"minecraft:cooked_mutton",
+				"minecraft:cooked_rabbit",
+				"minecraft:cooked_cod",
+				"minecraft:cooked_salmon",
+				"minecraft:melon_slice",
+				"minecraft:sweet_berries",
+				"minecraft:glow_berries",
+				"minecraft:pumpkin_pie",
+				"minecraft:cookie",
+				"minecraft:dried_kelp"
+			]
+		},
+		{
+			"id": "plants",
+			"weight": 12,
+			"count_min": 64,
+			"count_max": 192,
+			"bonus_min": 1.25,
+			"bonus_max": 1.45,
+			"tags": ["#minecraft:saplings"],
+			"items": [
+				"minecraft:sugar_cane",
+				"minecraft:bamboo",
+				"minecraft:cactus",
+				"minecraft:wheat",
+				"minecraft:kelp",
+				"minecraft:vine",
+				"minecraft:brown_mushroom",
+				"minecraft:red_mushroom",
+				"minecraft:wheat_seeds",
+				"minecraft:pumpkin",
+				"minecraft:melon",
+				"minecraft:cocoa_beans",
+				"minecraft:lily_pad",
+				"minecraft:sea_pickle"
+			]
+		},
+		{
+			"id": "ores",
+			"weight": 10,
+			"count_min": 32,
+			"count_max": 128,
+			"bonus_min": 1.30,
+			"bonus_max": 1.60,
+			"tags": [],
+			"items": [
+				"minecraft:coal",
+				"minecraft:raw_iron",
+				"minecraft:raw_copper",
+				"minecraft:raw_gold",
+				"minecraft:redstone",
+				"minecraft:lapis_lazuli",
+				"minecraft:quartz",
+				"minecraft:amethyst_shard"
+			]
+		},
+		{
+			"id": "gems",
+			"weight": 4,
+			"count_min": 16,
+			"count_max": 32,
+			"bonus_min": 1.60,
+			"bonus_max": 1.90,
+			"tags": [],
+			"items": [
+				"minecraft:diamond",
+				"minecraft:emerald"
+			]
+		}
+	],
+	"urgent": {
+		"comment": "Срочный заказ: раз в days_between игровых дней, длится seconds_min..seconds_max секунд активного времени, просит stacks_min..stacks_max стаков. Награда — reward_multiplier базовой цены всех единиц, но не больше max_reward, и предмет выбирается с ценой не выше max_item_price.",
+		"days_between": 2,
+		"seconds_min": 180,
+		"seconds_max": 600,
+		"stacks_min": 2,
+		"stacks_max": 6,
+		"max_item_price": 10000000.0,
+		"reward_multiplier": 3.0,
+		"max_reward": 100000000.0
+	}
+}

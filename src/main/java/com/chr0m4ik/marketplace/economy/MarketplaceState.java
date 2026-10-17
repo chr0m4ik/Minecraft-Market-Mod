@@ -71,6 +71,13 @@ public class MarketplaceState extends SavedData {
 	private static final String QUEST_COUNT_KEY = "count";
 	private static final String QUEST_BONUS_KEY = "bonus";
 	private static final String QUEST_DONE_KEY = "done";
+	/** Ключи срочного заказа: текущий заказ и игровой день последнего запуска. */
+	private static final String URGENT_KEY = "urgent";
+	private static final String URGENT_ITEM_KEY = "item";
+	private static final String URGENT_COUNT_KEY = "count";
+	private static final String URGENT_REWARD_KEY = "reward";
+	private static final String URGENT_LEFT_KEY = "left";
+	private static final String URGENT_LAST_DAY_KEY = "last_day";
 	/** Ключи крупных ивентов: активное время мира, идущий ивент и запланированный. */
 	private static final String EVENT_TIME_KEY = "event_active_time";
 	private static final String EVENT_ACTIVE_KEY = "event_active";
@@ -104,6 +111,10 @@ public class MarketplaceState extends SavedData {
 	private final Map<UUID, List<TraderQuest>> quests = new HashMap<>();
 	/** Игрок → игровой день, на который выданы заказы. */
 	private final Map<UUID, Long> questDay = new HashMap<>();
+	/** Идущий срочный заказ ({@code null} — заказа нет). */
+	private UrgentQuest urgentQuest;
+	/** Игровой день, в который последний раз запускался срочный заказ ({@link Long#MIN_VALUE} — не было). */
+	private long urgentLastDay = Long.MIN_VALUE;
 
 	/**
 	 * Активное время мира: тики, когда в игре был хотя бы один игрок. Ивенты считают время по нему,
@@ -379,6 +390,35 @@ public class MarketplaceState extends SavedData {
 
 	public void setQuestDay(UUID playerId, long day) {
 		questDay.put(playerId, day);
+		setDirty();
+	}
+
+	// --- Срочный заказ ---
+
+	/** Идущий срочный заказ или {@code null}. Заказ один на мир: сдаёт его только первый игрок. */
+	public UrgentQuest urgentQuest() {
+		return this.urgentQuest;
+	}
+
+	public void setUrgentQuest(UrgentQuest quest) {
+		this.urgentQuest = quest;
+		setDirty();
+	}
+
+	public void clearUrgentQuest() {
+		if (this.urgentQuest != null) {
+			this.urgentQuest = null;
+			setDirty();
+		}
+	}
+
+	/** Игровой день последнего запуска срочного заказа. */
+	public long urgentLastDay() {
+		return this.urgentLastDay;
+	}
+
+	public void setUrgentLastDay(long day) {
+		this.urgentLastDay = day;
 		setDirty();
 	}
 
@@ -658,6 +698,19 @@ public class MarketplaceState extends SavedData {
 			state.quests.put(playerId.get(), list);
 		}
 
+		// Срочный заказ: описание (если он ещё идёт) и день последнего запуска.
+		CompoundTag storedUrgent = tag.getCompoundOrEmpty(URGENT_KEY);
+		state.urgentLastDay = storedUrgent.getLongOr(URGENT_LAST_DAY_KEY, Long.MIN_VALUE);
+		String urgentItem = storedUrgent.getStringOr(URGENT_ITEM_KEY, "");
+		long urgentLeft = storedUrgent.getLongOr(URGENT_LEFT_KEY, 0L);
+
+		if (!urgentItem.isEmpty() && urgentLeft > 0L) {
+			state.urgentQuest = new UrgentQuest(urgentItem,
+					Math.max(1, storedUrgent.getIntOr(URGENT_COUNT_KEY, 1)),
+					storedUrgent.getDoubleOr(URGENT_REWARD_KEY, 0.0),
+					urgentLeft);
+		}
+
 		// Крупные ивенты. Старые сейвы этих ключей не знают — тогда ивентов просто нет,
 		// а счётчик активного времени начинается с нуля: следующий ивент выпадет в свой день.
 		state.activeTicks = tag.getLongOr(EVENT_TIME_KEY, 0L);
@@ -831,6 +884,19 @@ public class MarketplaceState extends SavedData {
 		});
 
 		tag.put(QUESTS_KEY, storedQuests);
+
+		// Срочный заказ: описание и день последнего запуска.
+		CompoundTag storedUrgent = new CompoundTag();
+		storedUrgent.putLong(URGENT_LAST_DAY_KEY, state.urgentLastDay);
+
+		if (state.urgentQuest != null) {
+			storedUrgent.putString(URGENT_ITEM_KEY, state.urgentQuest.itemId());
+			storedUrgent.putInt(URGENT_COUNT_KEY, state.urgentQuest.count());
+			storedUrgent.putDouble(URGENT_REWARD_KEY, state.urgentQuest.reward());
+			storedUrgent.putLong(URGENT_LEFT_KEY, state.urgentQuest.remaining());
+		}
+
+		tag.put(URGENT_KEY, storedUrgent);
 
 		// Крупные ивенты: активное время, идущий ивент с остатком, запланированный со слухом.
 		tag.putLong(EVENT_TIME_KEY, state.activeTicks);
