@@ -246,13 +246,19 @@ public final class MarketService {
 	}
 
 	/**
-	 * Сколько стоит выбранное в магазине, без списания денег. Набор считается по своей цене
-	 * (множитель покупки к нему не применяется), «особый предмет» — по своей фиксированной цене
-	 * (тоже без множителя, но за каждую штуку), обычный предмет — по цене стака с множителем.
+	 * Сколько стоит выбранное в магазине, без списания денег. Свой сет игрока считается по своей
+	 * формуле ({@link CustomKits#priceOf}), готовый набор — по своей ({@link KitCatalog#priceOf}),
+	 * «особый предмет» — по фиксированной цене, обычный предмет — по цене стака с множителем.
 	 */
-	public static double costOf(ShopState state) {
+	public static double costOf(MarketplaceState world, ShopState state) {
 		if (state.selected().isEmpty()) {
 			return 0.0;
+		}
+
+		java.util.Optional<CustomKit> custom = CustomKits.kitOf(world, state.selected());
+
+		if (custom.isPresent()) {
+			return MoneyFormat.round(CustomKits.priceOf(custom.get()));
 		}
 
 		java.util.Optional<KitCatalog.Kit> kit = KitCatalog.kitOf(state.selected());
@@ -288,13 +294,22 @@ public final class MarketService {
 			return false;
 		}
 
+		MarketplaceState world = MarketplaceEconomy.state(server);
+		java.util.Optional<CustomKit> custom = CustomKits.kitOf(world, state.selected());
 		int count = state.count();
-		java.util.Optional<KitCatalog.Kit> kit = KitCatalog.kitOf(state.selected());
-		double cost = costOf(state);
+		double cost = costOf(world, state);
 
 		if (!player.isCreative() && !MarketplaceEconomy.trySpend(server, player.getUUID(), cost)) {
 			return false;
 		}
+
+		if (custom.isPresent()) {
+			// Свой сет игрока выдаётся ровно один: количество к наборам не применяется.
+			CustomKits.deliver(player, custom.get());
+			return true;
+		}
+
+		java.util.Optional<KitCatalog.Kit> kit = KitCatalog.kitOf(state.selected());
 
 		if (kit.isPresent()) {
 			// Шалкеры набора приходят с содержимым (раскладка — в kits.json), а те наборы,

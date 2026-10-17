@@ -12,6 +12,9 @@ import com.chr0m4ik.marketplace.event.MarketEvent;
 import com.chr0m4ik.marketplace.event.MarketEvents;
 import com.chr0m4ik.marketplace.menu.MarketplaceMenus;
 import com.chr0m4ik.marketplace.menu.WindowKind;
+import com.chr0m4ik.marketplace.market.CustomKit;
+import com.chr0m4ik.marketplace.market.CustomKits;
+import com.chr0m4ik.marketplace.market.KitCatalog;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
 import com.chr0m4ik.marketplace.market.SpecialCatalog;
 import com.chr0m4ik.marketplace.price.ItemPrices;
@@ -42,6 +45,7 @@ import net.minecraft.world.item.ItemStack;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.UUID;
 
 /**
  * Команды мода.
@@ -75,6 +79,7 @@ public final class MarketplaceCommands {
 	private static final String ARG_EVENT = "id";
 	private static final String ARG_TICK = "tick";
 	private static final String ARG_SECTION = "section";
+	private static final String ARG_NAME = "name";
 
 	/** Сколько товаров раздела показывать в команде (списки бывают на сотни предметов). */
 	private static final int SHOP_SHOWN = 20;
@@ -161,6 +166,20 @@ public final class MarketplaceCommands {
 					.then(Commands.literal("stop")
 							.executes(MarketplaceCommands::urgentStop));
 
+			// Свои сеты: игрок собирает набор и создаёт его командой (виден всем в магазине).
+			// Название берём как «всё остальное» (greedyString): тогда работают и кириллица,
+			// и пробелы, а флаг true/false разбираем сами в конце строки.
+			LiteralArgumentBuilder<CommandSourceStack> kit = Commands.literal("kit")
+					.executes(MarketplaceCommands::listKits)
+					.then(Commands.literal("new")
+							.then(Commands.argument(ARG_NAME, StringArgumentType.greedyString())
+									.executes(MarketplaceCommands::createKit)))
+					.then(Commands.literal("delete")
+							.then(Commands.argument(ARG_NAME, StringArgumentType.greedyString())
+									.executes(MarketplaceCommands::deleteKit)))
+					.then(Commands.literal("list")
+							.executes(MarketplaceCommands::listKits));
+
 			dispatcher.register(Commands.literal("market")
 					.executes(MarketplaceCommands::openMainMenu)
 					.then(Commands.literal("help")
@@ -170,7 +189,8 @@ public final class MarketplaceCommands {
 					.then(drift)
 					.then(shop)
 					.then(event)
-					.then(urgent));
+					.then(urgent)
+					.then(kit));
 		});
 	}
 
@@ -205,6 +225,8 @@ public final class MarketplaceCommands {
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.shop")
 				.withStyle(ChatFormatting.GRAY), false);
 		source.sendSuccess(() -> Component.translatable("marketplace.command.help.urgent")
+				.withStyle(ChatFormatting.GRAY), false);
+		source.sendSuccess(() -> Component.translatable("marketplace.command.help.kit")
 				.withStyle(ChatFormatting.GRAY), false);
 
 		return 1;
@@ -283,6 +305,8 @@ public final class MarketplaceCommands {
 		}
 
 		ShopCatalog.Category category = found.get();
+		// Свои сеты лежат в сейве мира — каталогу их нужно отдать перед сборкой списка.
+		ShopCatalog.setCustomKits(CustomKits.all(MarketplaceEconomy.state(source.getServer())));
 		ShopCatalog.refresh(source.registryAccess());
 		List<ItemStack> items = ShopCatalog.items(category);
 
@@ -292,13 +316,28 @@ public final class MarketplaceCommands {
 
 		for (int index = 0; index < items.size() && index < SHOP_SHOWN; index++) {
 			ItemStack stack = items.get(index);
+			// У наборов (готовых и своих) цена не шлякерная, а своя — показываем именно её.
+			Optional<KitCatalog.Kit> kit = KitCatalog.kitOf(stack);
+			Optional<CustomKit> custom = CustomKits.kitOf(MarketplaceEconomy.state(source.getServer()), stack);
 			OptionalDouble special = SpecialCatalog.priceOf(stack);
-			double price = special.isPresent() ? special.getAsDouble() : ItemPrices.priceOf(stack);
+			double price;
+
+			if (custom.isPresent()) {
+				price = CustomKits.priceOf(custom.get());
+			} else if (kit.isPresent()) {
+				price = KitCatalog.priceOf(kit.get());
+			} else if (special.isPresent()) {
+				price = special.getAsDouble();
+			} else {
+				price = ItemPrices.priceOf(stack);
+			}
+
 			int number = index + 1;
 
 			source.sendSuccess(() -> Component.translatable("marketplace.command.shop.item",
 					Component.literal(number + ". "), stack.getHoverName(), money(price))
-					.withStyle(special.isPresent() ? ChatFormatting.LIGHT_PURPLE : ChatFormatting.GRAY), false);
+					.withStyle(special.isPresent() || custom.isPresent()
+							? ChatFormatting.LIGHT_PURPLE : ChatFormatting.GRAY), false);
 		}
 
 		if (items.size() > SHOP_SHOWN) {
@@ -608,6 +647,106 @@ public final class MarketplaceCommands {
 				Component.literal(String.valueOf(quest.count()))).withStyle(ChatFormatting.YELLOW), false);
 
 		return 1;
+	}
+
+	/** {@code /market kit new <название> <true|false>} — создать свой сет из текущего снаряжения. */
+	private static int createKit(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+		CommandSourceStack source = context.getSource();
+		ServerPlayer player = source.getPlayerOrException();
+		String raw = StringArgumentType.getString(context, ARG_NAME).trim();
+		int space = raw.lastIndexOf(' ');
+		String mode = space < 0 ? "" : raw.substring(space + 1).trim();
+		String name = stripQuotes(space < 0 ? "" : raw.substring(0, space).trim());
+
+		if (!mode.equalsIgnoreCase("true") && !mode.equalsIgnoreCase("false")) {
+			// Флаг обязателен: иначе непонятно, выдавать сет шлякерами или сразу на тело.
+			source.sendFailure(Component.translatable("marketplace.command.kit.mode"));
+			return 0;
+		}
+
+		boolean shulkers = mode.equalsIgnoreCase("true");
+		CustomKits.CreateResult result = CustomKits.create(source.getServer(), player, name, shulkers);
+
+		if (result.kit() == null) {
+			switch (result.status()) {
+				case BAD_NAME -> source.sendFailure(Component.translatable("marketplace.command.kit.badName",
+						Component.literal(String.valueOf(CustomKits.MAX_NAME))));
+				case NAME_TAKEN -> source.sendFailure(Component.translatable("marketplace.command.kit.nameTaken",
+						Component.literal(name)));
+				case LIMIT -> source.sendFailure(Component.translatable("marketplace.command.kit.limit",
+						Component.literal(String.valueOf(CustomKits.LIMIT))));
+				default -> source.sendFailure(Component.translatable("marketplace.command.kit.empty"));
+			}
+
+			return 0;
+		}
+
+		CustomKit kit = result.kit();
+		boolean created = result.status() == CustomKits.CreateStatus.CREATED;
+		source.sendSuccess(() -> Component.translatable(created
+								? "marketplace.command.kit.created" : "marketplace.command.kit.replaced",
+						Component.literal(kit.name()),
+						Component.literal(String.valueOf(kit.size())),
+						money(CustomKits.priceOf(kit))).withStyle(ChatFormatting.GREEN), false);
+
+		return 1;
+	}
+
+	/** Снимает кавычки, если игрок записал название в кавычках. */
+	private static String stripQuotes(String value) {
+		if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+			return value.substring(1, value.length() - 1).trim();
+		}
+
+		return value;
+	}
+
+	/** {@code /market kit delete <название>} — удалить свой сет (чужой может только оператор). */
+	private static int deleteKit(CommandContext<CommandSourceStack> context) {
+		CommandSourceStack source = context.getSource();
+		String name = stripQuotes(StringArgumentType.getString(context, ARG_NAME).trim());
+		ServerPlayer player = source.getPlayer();
+		UUID requester = player == null ? null : player.getUUID();
+		boolean operator = Commands.LEVEL_GAMEMASTERS.check(source.permissions());
+
+		CustomKits.DeleteStatus status = CustomKits.delete(MarketplaceEconomy.state(source.getServer()),
+				requester, operator, name);
+
+		switch (status) {
+			case DELETED -> source.sendSuccess(() -> Component.translatable("marketplace.command.kit.deleted",
+					Component.literal(name)).withStyle(ChatFormatting.GREEN), true);
+			case MISSING -> source.sendFailure(Component.translatable("marketplace.command.kit.missing",
+					Component.literal(name)));
+			case NOT_OWNER -> source.sendFailure(Component.translatable("marketplace.command.kit.notOwner",
+					Component.literal(name)));
+		}
+
+		return status == CustomKits.DeleteStatus.DELETED ? 1 : 0;
+	}
+
+	/** {@code /market kit list} — все свои сеты мира. */
+	private static int listKits(CommandContext<CommandSourceStack> context) {
+		CommandSourceStack source = context.getSource();
+		List<CustomKit> kits = CustomKits.all(MarketplaceEconomy.state(source.getServer()));
+
+		if (kits.isEmpty()) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.kit.list.empty")
+					.withStyle(ChatFormatting.GRAY), false);
+			return 0;
+		}
+
+		source.sendSuccess(() -> Component.translatable("marketplace.command.kit.list.header",
+				Component.literal(String.valueOf(kits.size()))).withStyle(ChatFormatting.GOLD), false);
+
+		for (CustomKit kit : kits) {
+			source.sendSuccess(() -> Component.translatable("marketplace.command.kit.list.line",
+					Component.literal(kit.name()),
+					Component.literal(String.valueOf(kit.size())),
+					money(CustomKits.priceOf(kit)),
+					Component.literal(kit.authorName())).withStyle(ChatFormatting.GRAY), false);
+		}
+
+		return kits.size();
 	}
 
 	/** Отклонение цены ивентом: зелёным рост, красным падение. */

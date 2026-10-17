@@ -45,6 +45,9 @@ public final class ShopCatalog {
 	/** Разделы магазина. Иконка — предмет, которым раздел показывается в меню. */
 	public enum Category {
 		KITS("marketplace.gui.category.kits", () -> Items.SHULKER_BOX),
+		// «Свои сеты»: наборы, которые создали сами игроки (см. CustomKits). Иконка — ракушка
+		// шлякера, чтобы раздел не путался с готовыми наборами.
+		CUSTOM_KITS("marketplace.gui.category.customKits", () -> Items.SHULKER_SHELL),
 		// «Особые предметы»: книги своих зачарований со своей ценой (см. SpecialCatalog).
 		// Иконка — золотое яблоко: «особый предмет» и при этом не совпадает с иконками
 		// других разделов (у «Книг зачарований» — книга, у «Инструментов» — кирка).
@@ -111,6 +114,12 @@ public final class ShopCatalog {
 	/** Доступ к реестрам мира: зачарования в 26.3 лежат в динамическом реестре, вне мира их не видно. */
 	private static HolderLookup.Provider registries;
 
+	/**
+	 * Свои сеты игроков: лежат в сейве мира, поэтому каталог получает их снимок от серверной части
+	 * окна перед сборкой списка (см. {@link #setCustomKits}). Клиент списки не собирает.
+	 */
+	private static List<CustomKit> customKits = List.of();
+
 	/** Порядок предметов из креативного инвентаря (строится один раз). */
 	private static Map<Item, Integer> CREATIVE_ORDER;
 
@@ -136,6 +145,11 @@ public final class ShopCatalog {
 
 	private ShopCatalog() {
 		// Класс только со статическими методами.
+	}
+
+	/** Отдаём каталогу снимок своих сетов игроков (вызывается перед сборкой списка на сервере). */
+	public static void setCustomKits(List<CustomKit> kits) {
+		customKits = List.copyOf(kits);
 	}
 
 	/** Отдаём каталогу реестры мира (вызывается серверной частью окна). */
@@ -176,6 +190,12 @@ public final class ShopCatalog {
 					stacks.add(KitCatalog.iconOf(kit));
 				}
 			}
+			case CUSTOM_KITS -> {
+				// Свои сеты игроков: порядок — как их создавали, поэтому сортировка ниже не нужна.
+				for (CustomKit kit : customKits) {
+					stacks.add(CustomKits.iconOf(kit));
+				}
+			}
 			case SPECIAL -> {
 				// Свои книги со своей ценой: по предмету их не отличить (это всё та же
 				// книга зачарований), поэтому раздел собирается отдельно, как и «Киты».
@@ -207,7 +227,11 @@ public final class ShopCatalog {
 			}
 		}
 
-		stacks.sort(Comparator.comparing(stack -> sortKey(category, stack), SORT_KEY_ORDER));
+		// Свои сеты не сортируем: их порядок — порядок создания, так игроку понятнее.
+		if (category != Category.CUSTOM_KITS) {
+			stacks.sort(Comparator.comparing(stack -> sortKey(category, stack), SORT_KEY_ORDER));
+		}
+
 		List<ItemStack> result = List.copyOf(stacks);
 
 		// Пустой раздел «Особые предметы» без реестров мира не запоминаем: как только реестры

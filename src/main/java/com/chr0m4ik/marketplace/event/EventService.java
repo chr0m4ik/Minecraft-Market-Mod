@@ -447,6 +447,7 @@ public final class EventService {
 	private static ShopCatalog.Category rollCategory(RandomSource random) {
 		List<ShopCatalog.Category> pool = Arrays.stream(ShopCatalog.Category.values())
 				.filter(category -> category != ShopCatalog.Category.KITS
+						&& category != ShopCatalog.Category.CUSTOM_KITS
 						&& category != ShopCatalog.Category.SPECIAL)
 				.toList();
 

@@ -9,6 +9,7 @@ import com.chr0m4ik.marketplace.economy.TraderPrices;
 import com.chr0m4ik.marketplace.event.EventService;
 import com.chr0m4ik.marketplace.event.MarketEvent;
 import com.chr0m4ik.marketplace.event.MarketEvents;
+import com.chr0m4ik.marketplace.market.CustomKits;
 import com.chr0m4ik.marketplace.market.KitCatalog;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.SpecialCatalog;
@@ -93,6 +94,12 @@ public final class MarketplaceTooltips {
 				addTraderPriceLines(lines, stack);
 				return;
 			}
+		}
+
+		// Иконка своего сета (его создал игрок): цена и содержимое уже в описании, которое
+		// собрал сервер, — шлякерную цену сверху дописывать нельзя.
+		if (!CustomKits.nameOf(stack).isEmpty()) {
+			return;
 		}
 
 		// Иконка набора — шлякер, но цена у неё не шлякерная: см. KitCatalog.priceOf.

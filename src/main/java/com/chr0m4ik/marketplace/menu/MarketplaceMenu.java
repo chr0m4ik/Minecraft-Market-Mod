@@ -10,6 +10,7 @@ import com.chr0m4ik.marketplace.economy.TraderService;
 import com.chr0m4ik.marketplace.economy.UrgentQuest;
 import com.chr0m4ik.marketplace.economy.UrgentQuests;
 import com.chr0m4ik.marketplace.event.MarketEvents;
+import com.chr0m4ik.marketplace.market.CustomKits;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.chr0m4ik.marketplace.market.MarketService;
 import com.chr0m4ik.marketplace.market.ShopCatalog;
@@ -270,7 +271,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 		// Список собираем прямо сейчас и на сервере: у клиента реестров мира нет, а страница
 		// должна показать товары (книги своих зачарований строятся из реестра зачарований).
-		ShopCatalog.refresh(this.serverPlayer.registryAccess());
+		prepareShopCatalog();
 
 		MarketService.ShopState shop = MarketService.shop(this.serverPlayer.getUUID());
 		ShopCatalog.Category category = shopCategory(shop);
@@ -281,6 +282,21 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		for (int i = 0; i < this.kind.tradeSlots(); i++) {
 			this.tradeContainer.setItem(i, i < page.size() ? page.get(i).copy() : ItemStack.EMPTY);
 		}
+	}
+
+	/**
+	 * Готовит каталог к сборке списка: отдаёт ему свои сеты мира (они лежат в сейве) и реестры
+	 * мира, после чего сбрасывает кэш списков.
+	 */
+	private void prepareShopCatalog() {
+		MinecraftServer server = this.serverPlayer.level().getServer();
+
+		if (server == null) {
+			return;
+		}
+
+		ShopCatalog.setCustomKits(CustomKits.all(MarketplaceEconomy.state(server)));
+		ShopCatalog.refresh(server.registryAccess());
 	}
 
 	/** Раздел магазина по состоянию окна: индекс может прийти любым, поэтому зажимаем его в границы. */
@@ -1220,8 +1236,8 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	 */
 	private int[] shopCounts() {
 		if (this.shopCounts == null) {
-			// Реестры мира нужны каталогу для сборки списков — берём их у сервера.
-			ShopCatalog.refresh(this.serverPlayer.registryAccess());
+			// Реестры мира и свои сеты нужны каталогу для сборки списков — берём их у сервера.
+			prepareShopCatalog();
 			ShopCatalog.Category[] categories = ShopCatalog.Category.values();
 			int[] counts = new int[categories.length];
 
@@ -1264,7 +1280,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 			return;
 		}
 
-		double cost = MarketService.costOf(shop);
+		double cost = MarketService.costOf(MarketplaceEconomy.state(server), shop);
 
 		if (MarketService.buy(server, player, shop)) {
 			player.sendSystemMessage(Component.translatable("marketplace.gui.buy.bought",

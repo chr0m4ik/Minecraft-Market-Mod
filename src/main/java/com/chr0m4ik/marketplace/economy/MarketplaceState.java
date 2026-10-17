@@ -2,12 +2,14 @@ package com.chr0m4ik.marketplace.economy;
 
 import com.chr0m4ik.marketplace.MarketplaceMod;
 import com.chr0m4ik.marketplace.event.MarketEvent;
+import com.chr0m4ik.marketplace.market.CustomKit;
 import com.chr0m4ik.marketplace.market.MarketOrder;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DynamicOps;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
@@ -18,7 +20,9 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -78,6 +82,14 @@ public class MarketplaceState extends SavedData {
 	private static final String URGENT_REWARD_KEY = "reward";
 	private static final String URGENT_LEFT_KEY = "left";
 	private static final String URGENT_LAST_DAY_KEY = "last_day";
+	/** Ключи своих сетов игроков: название (ключ записи), автор, способ выдачи и предметы. */
+	private static final String CUSTOM_KITS_KEY = "custom_kits";
+	private static final String CUSTOM_KIT_AUTHOR_KEY = "author";
+	private static final String CUSTOM_KIT_AUTHOR_NAME_KEY = "author_name";
+	private static final String CUSTOM_KIT_SHULKERS_KEY = "shulkers";
+	private static final String CUSTOM_KIT_ITEMS_KEY = "items";
+	private static final String CUSTOM_KIT_ITEM_KEY = "item";
+	private static final String CUSTOM_KIT_SOURCE_KEY = "source";
 	/** Ключи крупных ивентов: активное время мира, идущий ивент и запланированный. */
 	private static final String EVENT_TIME_KEY = "event_active_time";
 	private static final String EVENT_ACTIVE_KEY = "event_active";
@@ -115,6 +127,8 @@ public class MarketplaceState extends SavedData {
 	private UrgentQuest urgentQuest;
 	/** Игровой день, в который последний раз запускался срочный заказ ({@link Long#MIN_VALUE} — не было). */
 	private long urgentLastDay = Long.MIN_VALUE;
+	/** Свои сеты игроков: название → сет. Порядок создания сохраняется для списка в магазине. */
+	private final Map<String, CustomKit> customKits = new LinkedHashMap<>();
 
 	/**
 	 * Активное время мира: тики, когда в игре был хотя бы один игрок. Ивенты считают время по нему,
@@ -422,6 +436,30 @@ public class MarketplaceState extends SavedData {
 		setDirty();
 	}
 
+	// --- Свои сеты игроков ---
+
+	/** Свои сеты мира в порядке создания. */
+	public Map<String, CustomKit> customKits() {
+		return Collections.unmodifiableMap(this.customKits);
+	}
+
+	/** Добавляет или заменяет свой сет (ключ — название). */
+	public void putCustomKit(CustomKit kit) {
+		this.customKits.put(kit.name(), kit);
+		setDirty();
+	}
+
+	/** Удаляет свой сет по названию. */
+	public CustomKit removeCustomKit(String name) {
+		CustomKit removed = this.customKits.remove(name);
+
+		if (removed != null) {
+			setDirty();
+		}
+
+		return removed;
+	}
+
 	// --- Крупные ивенты ---
 
 	/** Активное время мира в тиках: копится, только пока в игре есть игроки. */
@@ -711,6 +749,46 @@ public class MarketplaceState extends SavedData {
 					urgentLeft);
 		}
 
+		// Свои сеты игроков: название — ключ записи, предметы читаются через реестры мира
+		// (иначе зачарования и зелья в составе сета теряются).
+		CompoundTag storedKits = tag.getCompoundOrEmpty(CUSTOM_KITS_KEY);
+
+		for (String name : storedKits.keySet()) {
+			CompoundTag kitTag = storedKits.getCompoundOrEmpty(name);
+			Optional<UUID> author = parseUuid(kitTag.getStringOr(CUSTOM_KIT_AUTHOR_KEY, ""));
+
+			if (author.isEmpty()) {
+				MarketplaceMod.LOGGER.warn("В сейве свой сет «{}» без корректного автора — запись пропущена", name);
+				continue;
+			}
+
+			ListTag itemsTag = kitTag.getListOrEmpty(CUSTOM_KIT_ITEMS_KEY);
+			List<CustomKit.Entry> items = new ArrayList<>();
+
+			for (int index = 0; index < itemsTag.size(); index++) {
+				CompoundTag itemTag = itemsTag.getCompoundOrEmpty(index);
+				Optional<ItemStack> stack = ItemStack.CODEC
+						.parse(ops(), itemTag.getCompoundOrEmpty(CUSTOM_KIT_ITEM_KEY)).result();
+
+				if (stack.isEmpty() || stack.get().isEmpty()) {
+					MarketplaceMod.LOGGER.warn("В сейве свой сет «{}» содержит повреждённый предмет — пропущен", name);
+					continue;
+				}
+
+				items.add(new CustomKit.Entry(stack.get(),
+						parseSource(itemTag.getStringOr(CUSTOM_KIT_SOURCE_KEY, ""), name)));
+			}
+
+			if (items.isEmpty()) {
+				MarketplaceMod.LOGGER.warn("В сейве свой сет «{}» остался без предметов — запись пропущена", name);
+				continue;
+			}
+
+			state.customKits.put(name, new CustomKit(name, author.get(),
+					kitTag.getStringOr(CUSTOM_KIT_AUTHOR_NAME_KEY, "?"),
+					kitTag.getBooleanOr(CUSTOM_KIT_SHULKERS_KEY, true), items));
+		}
+
 		// Крупные ивенты. Старые сейвы этих ключей не знают — тогда ивентов просто нет,
 		// а счётчик активного времени начинается с нуля: следующий ивент выпадет в свой день.
 		state.activeTicks = tag.getLongOr(EVENT_TIME_KEY, 0L);
@@ -751,8 +829,22 @@ public class MarketplaceState extends SavedData {
 		return event.get();
 	}
 
-	private static int parseSlot(String slotKey, String playerKey) {
+	/** Откуда взят предмет своего сета: значение из перечисления {@link CustomKit.Source}. */
+	private static CustomKit.Source parseSource(String value, String kitName) {
+		if (value == null || value.isEmpty()) {
+			return CustomKit.Source.INVENTORY;
+		}
+
 		try {
+			return CustomKit.Source.valueOf(value);
+		} catch (IllegalArgumentException exception) {
+			MarketplaceMod.LOGGER.warn("В своём сете «{}» неизвестный источник предмета «{}» — считаю инвентарём",
+					kitName, value);
+			return CustomKit.Source.INVENTORY;
+		}
+	}
+
+	private static int parseSlot(String slotKey, String playerKey) {		try {
 			return Integer.parseInt(slotKey);
 		} catch (NumberFormatException exception) {
 			MarketplaceMod.LOGGER.warn("В ордерах игрока {} некорректный номер ячейки, запись пропущена: {}",
@@ -897,6 +989,33 @@ public class MarketplaceState extends SavedData {
 		}
 
 		tag.put(URGENT_KEY, storedUrgent);
+
+		// Свои сеты игроков: название — ключ записи, внутри автор, способ выдачи и предметы.
+		CompoundTag storedKits = new CompoundTag();
+
+		state.customKits.forEach((name, kit) -> {
+			CompoundTag kitTag = new CompoundTag();
+			kitTag.putString(CUSTOM_KIT_AUTHOR_KEY, kit.author().toString());
+			kitTag.putString(CUSTOM_KIT_AUTHOR_NAME_KEY, kit.authorName());
+			kitTag.putBoolean(CUSTOM_KIT_SHULKERS_KEY, kit.shulkers());
+			ListTag itemsTag = new ListTag();
+
+			for (CustomKit.Entry entry : kit.items()) {
+				CompoundTag itemTag = new CompoundTag();
+				itemTag.putString(CUSTOM_KIT_SOURCE_KEY, entry.source().name());
+				// Ошибку кодирования не прячем: без неё предмет молча исчезнет из сета в сейве.
+				ItemStack.CODEC.encodeStart(ops(), entry.stack()).result().ifPresentOrElse(
+						encoded -> itemTag.put(CUSTOM_KIT_ITEM_KEY, encoded),
+						() -> MarketplaceMod.LOGGER.error(
+								"Не удалось сохранить предмет своего сета «{}»", name));
+				itemsTag.add(itemTag);
+			}
+
+			kitTag.put(CUSTOM_KIT_ITEMS_KEY, itemsTag);
+			storedKits.put(name, kitTag);
+		});
+
+		tag.put(CUSTOM_KITS_KEY, storedKits);
 
 		// Крупные ивенты: активное время, идущий ивент с остатком, запланированный со слухом.
 		tag.putLong(EVENT_TIME_KEY, state.activeTicks);

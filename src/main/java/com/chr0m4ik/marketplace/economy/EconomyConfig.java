@@ -59,6 +59,13 @@ public final class EconomyConfig {
 	private static final double DEFAULT_CRAFT_MARKUP = 1.25;
 	private static final double DEFAULT_SMELT_MARKUP = 1.15;
 
+	/**
+	 * Наценка на цену предметов в «своих сетах» игроков (по умолчанию 1.2, как у готовых наборов).
+	 * Ниже 1.0 опускать нельзя: тогда сет дешевле своего содержимого и его выгодно разбирать
+	 * на предметы и продавать на рынке — это печать денег.
+	 */
+	private static final double DEFAULT_CUSTOM_KIT_MARKUP = 1.2;
+
 	/** Играть ли звуки мода. Заказчик может выключить их одним флагом в файле. */
 	private static final boolean DEFAULT_SOUNDS = true;
 
@@ -94,7 +101,7 @@ public final class EconomyConfig {
 	/** Набор значений из файла. Массивы не меняются после чтения. */
 	private record Values(double buyMultiplier, double traderMultiplier, double[] marketMarkups,
 			double[] markupSlowdowns, double driftAmplitude, double craftMarkup, double smeltMarkup,
-			boolean sounds, EventSettings events) {
+			double customKitMarkup, boolean sounds, EventSettings events) {
 	}
 
 	private static final EventSettings EVENT_DEFAULTS = new EventSettings(DEFAULT_EVENT_DAILY_CHANCE,
@@ -104,7 +111,8 @@ public final class EconomyConfig {
 
 	private static final Values DEFAULTS = new Values(DEFAULT_BUY_MULTIPLIER, DEFAULT_TRADER_MULTIPLIER,
 			DEFAULT_MARKET_MARKUPS, DEFAULT_MARKUP_SLOWDOWNS, DEFAULT_DRIFT_AMPLITUDE,
-			DEFAULT_CRAFT_MARKUP, DEFAULT_SMELT_MARKUP, DEFAULT_SOUNDS, EVENT_DEFAULTS);
+			DEFAULT_CRAFT_MARKUP, DEFAULT_SMELT_MARKUP, DEFAULT_CUSTOM_KIT_MARKUP, DEFAULT_SOUNDS,
+			EVENT_DEFAULTS);
 
 	private static volatile Values values = DEFAULTS;
 	private static volatile boolean loadAttempted;
@@ -154,16 +162,18 @@ public final class EconomyConfig {
 						number(object, "drift_amplitude", DEFAULT_DRIFT_AMPLITUDE),
 						number(object, "craft_markup", DEFAULT_CRAFT_MARKUP),
 						number(object, "smelt_markup", DEFAULT_SMELT_MARKUP),
+						sanitizeCustomKitMarkup(object),
 						flag(object, "sounds", DEFAULT_SOUNDS),
 						events);
 				values = parsed;
 				loaded = true;
 
 				MarketplaceMod.LOGGER.info("Настройки экономики загружены: покупка ×{}, торговец ×{},"
-								+ " наценки рынка {}, дрейф ±{}%, наценка крафта {}, переплавки {}, звуки {}",
+								+ " наценки рынка {}, дрейф ±{}%, наценка крафта {}, переплавки {},"
+								+ " свои сеты ×{}, звуки {}",
 						parsed.buyMultiplier(), parsed.traderMultiplier(), format(parsed.marketMarkups()),
 						parsed.driftAmplitude() * 100.0, parsed.craftMarkup(), parsed.smeltMarkup(),
-						parsed.sounds() ? "включены" : "выключены");
+						parsed.customKitMarkup(), parsed.sounds() ? "включены" : "выключены");
 				MarketplaceMod.LOGGER.info("Настройки ивентов: шанс {}% в игровой день, длительность"
 								+ " {}–{} с, максимум ±{}%, до {} предметов, слух с шансом {}% за {}–{} с",
 						one(events.dailyChance() * 100.0), one(events.minSeconds()), one(events.maxSeconds()),
@@ -458,6 +468,37 @@ public final class EconomyConfig {
 	public static double smeltMarkup() {
 		ensureLoaded();
 		return values.smeltMarkup();
+	}
+
+	/**
+	 * Наценка на содержимое «своих сетов» игроков. Ниже 1.0 неё нельзя: сет стал бы дешевле
+	 * своего содержимого, и его выгодно было бы разбирать и продавать — см. {@link #sanitizeCustomKitMarkup}.
+	 */
+	public static double customKitMarkup() {
+		ensureLoaded();
+		return values.customKitMarkup();
+	}
+
+	/**
+	 * Читает и проверяет наценку своих сетов. Значение ниже 1.0 — это «печать денег»
+	 * (купил сет, разобрал, продал дороже), поэтому оно заменяется на значение по умолчанию.
+	 */
+	private static double sanitizeCustomKitMarkup(JsonObject object) {
+		double markup = number(object, "custom_kit_markup", DEFAULT_CUSTOM_KIT_MARKUP);
+
+		if (markup < 1.0) {
+			MarketplaceMod.LOGGER.error("СВОИ СЕТЫ ПОЗВОЛЯЮТ ПЕЧАТАТЬ ДЕНЬГИ: custom_kit_markup = {}, а допустимо"
+							+ " не меньше 1.0 (иначе сет дешевле своего содержимого). Беру {} в {}",
+					num(markup), num(DEFAULT_CUSTOM_KIT_MARKUP), FILE_PATH);
+			return DEFAULT_CUSTOM_KIT_MARKUP;
+		}
+
+		if (markup < 1.05) {
+			MarketplaceMod.LOGGER.warn("Наценка своих сетов {} очень низкая: рынок платит 100% цены, из-за"
+							+ " микро-дрейфа (±3%) такой сет можно разбирать с небольшой прибылью", num(markup));
+		}
+
+		return markup;
 	}
 
 	/**
