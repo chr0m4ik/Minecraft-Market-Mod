@@ -104,7 +104,7 @@ const scale = (recorded) => 1 + (recorded - 1) * AMPLITUDE / RECORDED_AMPLITUDE;
 const seed = REAL_SEED;
 const items = [
 	{ id: 'minecraft:diamond', price: 5000 },
-	{ id: 'minecraft:apple', price: 1000 },
+	{ id: 'minecraft:apple', price: 250 },
 	{ id: 'minecraft:netherite_ingot', price: 105513 },
 	{ id: 'minecraft:coal', price: 50 },
 	{ id: 'minecraft:shulker_box', price: 100000000 },

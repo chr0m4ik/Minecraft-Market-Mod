@@ -174,10 +174,10 @@ public final class ItemPrices {
 		ItemEnchantments enchantments = stack.get(DataComponents.ENCHANTMENTS);
 
 		if (enchantments != null) {
-			price += EnchantmentPrices.valueOf(enchantments);
+			price += EnchantmentPrices.valueOnItem(stack, enchantments);
 		}
 
-		// Зачарования внутри книги.
+		// Зачарования внутри книги: книга переносима, её цена считается по-старому.
 		ItemEnchantments stored = stack.get(DataComponents.STORED_ENCHANTMENTS);
 
 		if (stored != null) {

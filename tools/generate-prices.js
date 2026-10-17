@@ -39,7 +39,18 @@ const LOCKED = new Set([
 	// Шалкер: заказчик закрепил 100 000 000 — из рецепта (2 панциря по 50M) с наценкой крафта
 	// 1,25 вышло бы 125M, а это подняло бы и цену наборов, и цену цветных шлякеров.
 	'minecraft:shulker_box',
+	// Древесный уголь в LOCKED не входит: его цена (переплавка бревна) считается сама.
+	// Узор флага Моджанга: крафтится из зачарованного золотого яблока, и расчёт дал бы 6,25M
+	// за косметический узор. Держим на уровне остальных узоров; наживы на крафте нет
+	// (яблоко дороже), поэтому закрепление безопасно.
+	'minecraft:mojang_banner_pattern',
 ]);
+
+/** Шаблоны отделки брони дорогие и одинаковые: цена 250 000 (шаблон заказчика), но расчёт
+ * дублирования всё равно опускает её до стоимости крафта — так на них нельзя заработать. */
+const LOCKED_PATTERNS = [];
+
+const isLocked = (id) => LOCKED.has(id) || LOCKED_PATTERNS.some((pattern) => pattern.test(id));
 
 /** Сколько стаков предмета торговец готов купить за один игровой день. */
 const TRADER_DEFAULT_LIMIT = 30;
@@ -64,14 +75,14 @@ const BASE = {
 	'minecraft:moss_block': 3, 'minecraft:mud': 1, 'minecraft:packed_mud': 2, 'minecraft:muddy_mangrove_roots': 1,
 	'minecraft:sand': 1, 'minecraft:red_sand': 1, 'minecraft:suspicious_sand': 1, 'minecraft:suspicious_gravel': 1,
 	'minecraft:gravel': 1, 'minecraft:clay': 2, 'minecraft:clay_ball': 1, 'minecraft:flint': 3,
-	'minecraft:cobblestone': 1, 'minecraft:stone': 1, 'minecraft:andesite': 1, 'minecraft:diorite': 1,
-	'minecraft:granite': 1, 'minecraft:tuff': 1, 'minecraft:deepslate': 1, 'minecraft:cobbled_deepslate': 1,
+	'minecraft:cobblestone': 2, 'minecraft:stone': 2, 'minecraft:andesite': 2, 'minecraft:diorite': 2,
+	'minecraft:granite': 2, 'minecraft:tuff': 2, 'minecraft:deepslate': 2, 'minecraft:cobbled_deepslate': 2,
+	'minecraft:charcoal': 6,
 	'minecraft:calcite': 2, 'minecraft:dripstone_block': 2, 'minecraft:pointed_dripstone': 2,
 	'minecraft:netherrack': 1, 'minecraft:soul_sand': 2, 'minecraft:soul_soil': 2, 'minecraft:basalt': 1,
-	'minecraft:smooth_basalt': 1, 'minecraft:blackstone': 1, 'minecraft:magma_block': 5, 'minecraft:glowstone': 20,
+	'minecraft:smooth_basalt': 1, 'minecraft:blackstone': 2, 'minecraft:magma_block': 5, 'minecraft:glowstone': 20,
 	'minecraft:end_stone': 2, 'minecraft:obsidian': 25, 'minecraft:crying_obsidian': 40,
-	'minecraft:snow_block': 1, 'minecraft:snowball': 1, 'minecraft:ice': 2, 'minecraft:packed_ice': 5,
-	'minecraft:blue_ice': 15, 'minecraft:glass': 2, 'minecraft:terracotta': 2, 'minecraft:sculk': 5,
+	'minecraft:snow_block': 1, 'minecraft:snowball': 1, 'minecraft:ice': 2, 'minecraft:packed_ice': 5,	'minecraft:blue_ice': 15, 'minecraft:glass': 2, 'minecraft:terracotta': 2, 'minecraft:sculk': 5,
 	'minecraft:sculk_vein': 5, 'minecraft:vine': 1, 'minecraft:glow_lichen': 1, 'minecraft:moss_carpet': 1,
 	'minecraft:hanging_roots': 1, 'minecraft:big_dripleaf': 2, 'minecraft:small_dripleaf': 1,
 	'minecraft:sponge': 500, 'minecraft:wet_sponge': 400, 'minecraft:cobweb': 5, 'minecraft:bedrock': 1,
@@ -87,35 +98,38 @@ const BASE = {
 	'minecraft:deepslate_redstone_ore': 100, 'minecraft:lapis_lazuli': 150, 'minecraft:lapis_ore': 180,
 	'minecraft:deepslate_lapis_ore': 180, 'minecraft:quartz': 120, 'minecraft:nether_quartz_ore': 140,
 	'minecraft:amethyst_shard': 200, 'minecraft:amethyst_block': 800, 'minecraft:echo_shard': 20000,
-	'minecraft:glowstone_dust': 10, 'minecraft:blaze_powder': 10000, 'minecraft:gunpowder': 6,
+	'minecraft:glowstone_dust': 10, 'minecraft:blaze_powder': 1000, 'minecraft:gunpowder': 6,
 	'minecraft:flint': 3, 'minecraft:paper': 3, 'minecraft:string': 3, 'minecraft:feather': 2,
 	'minecraft:leather': 5, 'minecraft:rabbit_hide': 3, 'minecraft:bone': 3, 'minecraft:slime_ball': 8,
 	'minecraft:spider_eye': 10, 'minecraft:rotten_flesh': 10, 'minecraft:ink_sac': 3, 'minecraft:glow_ink_sac': 15,
 	'minecraft:honeycomb': 15, 'minecraft:honey_bottle': 200, 'minecraft:sugar_cane': 2, 'minecraft:bamboo': 1,
 	'minecraft:kelp': 10, 'minecraft:dried_kelp': 20, 'minecraft:sea_pickle': 5, 'minecraft:sweet_berries': 20,
 	'minecraft:glow_berries': 50, 'minecraft:nether_wart': 10, 'minecraft:wheat': 20, 'minecraft:wheat_seeds': 1,
-	'minecraft:beetroot': 20, 'minecraft:beetroot_seeds': 1, 'minecraft:carrot': 20, 'minecraft:potato': 20,
+	'minecraft:beetroot': 8, 'minecraft:beetroot_seeds': 1, 'minecraft:carrot': 20, 'minecraft:potato': 20,
 	'minecraft:poisonous_potato': 10, 'minecraft:melon_seeds': 1, 'minecraft:pumpkin_seeds': 1,
 	'minecraft:pumpkin': 3, 'minecraft:carved_pumpkin': 3, 'minecraft:melon': 3, 'minecraft:melon_slice': 10,
-	'minecraft:apple': 1000, 'minecraft:cocoa_beans': 3, 'minecraft:cactus': 2, 'minecraft:dead_bush': 1,
+	'minecraft:apple': 250, 'minecraft:cocoa_beans': 3, 'minecraft:cactus': 2, 'minecraft:dead_bush': 1,
 	'minecraft:egg': 2, 'minecraft:turtle_egg': 5000, 'minecraft:armadillo_scute': 500,
 	'minecraft:nautilus_shell': 100000, 'minecraft:prismarine_shard': 50, 'minecraft:prismarine_crystals': 80,
 	'minecraft:heart_of_the_sea': 500000, 'minecraft:scute': 150, 'minecraft:phantom_membrane': 800,
-	'minecraft:rabbit_foot': 300, 'minecraft:magma_cream': 25, 'minecraft:blaze_rod': 22000,
+	'minecraft:rabbit_foot': 300, 'minecraft:magma_cream': 25, 'minecraft:blaze_rod': 2000,
 	'minecraft:ender_pearl': 400, 'minecraft:chorus_fruit': 500, 'minecraft:popped_chorus_fruit': 550,
 	'minecraft:shulker_shell': 50000000,
 	// Шалкер закреплён на 100M (см. LOCKED) — иначе наценка крафта 1,25 подняла бы его до 125M.
-	'minecraft:shulker_box': 100000000, 'minecraft:dragon_breath': 200000, 'minecraft:ghast_tear': 150000,
-	'minecraft:wither_skeleton_skull': 600000, 'minecraft:trident': 250000, 'minecraft:breeze_rod': 400000,
-	'minecraft:heavy_core': 20000000, 'minecraft:ominous_bottle': 100000, 'minecraft:ominous_trial_key': 75000,
-	'minecraft:trial_key': 25000,
-	'minecraft:experience_bottle': 5000, 'minecraft:enchanted_golden_apple': 50000000,
+	'minecraft:shulker_box': 100000000, 'minecraft:dragon_breath': 20000, 'minecraft:ghast_tear': 30000,
+	'minecraft:wither_skeleton_skull': 600000, 'minecraft:trident': 250000, 'minecraft:breeze_rod': 60000,
+	'minecraft:heavy_core': 5000000, 'minecraft:ominous_bottle': 100000,
+	// Узор флага Моджанга закреплён в LOCKED (расчёт из зачарованного яблока дал бы миллионы).
+	'minecraft:mojang_banner_pattern': 5000,
+	// Ключи испытаний: их выдают испытательные камеры, поэтому цена умеренная.
+	'minecraft:trial_key': 250000, 'minecraft:ominous_trial_key': 500000,
+	// Пузырёк опыта — нужен для починки предметов, но в сундуках он попадается часто
+	// (61% сундуков аванпоста), поэтому не 100 000, а 30 000.
+	'minecraft:experience_bottle': 30000,
+	// Зачарованное золотое яблоко: раньше 50M — это давало «джекпот» в 1,5% сундуков порталов.
+	'minecraft:enchanted_golden_apple': 5000000,
 	'minecraft:name_tag': 5000, 'minecraft:saddle': 10000, 'minecraft:elytra': 20000000000,
-	// Узор флага Моджанга — как остальные узоры (они дешёвые, из бумаги), а ключи испытаний дорогие.
-	'minecraft:mojang_banner_pattern': 5,
-	'minecraft:trial_key': 1000000, 'minecraft:ominous_trial_key': 1000000,
-	// Пузырёк опыта — нужен для починки предметов, поэтому цена высокая.
-	'minecraft:experience_bottle': 100000,
+	'minecraft:heart_of_the_sea': 150000,
 	'minecraft:totem_of_undying': 100000000, 'minecraft:nether_star': 2000000000,
 	'minecraft:dragon_egg': 5000000000, 'minecraft:spawner': 10000000000,
 	'minecraft:trial_spawner': 2000000000, 'minecraft:vault': 2000000000, 'minecraft:end_portal_frame': 10000000,
@@ -178,19 +192,23 @@ const BASE = {
 	// и нужно для золотых яблок.
 	'minecraft:beef': 200, 'minecraft:porkchop': 200, 'minecraft:chicken': 150, 'minecraft:mutton': 200,
 	'minecraft:rabbit': 200, 'minecraft:cod': 150, 'minecraft:salmon': 200, 'minecraft:tropical_fish': 250,
-	'minecraft:pufferfish': 300, 'minecraft:milk_bucket': 100, 'minecraft:water_bucket': 85,
-	'minecraft:lava_bucket': 95, 'minecraft:powder_snow_bucket': 90, 'minecraft:turtle_scute': 200,
+	'minecraft:pufferfish': 300,
+	// Ведро с содержимым = пустое ведро (862,5$) + содержимое. Иначе «купил полное ведро,
+	// вылил воду, сдал пустое» было бесконечной наживой: пустое ведро дороже полного.
+	'minecraft:water_bucket': 962, 'minecraft:milk_bucket': 912, 'minecraft:lava_bucket': 1012,
+	'minecraft:powder_snow_bucket': 962, 'minecraft:turtle_scute': 200,
 	'minecraft:turtle_helmet': 5000, 'minecraft:sniffer_egg': 500000,
 
 	// --- броня и конская сбруя, которую нельзя скрафтить ---
-	'minecraft:chainmail_helmet': 3000, 'minecraft:chainmail_chestplate': 5000,
-	'minecraft:chainmail_leggings': 4500, 'minecraft:chainmail_boots': 2500,
-	'minecraft:leather_horse_armor': 2000, 'minecraft:copper_horse_armor': 3000,
-	'minecraft:iron_horse_armor': 8000, 'minecraft:golden_horse_armor': 12000,
-	'minecraft:diamond_horse_armor': 30000, 'minecraft:netherite_horse_armor': 900000,
-	'minecraft:copper_nautilus_armor': 5000, 'minecraft:iron_nautilus_armor': 12000,
-	'minecraft:golden_nautilus_armor': 18000, 'minecraft:diamond_nautilus_armor': 45000,
-	'minecraft:netherite_nautilus_armor': 1200000,
+	// Кольчуга хуже железа (её нельзя скрафтить, только найти), поэтому и дешевле.
+	'minecraft:chainmail_helmet': 1000, 'minecraft:chainmail_chestplate': 1600,
+	'minecraft:chainmail_leggings': 1400, 'minecraft:chainmail_boots': 800,
+	'minecraft:leather_horse_armor': 500, 'minecraft:copper_horse_armor': 1500,
+	'minecraft:iron_horse_armor': 3000, 'minecraft:golden_horse_armor': 4500,
+	'minecraft:diamond_horse_armor': 55000, 'minecraft:netherite_horse_armor': 300000,
+	'minecraft:copper_nautilus_armor': 2000, 'minecraft:iron_nautilus_armor': 3500,
+	'minecraft:golden_nautilus_armor': 5000, 'minecraft:diamond_nautilus_armor': 60000,
+	'minecraft:netherite_nautilus_armor': 320000,
 
 	// --- карты, шаблоны и редкие находки ---
 	'minecraft:map': 250, 'minecraft:filled_map': 3000, 'minecraft:buried_treasure_map': 10000,
@@ -205,6 +223,13 @@ const BASE = {
 	'minecraft:goat_horn': 15000, 'minecraft:netherite_upgrade_smithing_template': 100000,
 	'minecraft:flow_banner_pattern': 5000, 'minecraft:globe_banner_pattern': 5000,
 	'minecraft:guster_banner_pattern': 5000, 'minecraft:piglin_banner_pattern': 5000,
+	'minecraft:disc_fragment_5': 2000,
+	// Золотой одуванчик крафтится из 8 золотых самородков, остальные три — редкие находки,
+	// которые раньше попадали под дешёвый шаблон «цветы».
+	'minecraft:golden_dandelion': 561, 'minecraft:chorus_flower': 200,
+	'minecraft:spore_blossom': 100, 'minecraft:wither_rose': 100,
+	// Факел: один уголь на четыре штуки, поэтому цена ниже «угольной» втрое.
+	'minecraft:torch': 5,
 
 	// --- медь в разных состояниях (окисляется сама, поэтому цена как у блока меди) ---
 	'minecraft:exposed_copper': 95, 'minecraft:weathered_copper': 95, 'minecraft:oxidized_copper': 95,
@@ -217,8 +242,8 @@ const BASE = {
 	// --- то, что получают не крафтом, а в мире ---
 	'minecraft:brown_egg': 5, 'minecraft:blue_egg': 5, 'minecraft:chipped_anvil': 500,
 	'minecraft:damaged_anvil': 300, 'minecraft:copper_golem_statue': 5000,
-	'minecraft:cod_bucket': 50, 'minecraft:salmon_bucket': 55, 'minecraft:pufferfish_bucket': 65,
-	'minecraft:tropical_fish_bucket': 60, 'minecraft:axolotl_bucket': 500, 'minecraft:tadpole_bucket': 200,
+	'minecraft:cod_bucket': 1012, 'minecraft:salmon_bucket': 1062, 'minecraft:pufferfish_bucket': 1162,
+	'minecraft:tropical_fish_bucket': 1062, 'minecraft:axolotl_bucket': 1362, 'minecraft:tadpole_bucket': 1062,
 };
 
 // ---------------------------------------------------------------------------
@@ -317,7 +342,7 @@ const PATTERNS = [
 	{ what: 'керамика', match: /_terracotta$/, price: 3 },
 	{ what: 'черепки', match: /_pottery_sherd$/, price: 500 },
 	{ what: 'шаблоны кузнеца', match: /_armor_trim_smithing_template$/, price: 250000 },
-	{ what: 'пластинки', match: /^minecraft:music_disc_/, price: 5000 },
+	{ what: 'пластинки', match: /^minecraft:music_disc_/, price: 25000 },
 	{ what: 'книги зачарований', match: /^minecraft:enchanted_book$/, price: 5000 },
 	{ what: 'черепа черепов', match: /_head$|_skull$/, price: 25000 },
 	{ what: 'флаги', match: /_banner$/, price: 20 },
@@ -503,7 +528,7 @@ for (let pass = 0; pass < MAX_PASSES; pass++) {
 		// Явную цену не поднимаем, но можем опустить: если предмет дешевле скрафтить,
 		// чем купить его ингредиенты, оставлять высокую цену нельзя — игрок начнёт
 		// покупать сырьё, крафтить и продавать, то есть печатать деньги.
-		if (LOCKED.has(info.id)) continue;
+		if (isLocked(info.id)) continue;
 		const candidate = (info.cost * info.markup) / info.count;
 		const current = prices.get(info.id);
 		// Считаем улучшением только заметное изменение: некоторые рецепты (например,

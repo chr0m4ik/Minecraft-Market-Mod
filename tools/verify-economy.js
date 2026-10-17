@@ -98,11 +98,9 @@ function enchantWeight(id) {
 	return weight;
 }
 
-/** Цена всех зачарований предмета (без цены самого предмета). */
-function enchantmentsPrice(enchantments) {
+/** Цена всех зачарований книги (без наценки за количество) — как в EnchantmentPrices.sumOf. */
+function enchantmentsSum(enchantments) {
 	const ids = Object.keys(enchantments ?? {});
-	if (ids.length === 0) return 0.0;
-
 	let sum = 0.0;
 
 	for (const id of ids) {
@@ -119,7 +117,66 @@ function enchantmentsPrice(enchantments) {
 		sum += price;
 	}
 
-	return sum * (1.0 + (ids.length - 1) * ENCH_COMPLEXITY_STEP);
+	return sum;
+}
+
+// Коэффициенты «зачарование на предмете»: price/EnchantmentPrices.tierFactor.
+const ENCH_MATERIAL_FACTORS = [
+	['netherite', 0.95], ['diamond', 0.60], ['iron', 0.12], ['chainmail', 0.03], ['copper', 0.03],
+	['golden', 0.02], ['stone', 0.015], ['wooden', 0.01], ['leather', 0.01],
+];
+const ENCH_ITEM_FACTORS = {
+	'minecraft:turtle_helmet': 0.12, 'minecraft:wolf_armor': 0.15,
+	'minecraft:bow': 0.30, 'minecraft:crossbow': 0.30, 'minecraft:shield': 0.30,
+	'minecraft:fishing_rod': 0.30, 'minecraft:carrot_on_a_stick': 0.30,
+	'minecraft:warped_fungus_on_a_stick': 0.30,
+	'minecraft:trident': 1.0, 'minecraft:mace': 1.0, 'minecraft:elytra': 1.0,
+};
+const ENCH_DEFAULT_FACTOR = 0.10;
+const ENCH_BOOK_FACTOR = 1.0;
+const ENCH_BUNDLE_STEP = 0.10;
+const ENCH_BUNDLE_FLOOR = 0.55;
+const ENCH_JUNK_FACTOR_MAX = 0.15;
+const ENCH_JUNK_CAP = 1_500_000.0;
+
+/** Коэффициент материала предмета. */
+function enchantTier(itemId) {
+	if (itemId === 'minecraft:enchanted_book') return ENCH_BOOK_FACTOR;
+
+	const exact = ENCH_ITEM_FACTORS[itemId];
+	if (exact !== undefined) return exact;
+
+	const path = itemId.replace('minecraft:', '');
+
+	for (const [material, factor] of ENCH_MATERIAL_FACTORS) {
+		if (path.startsWith(material + '_')) return factor;
+	}
+
+	return ENCH_DEFAULT_FACTOR;
+}
+
+/** Скидка за количество зачарований на предмете. */
+function enchantBundle(count) {
+	return Math.max(ENCH_BUNDLE_FLOOR, 1.0 - ENCH_BUNDLE_STEP * (count - 1));
+}
+
+/** Цена зачарований на предмете (книга считается по-старому — она переносима). */
+function itemEnchantmentsPrice(itemId, enchantments) {
+	const ids = Object.keys(enchantments ?? {});
+	if (ids.length === 0) return 0.0;
+
+	const sum = enchantmentsSum(enchantments);
+
+	if (itemId === 'minecraft:enchanted_book') {
+		return sum * (1.0 + (ids.length - 1) * ENCH_COMPLEXITY_STEP);
+	}
+
+	const factor = enchantTier(itemId);
+	let value = sum * factor * enchantBundle(ids.length);
+
+	if (factor <= ENCH_JUNK_FACTOR_MAX) value = Math.min(value, ENCH_JUNK_CAP);
+
+	return Math.min(value, sum);
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +266,7 @@ function stackPrice(entry, drift = 1.0) {
 		? potionPrice(entry.item, entry.potion)
 		: basePrice(entry.item);
 
-	return base * drift * (entry.count ?? 1) + enchantmentsPrice(entry.enchantments);
+	return base * drift * (entry.count ?? 1) + itemEnchantmentsPrice(entry.item, entry.enchantments);
 }
 
 // ---------------------------------------------------------------------------
