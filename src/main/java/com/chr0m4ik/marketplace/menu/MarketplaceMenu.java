@@ -373,6 +373,15 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 	private boolean syncingMarketCells;
 
+	/** Любая правка ячеек требует полного досыла окна: клиент мог предсказать клик. */
+	private boolean marketCellsChanged;
+
+	private void resyncClient() {
+		if (this.serverPlayer != null) {
+			this.sendAllDataToRemote();
+		}
+	}
+
 	private void syncMarketCells() {
 		if (this.syncingMarketCells || this.serverPlayer == null || this.kind != WindowKind.SELL) {
 			return;
@@ -410,6 +419,7 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 						&& current.getCount() > expected.getCount()) {
 					this.serverPlayer.getInventory().placeItemBackInInventory(
 							current.copyWithCount(current.getCount() - expected.getCount()), Prediction.SERVER_ONLY);
+					this.marketCellsChanged = true;
 				}
 
 				this.orderCells.add(i);
@@ -417,10 +427,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 				// иначе предмет можно было бы утащить второй раз.
 				expected = ItemStack.EMPTY;
+				this.marketCellsChanged = true;
 			}
 
 			if (expected != null && !ItemStack.matches(this.tradeContainer.getItem(i), expected)) {
 				this.tradeContainer.setItem(i, expected);
+				this.marketCellsChanged = true;
 			}
 		}
 	}
@@ -650,11 +662,14 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 
 				// проверка режима внутри takeMarketCell.
 				this.takeMarketCell(player, slotId);
+				this.resyncClient();
 				return;
 			}
 
 			if (order) {
 
+				// Клик по ордеру отклонён — досылаем окно, чтобы клиент не оставил «призрак».
+				this.resyncClient();
 				return;
 			}
 		}
@@ -1346,6 +1361,12 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.updateUrgentButton();
 		this.saveMarketCells();
 		this.syncMarketCells();
+
+		if (this.marketCellsChanged) {
+			this.marketCellsChanged = false;
+			this.sendAllDataToRemote();
+		}
+
 		super.broadcastChanges();
 	}
 

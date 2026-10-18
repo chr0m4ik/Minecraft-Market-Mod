@@ -40,7 +40,6 @@ public final class CollectorItem extends Item {
 					.setId(ITEM_KEY)
 					.stacksTo(1)
 					.durability(1)
-					.component(DataComponents.ITEM_MODEL, Identifier.fromNamespaceAndPath("minecraft", "golden_hoe"))
 					.component(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true)
 					.component(DataComponents.RARITY, Rarity.EPIC)
 					.component(DataComponents.LORE, new ItemLore(List.of(
