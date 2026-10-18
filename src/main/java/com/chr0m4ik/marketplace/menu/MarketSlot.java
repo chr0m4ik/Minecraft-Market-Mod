@@ -22,4 +22,14 @@ public class MarketSlot extends Slot {
 	public boolean mayPickup(Player player) {
 		return this.menu.isCellUnlocked(this.getContainerSlot()) && !this.menu.isCellOrder(this.getContainerSlot());
 	}
+
+	@Override
+	public void set(ItemStack stack) {
+		// Ячейка ордера — копия сейва: клики (перетаскивание, shift, хотбар) не должны её менять.
+		if (this.menu.isCellOrder(this.getContainerSlot())) {
+			return;
+		}
+
+		super.set(stack);
+	}
 }

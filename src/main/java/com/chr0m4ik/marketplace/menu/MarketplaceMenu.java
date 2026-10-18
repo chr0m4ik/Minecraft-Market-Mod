@@ -371,11 +371,23 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 		this.broadcastChanges();
 	}
 
+	private boolean syncingMarketCells;
+
 	private void syncMarketCells() {
-		if (this.serverPlayer == null || this.kind != WindowKind.SELL) {
+		if (this.syncingMarketCells || this.serverPlayer == null || this.kind != WindowKind.SELL) {
 			return;
 		}
 
+		this.syncingMarketCells = true;
+
+		try {
+			this.syncMarketCellsNow();
+		} finally {
+			this.syncingMarketCells = false;
+		}
+	}
+
+	private void syncMarketCellsNow() {
 		MarketplaceState state = MarketplaceEconomy.state(this.serverPlayer.level().getServer());
 		UUID playerId = this.serverPlayer.getUUID();
 		int unlocked = MarketService.unlockedSlots(state, playerId);
@@ -387,13 +399,17 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 				expected = lockedPane();
 				this.orderCells.remove(i);
 			} else if (state.order(playerId, i) != null) {
-				expected = state.order(playerId, i).stack().copy();
 
+				// Ордер — источник истины. Если в ячейку всё же попал лишний предмет,
+				// возвращаем только излишек: сама стопка ордера остаётся в сейве.
+				expected = state.order(playerId, i).stack().copy();
 				ItemStack current = this.tradeContainer.getItem(i);
 
-				if (!current.isEmpty() && !ItemStack.matches(current, expected)) {
-					this.tradeContainer.setItem(i, ItemStack.EMPTY);
-					this.serverPlayer.getInventory().placeItemBackInInventory(current, Prediction.SERVER_ONLY);
+				if (!current.isEmpty() && !ItemStack.matches(current, expected)
+						&& ItemStack.isSameItemSameComponents(current, expected)
+						&& current.getCount() > expected.getCount()) {
+					this.serverPlayer.getInventory().placeItemBackInInventory(
+							current.copyWithCount(current.getCount() - expected.getCount()), Prediction.SERVER_ONLY);
 				}
 
 				this.orderCells.add(i);
@@ -413,8 +429,10 @@ public class MarketplaceMenu extends AbstractContainerMenu {
 	public void slotsChanged(Container container) {
 		super.slotsChanged(container);
 
-		if (container == this.tradeContainer) {
+		if (container == this.tradeContainer && !this.syncingMarketCells) {
+			// Любая правка ячейки сразу сверяется с ордерами: лишнее не задерживается.
 			this.saveMarketCells();
+			this.syncMarketCells();
 		}
 	}
 
